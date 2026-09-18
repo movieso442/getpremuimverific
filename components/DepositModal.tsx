@@ -17,10 +17,11 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const [phone, setPhone] = useState<string>('677034736')
   const [isProcessing, setIsProcessing] = useState<boolean>(false)
   const [isSuccess, setIsSuccess] = useState<boolean>(false)
+  const [statusMessage, setStatusMessage] = useState<string>('')
 
   if (!isOpen) return null
 
-  const handleDepositSubmit = (e: React.FormEvent) => {
+  const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (amount <= 0) {
       alert('Please enter a valid deposit amount')
@@ -28,11 +29,37 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     }
 
     setIsProcessing(true)
+    setStatusMessage('')
 
-    setTimeout(() => {
-      topUpBalance(amount, selectedMethod, 'MOMO-' + Math.floor(100000 + Math.random() * 900000))
-      setIsProcessing(false)
+    try {
+      let endpoint = '/api/payments/momo'
+      let payload: any = { amount, phone, method: selectedMethod }
+
+      if (selectedMethod === 'visa_mastercard') {
+        endpoint = '/api/payments/stripe'
+        payload = { amount: (amount / 600).toFixed(2), currency: 'usd' }
+      } else if (selectedMethod === 'crypto_usdt') {
+        endpoint = '/api/payments/crypto'
+        payload = { amount: (amount / 600).toFixed(2), crypto: 'USDT' }
+      }
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await res.json()
+
+      if (data.status === 'REDIRECT' && data.payment_url) {
+        window.location.href = data.payment_url
+        return
+      }
+
+      // Add balance to local state & persist
+      topUpBalance(amount, selectedMethod, data.reference || 'DEP-' + Math.floor(100000 + Math.random() * 900000))
       setIsSuccess(true)
+      setStatusMessage(data.message || 'Payment successfully processed!')
 
       confetti({
         particleCount: 80,
@@ -43,8 +70,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       setTimeout(() => {
         setIsSuccess(false)
         onClose()
-      }, 1800)
-    }, 1500)
+      }, 2000)
+
+    } catch (err: any) {
+      alert(err.message || 'Payment processing failed')
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   return (
@@ -71,14 +103,15 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
         </div>
 
         {isSuccess ? (
-          <div className="py-12 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 rounded-full bg-orange-100 text-[#ff6b00] flex items-center justify-center mb-4 animate-bounce">
+          <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+            <div className="w-16 h-16 rounded-full bg-orange-100 text-[#ff6b00] flex items-center justify-center animate-bounce">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <h4 className="text-2xl font-bold text-gray-900 mb-1">Payment Successful!</h4>
-            <p className="text-sm text-gray-600 mb-2">
+            <h4 className="text-2xl font-bold text-gray-900">Payment Successful!</h4>
+            <p className="text-sm text-gray-600">
               Added <span className="text-[#ea580c] font-bold">{amount.toLocaleString()} XAF</span> to your Premium Verify balance.
             </p>
+            {statusMessage && <div className="text-xs text-green-600 font-semibold">{statusMessage}</div>}
           </div>
         ) : (
           <form onSubmit={handleDepositSubmit} className="mt-5 space-y-5">
