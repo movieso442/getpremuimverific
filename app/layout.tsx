@@ -7,6 +7,8 @@ import { AppStateProvider } from '@/lib/store'
 import { Sidebar } from '@/components/Sidebar'
 import { JapHeader } from '@/components/JapHeader'
 import { JapFooter } from '@/components/JapFooter'
+import { PublicHeader } from '@/components/PublicHeader'
+import { PublicFooter } from '@/components/PublicFooter'
 import { DepositModal } from '@/components/DepositModal'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 
@@ -19,7 +21,9 @@ export default function RootLayout({
   const [isDepositOpen, setIsDepositOpen] = useState(false)
   const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState(false)
 
-  const isPublicLanding = pathname === '/'
+  // Public pages that should render with PublicHeader & PublicFooter instead of Dashboard Sidebar
+  const publicRoutes = ['/', '/terms', '/privacy', '/refund-policy', '/login', '/signup']
+  const isPublicPage = publicRoutes.includes(pathname)
 
   return (
     <html lang="en">
@@ -37,15 +41,17 @@ export default function RootLayout({
       </head>
       <body className="bg-[#f8fafc] text-gray-900 min-h-screen font-sans antialiased">
         <AppStateProvider>
-          {isPublicLanding ? (
-            /* Public Landing Page View - Full Width without dashboard sidebar */
-            <div className="min-h-screen flex flex-col justify-between">
+          {isPublicPage ? (
+            /* Public Website Page View (Header, Body, Public Footer) */
+            <div className="min-h-screen flex flex-col justify-between bg-white">
+              <PublicHeader />
               <main className="flex-1">
                 {children}
               </main>
+              <PublicFooter />
             </div>
           ) : (
-            /* Authenticated Portal View - Exact JustAnotherPanel Layout */
+            /* Authenticated Portal View (Left Sidebar & Top Header) */
             <div className="flex min-h-screen">
               {/* Left Sidebar Navigation */}
               <div className={`${isSidebarOpenMobile ? 'block' : 'hidden'} md:block sticky top-0 h-screen z-30`}>
@@ -54,7 +60,7 @@ export default function RootLayout({
 
               {/* Main Content Area */}
               <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
-                {/* JAP Top Bar */}
+                {/* Dashboard Top Bar */}
                 <JapHeader
                   onToggleSidebar={() => setIsSidebarOpenMobile(!isSidebarOpenMobile)}
                   onOpenDeposit={() => setIsDepositOpen(true)}
@@ -65,7 +71,7 @@ export default function RootLayout({
                   {children}
                 </main>
 
-                {/* JAP Footer */}
+                {/* Dashboard Footer */}
                 <JapFooter />
               </div>
             </div>

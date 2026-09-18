@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ThumbsUp } from 'lucide-react'
+import { ThumbsUp, ArrowRight } from 'lucide-react'
 import { useAppState } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import confetti from 'canvas-confetti'
@@ -21,7 +21,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !password) {
-      setErrorMsg('Please enter email and password.')
+      setErrorMsg('Please enter your email and password.')
       return
     }
 
@@ -52,7 +52,6 @@ export default function LoginPage() {
       }
 
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } })
-      alert('Sign in successful!')
       router.push('/dashboard')
     } catch (err: any) {
       setErrorMsg(err.message || 'Login failed')
@@ -63,10 +62,11 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     try {
-      await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: `${window.location.origin}/dashboard` }
       })
+      if (error) throw error
     } catch (err) {
       setProfile({
         full_name: 'Google Partner',
@@ -79,10 +79,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans flex flex-col justify-between">
+    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col justify-between">
       
       {/* HEADER */}
-      <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-0 z-30 shadow-2xs">
+      <header className="bg-white border-b border-gray-100 py-4 px-6 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#ff5722] to-[#ff7a00] flex items-center justify-center text-white font-extrabold shadow-sm group-hover:scale-105 transition">
@@ -90,7 +90,7 @@ export default function LoginPage() {
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <span className="text-2xl font-black text-[#ff5722] tracking-tighter">PV</span>
+                <span className="text-2xl font-black text-[#ff5722] tracking-tight">PV</span>
                 <span className="text-xs font-bold text-gray-800 uppercase tracking-tight">Premium Verify</span>
               </div>
               <span className="text-[9px] font-black text-[#ea580c] uppercase tracking-widest block leading-none">
@@ -100,10 +100,10 @@ export default function LoginPage() {
           </Link>
 
           <div className="flex items-center gap-3">
-            <Link href="/login" className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-[#ff5722] shadow-xs transition">
+            <Link href="/login" className="px-5 py-2.5 rounded-xl text-xs font-extrabold text-white bg-[#ff5722] shadow-sm transition">
               Sign In
             </Link>
-            <Link href="/signup" className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 transition">
+            <Link href="/signup" className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 transition">
               Sign Up
             </Link>
           </div>
@@ -114,25 +114,25 @@ export default function LoginPage() {
       <main className="py-16 px-6 max-w-md mx-auto w-full flex-1 flex flex-col justify-center">
         <div className="bg-white rounded-3xl border border-gray-200 p-8 md:p-10 shadow-sm space-y-6">
           <div>
-            <h1 className="text-2xl font-black text-gray-900">Sign In</h1>
+            <h1 className="text-2xl font-black text-gray-900">Sign In to Your Account</h1>
             <p className="text-xs text-gray-500 mt-1">Enter your account credentials to access your dashboard.</p>
           </div>
 
           {errorMsg && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs font-bold">
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs font-bold">
               {errorMsg}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Username / Email</label>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@example.com"
-                className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
+                placeholder="name@domain.com"
+                className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-sm font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                 required
               />
             </div>
@@ -144,7 +144,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
+                className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-sm font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                 required
               />
             </div>
@@ -154,7 +154,8 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-sm uppercase tracking-wider transition shadow-md flex items-center justify-center gap-2"
             >
-              <span>{loading ? 'Signing In...' : 'Sign In'}</span>
+              <span>{loading ? 'Signing In...' : 'Sign In to Account'}</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
@@ -183,7 +184,7 @@ export default function LoginPage() {
       </main>
 
       {/* FOOTER */}
-      <footer className="bg-white border-t border-gray-200 py-6 px-6 text-center text-xs text-gray-400">
+      <footer className="bg-white border-t border-gray-100 py-6 px-6 text-center text-xs text-gray-400">
         © 2026 Premium Verify (premiumverific.com). All rights reserved. Support WhatsApp: +237 677034736
       </footer>
 

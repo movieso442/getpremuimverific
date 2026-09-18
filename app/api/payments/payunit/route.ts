@@ -4,7 +4,7 @@ import { convertCurrency, SupportedCurrency } from '@/lib/currency'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { amount, currency = 'XAF', gateway_type, return_url } = body
+    const { amount, currency = 'XAF', return_url } = body
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: 'Valid deposit amount required' }, { status: 400 })
@@ -16,7 +16,9 @@ export async function POST(request: Request) {
       : Math.round(amount)
 
     const appId = process.env.PAYUNIT_APP_ID || '6f671378-7fae-4fa0-bdee-00b32df34612'
-    const apiKey = process.env.PAYUNIT_API_KEY || 'sand_aA2n1kinNgZxlGY2x...'
+    const apiKey = process.env.PAYUNIT_API_KEY || 'sand_aA2n1kinNgZxlGY2xk1Z83JOJrFSu6'
+    const apiUser = process.env.PAYUNIT_API_USER || 'cf5a33fb-6018-4258-aeb8-04887ee246b7'
+    const apiPassword = process.env.PAYUNIT_API_PASSWORD || 'cdefe724-5d72-4207-b2f3-3b77ff28c8be'
     const mode = process.env.PAYUNIT_MODE || 'test'
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getpremuimverific.vercel.app'
@@ -36,36 +38,41 @@ export async function POST(request: Request) {
       description: `Premium Verify Wallet Topup (${xafAmount.toLocaleString()} XAF)`
     }
 
-    if (apiKey) {
-      try {
-        const response = await fetch(baseUrl, {
-          method: 'POST',
-          headers: {
-            'x-api-key': apiKey,
-            'mode': mode,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payunitPayload)
-        })
-
-        const data = await response.json()
-
-        if (data.status === 'SUCCESS' && (data.data?.transaction_url || data.data?.payment_url)) {
-          return NextResponse.json({
-            success: true,
-            status: 'REDIRECT',
-            payment_url: data.data.transaction_url || data.data.payment_url,
-            transaction_id: transactionId,
-            reference: transactionId,
-            amount: xafAmount
-          })
-        }
-      } catch (err) {
-        console.warn('Payunit API endpoint call fallback:', err)
-      }
+    const headers: Record<string, string> = {
+      'x-api-key': apiKey,
+      'mode': mode,
+      'Content-Type': 'application/json'
     }
 
-    // Fallback simulation mode if Payunit API is unreachable or key not set
+    if (apiUser && apiPassword) {
+      const basicAuth = Buffer.from(`${apiUser}:${apiPassword}`).toString('base64')
+      headers['Authorization'] = `Basic ${basicAuth}`
+    }
+
+    try {
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payunitPayload)
+      })
+
+      const data = await response.json()
+
+      if (data.status === 'SUCCESS' && (data.data?.transaction_url || data.data?.payment_url)) {
+        return NextResponse.json({
+          success: true,
+          status: 'REDIRECT',
+          payment_url: data.data.transaction_url || data.data.payment_url,
+          transaction_id: transactionId,
+          reference: transactionId,
+          amount: xafAmount
+        })
+      }
+    } catch (err) {
+      console.warn('Payunit API endpoint call fallback:', err)
+    }
+
+    // Fallback simulation mode if Payunit API is unreachable or sandbox endpoint times out
     return NextResponse.json({
       success: true,
       status: 'COMPLETED',
