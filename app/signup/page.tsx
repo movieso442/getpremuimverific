@@ -49,7 +49,7 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: `${firstName} ${lastName}`.trim() || username || 'Member',
-            phone: phone || '+237677034736'
+            phone: phone || '+237680209047'
           }
         }
       })
@@ -58,7 +58,7 @@ export default function SignupPage() {
         setProfile({
           full_name: `${firstName} ${lastName}`.trim() || username || 'Premium Partner',
           email,
-          phone_number: phone || '+237 677034736',
+          phone_number: phone || '+237 680209047',
           balance_xaf: 5000
         })
       } else if (data.user) {
@@ -66,7 +66,7 @@ export default function SignupPage() {
           id: data.user.id,
           email: data.user.email || email,
           full_name: `${firstName} ${lastName}`.trim() || username || 'Premium Partner',
-          phone_number: phone || '+237 677034736',
+          phone_number: phone || '+237 680209047',
           balance_xaf: 5000
         })
       }
@@ -91,7 +91,7 @@ export default function SignupPage() {
       setProfile({
         full_name: 'Google Member',
         email: 'user@google.com',
-        phone_number: '+237 677034736',
+        phone_number: '+237 680209047',
         balance_xaf: 5000
       })
       router.push('/dashboard')
@@ -337,7 +337,7 @@ export default function SignupPage() {
             <span>PayPal</span>
           </div>
           <div className="text-gray-400 text-[11px] pt-2">
-            © 2026 Premium Verify (premiumverific.com). All rights reserved. Support WhatsApp: +237 677034736
+            © 2026 Premium Verify (premiumverific.com). All rights reserved. Support WhatsApp: +237 680209047
           </div>
         </div>
       </footer>

@@ -31,7 +31,7 @@ export default function RootLayout({
         <title>Premium Verify - Best & Cheapest SMM Panel & SMS Virtual Verification</title>
         <meta
           name="description"
-          content="Premium Verify (premiumverific.com): High retention YouTube monetization, organic Instagram followers, TikTok views, Facebook page boost & rescue, virtual phone numbers across 197 countries. Contact: +237 677034736 / hello@premiumverific.com."
+          content="Premium Verify (premiumverific.com): High retention YouTube monetization, organic Instagram followers, TikTok views, Facebook page boost & rescue, virtual phone numbers across 197 countries. Contact: +237 680209047 / hello@premiumverific.com."
         />
         <meta name="keywords" content="Premium Verify, SMM Panel, SMS Verification, Virtual Phone Number, YouTube Monetization, Facebook Rescue, TikTok Followers" />
         <meta property="og:title" content="Premium Verify - Best & Cheapest SMM Panel & SMS Verification" />

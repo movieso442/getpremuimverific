@@ -48,9 +48,9 @@ export interface AccountProductItem {
 export const PLATFORM_INFO = {
   name: 'Premium Verify',
   domain: 'premiumverific.com',
-  phone: '237677034736',
+  phone: '237680209047',
   email: 'hello@premiumverific.com',
-  whatsappUrl: 'https://wa.me/237677034736',
+  whatsappUrl: 'https://wa.me/237680209047',
   currency: 'XAF',
 }
 
@@ -144,7 +144,7 @@ export const SMM_SERVICES: SmmServiceItem[] = [
     startTime: 'N/A',
     speed: 'N/A',
     guaranteed: 'N/A',
-    description: `- us US Targeted Engagement\n- AI Growth Tool.\n- Our Artificial Intelligence Software will boost your account!\n- 100% natural, no bots, no tricks. We find your audience and make them your organic followers.\n- Our system works to find target followers for you 24 hours a day, exposing your content to them and driving real audience conversion.`
+    description: `• US Targeted Engagement\n• AI Growth Tool\n• Our Artificial Intelligence Software will boost your account!\n• 100% natural, no bots, no tricks. We find your audience and make them your organic followers.\n• Our system works to find target followers for you 24 hours a day, exposing your content to them and driving real audience conversion.`
   },
   {
     id: 8752,
@@ -158,7 +158,7 @@ export const SMM_SERVICES: SmmServiceItem[] = [
     startTime: 'N/A',
     speed: 'N/A',
     guaranteed: 'N/A',
-    description: `- US High Authority AI Growth Engagement\n- 3,000 Real Target US Followers per Month\n- 100% Natural Organic Growth using Artificial Intelligence target matching.`
+    description: `• US High Authority AI Growth Engagement\n• 3,000 Real Target US Followers per Month\n• 100% Natural Organic Growth using Artificial Intelligence target matching.`
   },
   {
     id: 8753,
@@ -172,7 +172,7 @@ export const SMM_SERVICES: SmmServiceItem[] = [
     startTime: 'N/A',
     speed: 'N/A',
     guaranteed: 'N/A',
-    description: `- VIP US AI Growth Package\n- ~5,000 Real Target US Followers per Month\n- Dedicated AI Account Manager matching audience niches.`
+    description: `• VIP US AI Growth Package\n• ~5,000 Real Target US Followers per Month\n• Dedicated AI Account Manager matching audience niches.`
   },
 
   // Google Maps Citations (Screenshot 2)
@@ -313,7 +313,7 @@ export const ACCOUNT_PRODUCTS: AccountProductItem[] = [
     category: 'Social Media Accounts',
     price: 2000,
     originalPrice: 3000,
-    badge: '-33% Featured',
+    badge: '33% OFF Featured',
     description: 'High authority USA TikTok Account. Creator Rewards Program enabled, ready for monetization.',
     deliveryType: 'Manual delivery',
     rating: 4.9,

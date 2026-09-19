@@ -7,7 +7,7 @@ import { useAppState } from '@/lib/store'
 export default function ProfilePage() {
   const { profile } = useAppState()
   const [fullName, setFullName] = useState(profile.full_name || 'Premium Verify Partner')
-  const [phone, setPhone] = useState(profile.phone_number || '+237677034736')
+  const [phone, setPhone] = useState(profile.phone_number || '+237680209047')
   const [currency, setCurrency] = useState(profile.currency || 'XAF')
   const [savedSuccess, setSavedSuccess] = useState(false)
 

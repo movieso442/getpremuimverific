@@ -52,9 +52,9 @@ export const PublicFooter: React.FC = () => {
             <h3 className="font-extrabold text-gray-900 text-sm">Customer Support</h3>
             <div className="text-xs space-y-2">
               <div>Email: <strong className="text-gray-900">hello@premiumverific.com</strong></div>
-              <div>WhatsApp Support: <strong className="text-gray-900">+237 677034736</strong></div>
+              <div>WhatsApp Support: <strong className="text-gray-900">+237 680209047</strong></div>
               <a
-                href="https://wa.me/237677034736"
+                href="https://wa.me/237680209047"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition mt-2"

@@ -77,7 +77,7 @@ export default function TicketsPage() {
           </p>
 
           <a
-            href="https://wa.me/237677034736"
+            href="https://wa.me/237680209047"
             target="_blank"
             rel="noreferrer"
             className="w-full py-3 rounded-xl bg-[#25d366] hover:bg-[#1ebd59] text-white font-extrabold text-xs transition shadow-sm flex items-center justify-center gap-2"

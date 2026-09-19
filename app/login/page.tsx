@@ -38,7 +38,7 @@ export default function LoginPage() {
         setProfile({
           full_name: email.split('@')[0] || 'Premium Partner',
           email,
-          phone_number: '+237 677034736',
+          phone_number: '+237 680209047',
           balance_xaf: 5000
         })
       } else if (data.user) {
@@ -46,7 +46,7 @@ export default function LoginPage() {
           id: data.user.id,
           email: data.user.email || email,
           full_name: data.user.user_metadata?.full_name || email.split('@')[0],
-          phone_number: data.user.user_metadata?.phone || '+237 677034736',
+          phone_number: data.user.user_metadata?.phone || '+237 680209047',
           balance_xaf: 5000
         })
       }
@@ -71,7 +71,7 @@ export default function LoginPage() {
       setProfile({
         full_name: 'Google Partner',
         email: 'user@google.com',
-        phone_number: '+237 677034736',
+        phone_number: '+237 680209047',
         balance_xaf: 5000
       })
       router.push('/dashboard')
@@ -185,7 +185,7 @@ export default function LoginPage() {
 
       {/* FOOTER */}
       <footer className="bg-white border-t border-gray-100 py-6 px-6 text-center text-xs text-gray-400">
-        © 2026 Premium Verify (premiumverific.com). All rights reserved. Support WhatsApp: +237 677034736
+        © 2026 Premium Verify (premiumverific.com). All rights reserved. Support WhatsApp: +237 680209047
       </footer>
 
     </div>

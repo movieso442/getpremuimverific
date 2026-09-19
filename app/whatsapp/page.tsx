@@ -41,7 +41,7 @@ export default function WhatsAppBotPage() {
             changes: [{
               value: {
                 messages: [{
-                  from: '+237677034736',
+                  from: '+237680209047',
                   text: { body: userMsg }
                 }],
                 contacts: [{ profile: { name: 'Premium Verify Partner' } }]

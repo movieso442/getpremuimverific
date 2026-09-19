@@ -53,7 +53,7 @@ export default function RefundPolicyPage() {
           </p>
           <ul className="list-disc pl-5 space-y-1 text-gray-600">
             <li>Unused wallet balances can be withdrawn or refunded back to your original Mobile Money or Bank account upon request, subject to standard gateway processing fees (1.5%).</li>
-            <li>To request a manual wallet balance withdrawal, contact support at <strong>hello@premiumverific.com</strong> or WhatsApp <strong>+237 677034736</strong> with your transaction reference.</li>
+            <li>To request a manual wallet balance withdrawal, contact support at <strong>hello@premiumverific.com</strong> or WhatsApp <strong>+237 680209047</strong> with your transaction reference.</li>
           </ul>
         </section>
 
@@ -76,7 +76,7 @@ export default function RefundPolicyPage() {
           </p>
           <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 font-medium space-y-1 text-gray-800">
             <div>Email Support: <strong className="text-blue-700">hello@premiumverific.com</strong></div>
-            <div>WhatsApp 24/7 Helpline: <strong className="text-gray-900">+237 677034736</strong></div>
+            <div>WhatsApp 24/7 Helpline: <strong className="text-gray-900">+237 680209047</strong></div>
           </div>
         </section>
 

@@ -79,7 +79,7 @@ export default function TermsOfServicePage() {
           </p>
           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 font-medium space-y-1 text-gray-800">
             <div>Email Support: <strong className="text-[#ea580c]">hello@premiumverific.com</strong></div>
-            <div>WhatsApp Helpline: <strong className="text-gray-900">+237 677034736</strong></div>
+            <div>WhatsApp Helpline: <strong className="text-gray-900">+237 680209047</strong></div>
           </div>
         </section>
 

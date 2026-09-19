@@ -84,7 +84,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 font-medium space-y-1 text-gray-800">
             <div>Email: <strong className="text-emerald-700">hello@premiumverific.com</strong></div>
-            <div>WhatsApp Official Support: <strong className="text-gray-900">+237 677034736</strong></div>
+            <div>WhatsApp Official Support: <strong className="text-gray-900">+237 680209047</strong></div>
           </div>
         </section>
 

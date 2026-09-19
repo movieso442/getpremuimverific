@@ -380,7 +380,7 @@ export default function LandingPage() {
               Get Started Free
             </button>
             <a
-              href="https://wa.me/237677034736"
+              href="https://wa.me/237680209047"
               target="_blank"
               rel="noreferrer"
               className="px-9 py-4.5 rounded-2xl bg-black/30 hover:bg-black/40 text-white font-black text-base transition border border-white/20"

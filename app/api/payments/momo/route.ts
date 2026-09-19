@@ -11,10 +11,13 @@ export async function POST(request: Request) {
 
     const reference = `${method === 'orange_money' ? 'OM' : method === 'hubtel' ? 'HUB' : method === 'africastalking' ? 'AT' : 'MOMO'}-${Math.floor(100000 + Math.random() * 900000)}`
 
-    // 1. Primary Unified Gateway: Payunit (Supports MTN MoMo, Orange Money, Credit Cards, PayPal)
-    const payunitApiKey = process.env.PAYUNIT_API_KEY || 'sand_aA2n1kinNgZxlGY2x...'
-    const payunitAppId = process.env.PAYUNIT_APP_ID || '6f671378-7fae-4fa0-bdee-00b32df34612'
     const payunitMode = process.env.PAYUNIT_MODE || 'test'
+    const payunitApiKey = payunitMode === 'live'
+      ? (process.env.PAYUNIT_LIVE_KEY || process.env.PAYUNIT_API_KEY || 'live_jpniXcJT6aXHNXujkNw9Hne3qlcLQcz2daqisYPE')
+      : (process.env.PAYUNIT_API_KEY || 'sand_aA2n1kinNgZxlGY2xk1Z83JOJrFSu6')
+    const payunitAppId = process.env.PAYUNIT_APP_ID || '6f671378-7fae-4fa0-bdee-00b32df34612'
+    const payunitApiUser = process.env.PAYUNIT_API_USER || 'cf5a33fb-6018-4258-aeb8-04887ee246b7'
+    const payunitApiPassword = process.env.PAYUNIT_API_PASSWORD || 'cdefe724-5d72-4207-b2f3-3b77ff28c8be'
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getpremuimverific.vercel.app'
 
     if (payunitApiKey) {
@@ -23,13 +26,20 @@ export async function POST(request: Request) {
           ? 'https://gateway.payunit.net/api/gateway/initialize'
           : 'https://sandbox.payunit.net/api/gateway/initialize'
 
+        const headers: Record<string, string> = {
+          'x-api-key': payunitApiKey,
+          'mode': payunitMode,
+          'Content-Type': 'application/json'
+        }
+
+        if (payunitApiUser && payunitApiPassword) {
+          const basicAuth = Buffer.from(`${payunitApiUser}:${payunitApiPassword}`).toString('base64')
+          headers['Authorization'] = `Basic ${basicAuth}`
+        }
+
         const payunitRes = await fetch(baseUrl, {
           method: 'POST',
-          headers: {
-            'x-api-key': payunitApiKey,
-            'mode': payunitMode,
-            'Content-Type': 'application/json'
-          },
+          headers,
           body: JSON.stringify({
             total_amount: Math.round(amount),
             currency: currency || 'XAF',
@@ -139,7 +149,7 @@ export async function POST(request: Request) {
       amount,
       currency,
       method,
-      phone: phone || '+237 677034736',
+      phone: phone || '+237 680209047',
       message: `Successfully processed ${amount.toLocaleString()} ${currency} deposit via Payunit / ${methodName}.`
     })
 

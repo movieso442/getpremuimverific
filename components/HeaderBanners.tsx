@@ -27,12 +27,12 @@ export const HeaderBanners: React.FC = () => {
               </div>
               <div>
                 <h4 className="text-xs font-bold text-gray-900">Join Premium Verify Community</h4>
-                <p className="text-[11px] text-gray-500">Support: +237 677034736 • hello@premiumverific.com</p>
+                <p className="text-[11px] text-gray-500">Support: +237 680209047 • hello@premiumverific.com</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <a
-                href="https://wa.me/237677034736"
+                href="https://wa.me/237680209047"
                 target="_blank"
                 rel="noreferrer"
                 className="px-3 py-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition"

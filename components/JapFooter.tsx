@@ -28,7 +28,7 @@ export const JapFooter: React.FC = () => {
           <Link href="/privacy" className="hover:text-[#ff5722] transition">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-[#ff5722] transition">Terms of Service</Link>
           <Link href="/refund-policy" className="hover:text-[#ff5722] transition">Refund Policy</Link>
-          <a href="https://wa.me/237677034736" target="_blank" rel="noreferrer" className="hover:text-[#ff5722] transition">Support WhatsApp</a>
+          <a href="https://wa.me/237680209047" target="_blank" rel="noreferrer" className="hover:text-[#ff5722] transition">Support WhatsApp</a>
         </div>
 
         {/* Copyright */}

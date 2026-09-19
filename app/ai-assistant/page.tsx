@@ -39,7 +39,7 @@ export default function AIAssistantPage() {
     setIsThinking(true)
 
     setTimeout(() => {
-      let aiReply = 'I am your Premium Verify AI assistant. You can also reach our direct human support team on WhatsApp (+237 677034736) or email hello@premiumverific.com.'
+      let aiReply = 'I am your Premium Verify AI assistant. You can also reach our direct human support team on WhatsApp (+237 680209047) or email hello@premiumverific.com.'
 
       const lower = promptText.toLowerCase()
       if (lower.includes('number') || lower.includes('sms') || lower.includes('code') || lower.includes('whatsapp') || lower.includes('telegram')) {

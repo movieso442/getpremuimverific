@@ -184,7 +184,7 @@ export default function AddFundsPage() {
               </button>
 
               <a
-                href={`https://wa.me/237677034736?text=Hello%2C%20I%20want%20to%20deposit%20${amountXaf}%20XAF%20to%20my%20Premium%20Verify%20account.`}
+                href={`https://wa.me/237680209047?text=Hello%2C%20I%20want%20to%20deposit%20${amountXaf}%20XAF%20to%20my%20Premium%20Verify%20account.`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 px-6 py-4 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-extrabold text-xs shadow-sm transition"

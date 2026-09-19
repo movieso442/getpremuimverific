@@ -33,7 +33,7 @@ const DEFAULT_PROFILE: Profile = {
   balance_xaf: 0,
   currency: 'XAF',
   avatar_url: null,
-  phone_number: '+237677034736',
+  phone_number: '+237680209047',
   role: 'client',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString()

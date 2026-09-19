@@ -14,7 +14,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const { topUpBalance } = useAppState()
   const [selectedMethod, setSelectedMethod] = useState<'mtn_momo' | 'orange_money' | 'visa_mastercard' | 'crypto_usdt'>('mtn_momo')
   const [amount, setAmount] = useState<number>(5000)
-  const [phone, setPhone] = useState<string>('677034736')
+  const [phone, setPhone] = useState<string>('680209047')
   const [isProcessing, setIsProcessing] = useState<boolean>(false)
   const [isSuccess, setIsSuccess] = useState<boolean>(false)
   const [statusMessage, setStatusMessage] = useState<string>('')
@@ -249,7 +249,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full bg-white border border-gray-300 focus:border-[#ff6b00] rounded-xl py-2.5 pl-10 pr-4 text-gray-900 text-sm outline-none"
-                    placeholder="e.g. 677034736"
+                    placeholder="e.g. 680209047"
                   />
                 </div>
               </div>
