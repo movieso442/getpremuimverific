@@ -18,9 +18,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null
 
-  const handleGoogleSignIn = () => {
-    loginWithGoogle()
-    alert('Connecting to Google OAuth... Environment variables configured for Supabase Auth.')
+  const handleGoogleSignIn = async () => {
+    await loginWithGoogle()
   }
 
   const handleEmailSubmit = (e: React.FormEvent) => {

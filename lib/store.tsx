@@ -62,26 +62,121 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }
 
-  // Load initial state from localStorage if available
+  // Real Supabase DB Profile & Order Sync
   useEffect(() => {
-    try {
-      const savedProfile = localStorage.getItem('premiumverific_profile')
-      const savedTx = localStorage.getItem('premiumverific_tx')
-      const savedSms = localStorage.getItem('premiumverific_sms')
-      const savedSmm = localStorage.getItem('premiumverific_smm')
-      const savedAcc = localStorage.getItem('premiumverific_acc')
-      const savedKeys = localStorage.getItem('premiumverific_keys')
-      const savedHooks = localStorage.getItem('premiumverific_hooks')
+    async function syncSupabaseUser() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
 
-      if (savedProfile) setProfileState(JSON.parse(savedProfile))
-      if (savedTx) setTransactions(JSON.parse(savedTx))
-      if (savedSms) setSmsOrders(JSON.parse(savedSms))
-      if (savedSmm) setSmmOrders(JSON.parse(savedSmm))
-      if (savedAcc) setAccountOrders(JSON.parse(savedAcc))
-      if (savedKeys) setApiKeys(JSON.parse(savedKeys))
-      if (savedHooks) setWebhooks(JSON.parse(savedHooks))
-    } catch (e) {
-      console.error('Failed to load state from storage', e)
+        if (user) {
+          // 1. Fetch profile from Supabase profiles table
+          const { data: dbProfile, error: profileErr } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+          let activeProfile: Profile
+
+          if (dbProfile) {
+            activeProfile = {
+              id: dbProfile.id,
+              user_id: dbProfile.user_id,
+              email: dbProfile.email,
+              full_name: dbProfile.full_name || user.email?.split('@')[0] || 'Premium Partner',
+              balance_xaf: Number(dbProfile.balance_xaf) || 0,
+              currency: dbProfile.currency || 'XAF',
+              avatar_url: dbProfile.avatar_url || user.user_metadata?.avatar_url || null,
+              phone_number: dbProfile.phone_number || '+237680209047',
+              role: dbProfile.role || 'client',
+              created_at: dbProfile.created_at,
+              updated_at: dbProfile.updated_at
+            }
+          } else {
+            // 2. Insert new profile into Supabase if missing
+            const fullName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Premium Partner'
+            const avatarUrl = user.user_metadata?.avatar_url || null
+
+            const { data: inserted, error: insertErr } = await supabase
+              .from('profiles')
+              .insert({
+                user_id: user.id,
+                email: user.email!,
+                full_name: fullName,
+                avatar_url: avatarUrl,
+                balance_xaf: 0,
+                currency: 'XAF',
+                phone_number: '+237680209047'
+              })
+              .select()
+              .single()
+
+            if (inserted) {
+              activeProfile = {
+                id: inserted.id,
+                user_id: inserted.user_id,
+                email: inserted.email,
+                full_name: inserted.full_name,
+                balance_xaf: Number(inserted.balance_xaf) || 0,
+                currency: inserted.currency || 'XAF',
+                avatar_url: inserted.avatar_url,
+                phone_number: inserted.phone_number || '+237680209047',
+                role: inserted.role || 'client',
+                created_at: inserted.created_at,
+                updated_at: inserted.updated_at
+              }
+            } else {
+              activeProfile = {
+                id: user.id,
+                user_id: user.id,
+                email: user.email!,
+                full_name: fullName,
+                balance_xaf: 0,
+                currency: 'XAF',
+                avatar_url: avatarUrl,
+                phone_number: '+237680209047',
+                role: 'client',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }
+            }
+          }
+
+          setProfileState(activeProfile)
+
+          // 3. Fetch user's real orders & transactions from Supabase tables
+          const { data: dbTx } = await supabase.from('wallet_transactions').select('*').eq('profile_id', activeProfile.id).order('created_at', { ascending: false })
+          const { data: dbSmm } = await supabase.from('smm_orders').select('*').eq('profile_id', activeProfile.id).order('created_at', { ascending: false })
+          const { data: dbSms } = await supabase.from('sms_orders').select('*').eq('profile_id', activeProfile.id).order('created_at', { ascending: false })
+
+          if (dbTx) setTransactions(dbTx as any)
+          if (dbSmm) setSmmOrders(dbSmm as any)
+          if (dbSms) setSmsOrders(dbSms as any)
+        } else {
+          // Fallback to localStorage for guest/offline preview
+          const savedProfile = localStorage.getItem('premiumverific_profile')
+          const savedTx = localStorage.getItem('premiumverific_tx')
+          const savedSms = localStorage.getItem('premiumverific_sms')
+          const savedSmm = localStorage.getItem('premiumverific_smm')
+
+          if (savedProfile) setProfileState(JSON.parse(savedProfile))
+          if (savedTx) setTransactions(JSON.parse(savedTx))
+          if (savedSms) setSmsOrders(JSON.parse(savedSms))
+          if (savedSmm) setSmmOrders(JSON.parse(savedSmm))
+        }
+      } catch (err) {
+        console.error('Supabase DB Sync Error:', err)
+      }
+    }
+
+    syncSupabaseUser()
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      syncSupabaseUser()
+    })
+
+    return () => {
+      authListener.subscription.unsubscribe()
     }
   }, [])
 
@@ -131,9 +226,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }
 
   // Deposit Money
-  const topUpBalance = (amount: number, method: 'mtn_momo' | 'orange_money' | 'visa_mastercard' | 'crypto_usdt', customRef?: string) => {
+  const topUpBalance = async (amount: number, method: 'mtn_momo' | 'orange_money' | 'visa_mastercard' | 'crypto_usdt', customRef?: string) => {
     const newBalance = profile.balance_xaf + amount
     const updatedProfile = { ...profile, balance_xaf: newBalance }
+
+    const ref = customRef || 'DEP-' + Math.floor(100000 + Math.random() * 900000)
 
     const newTx: WalletTransaction = {
       id: 'tx_' + Math.random().toString(36).substr(2, 9),
@@ -141,7 +238,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       amount: amount,
       type: 'deposit',
       payment_method: method,
-      reference: customRef || 'DEP-' + Math.floor(100000 + Math.random() * 900000),
+      reference: ref,
       status: 'completed',
       description: `Deposit via ${method.toUpperCase().replace('_', ' ')}`,
       created_at: new Date().toISOString()
@@ -149,6 +246,23 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const updatedTxList = [newTx, ...transactions]
     saveState(updatedProfile, updatedTxList)
+
+    try {
+      if (profile.id && !profile.id.startsWith('usr_default')) {
+        await supabase.from('profiles').update({ balance_xaf: newBalance }).eq('id', profile.id)
+        await supabase.from('wallet_transactions').insert({
+          profile_id: profile.id,
+          amount: amount,
+          type: 'deposit',
+          payment_method: method,
+          reference: ref,
+          status: 'completed',
+          description: `Deposit via ${method.toUpperCase().replace('_', ' ')}`
+        })
+      }
+    } catch (e) {
+      console.error('Failed to sync topUpBalance to Supabase DB', e)
+    }
   }
 
   // Buy SMS Virtual Number
@@ -195,6 +309,21 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const updatedSms = [newOrder, ...smsOrders]
     const updatedTx = [newTx, ...transactions]
     saveState(updatedProfile, updatedTx, updatedSms)
+
+    if (profile.id && !profile.id.startsWith('usr_default')) {
+      supabase.from('profiles').update({ balance_xaf: newBalance }).eq('id', profile.id)
+      supabase.from('sms_orders').insert({
+        profile_id: profile.id,
+        service_name: serviceName,
+        service_code: serviceCode,
+        country_name: countryName,
+        country_code: countryCode,
+        phone_number: generatedPhone,
+        price_xaf: price,
+        status: 'waiting_sms',
+        expires_at: newOrder.expires_at
+      })
+    }
 
     // Simulate receiving SMS code after 8 seconds
     setTimeout(() => {
@@ -247,8 +376,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const newBalance = profile.balance_xaf - price
     const updatedProfile = { ...profile, balance_xaf: newBalance }
 
+    const orderRef = Math.floor(100000 + Math.random() * 900000).toString()
+
     const newOrder: SmmOrder = {
-      id: 'smm_' + Math.floor(100000 + Math.random() * 900000),
+      id: orderRef,
       profile_id: profile.id,
       service_id: serviceId,
       service_name: serviceName,

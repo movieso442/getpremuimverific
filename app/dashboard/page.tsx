@@ -19,42 +19,45 @@ import {
   MessageCircle,
   HelpCircle
 } from 'lucide-react'
-import { SMM_CATEGORIES, SMM_SERVICES, SmmServiceItem } from '@/lib/mockData'
+import liveServices from '@/lib/liveServices.json'
 import { useAppState } from '@/lib/store'
 import confetti from 'canvas-confetti'
 
 export default function DashboardPage() {
   const { createSmmOrder } = useAppState()
 
+  const allServices = liveServices as any[]
+  const allCategories = Array.from(new Set(allServices.map((s) => s.category)))
+
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'NEW_ORDER' | 'MY_FAVORITE' | 'AUTO_SUBSCRIPTION'>('NEW_ORDER')
   
   // Search & Filter state inside Order form
   const [searchFilter, setSearchFilter] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string>(SMM_CATEGORIES[0])
-  const [selectedServiceId, setSelectedServiceId] = useState<number>(SMM_SERVICES[0].id)
+  const [selectedCategory, setSelectedCategory] = useState<string>(allCategories[0] || 'CoinMarketCap')
+  const [selectedServiceId, setSelectedServiceId] = useState<number>(allServices[0]?.id || 10110)
   const [targetLink, setTargetLink] = useState('')
   const [quantity, setQuantity] = useState<number>(1000)
   const [favoriteServiceIds, setFavoriteServiceIds] = useState<number[]>([10110, 8751, 7102])
   const [showFilterGrid, setShowFilterGrid] = useState(true)
 
   const networks = [
-    { name: 'Instagram', icon: CameraIcon, cat: 'Instagram Followers & Likes' },
-    { name: 'Facebook', icon: Share2, cat: 'Facebook Page & Video Boost' },
-    { name: 'Youtube', icon: Tv, cat: 'YouTube Views & Monetization' },
-    { name: 'X (Twitter)', icon: MessageCircle, cat: 'Twitter / X Followers & Engagement' },
-    { name: 'Spotify', icon: Music, cat: 'Spotify & Twitch Engagement' },
-    { name: 'TikTok', icon: Video, cat: 'TikTok Followers & Views' },
-    { name: 'Linkedin', icon: Share2, cat: 'Facebook Page & Video Boost' },
-    { name: 'Google', icon: Search, cat: 'Google Business Reviews' },
-    { name: 'Telegram', icon: Send, cat: 'Telegram Members' },
-    { name: 'Discord', icon: MessageSquare, cat: 'Discord Members & Server Boosts' },
-    { name: 'Snapchat', icon: Video, cat: 'TikTok Followers & Views' },
-    { name: 'Twitch', icon: Music, cat: 'Spotify & Twitch Engagement' },
-    { name: 'Website Traffic', icon: Globe, cat: 'Telegram Members' },
-    { name: 'Reviews', icon: Star, cat: 'Google Business Reviews' },
-    { name: '+ Others', icon: Layers, cat: 'CoinMarketCap' },
-    { name: 'Everything', icon: Zap, cat: 'All' },
+    { name: 'Instagram', icon: CameraIcon, match: 'Instagram' },
+    { name: 'Facebook', icon: Share2, match: 'Facebook' },
+    { name: 'Youtube', icon: Tv, match: 'YouTube' },
+    { name: 'X (Twitter)', icon: MessageCircle, match: 'Twitter' },
+    { name: 'Spotify', icon: Music, match: 'Spotify' },
+    { name: 'TikTok', icon: Video, match: 'TikTok' },
+    { name: 'Linkedin', icon: Share2, match: 'LinkedIn' },
+    { name: 'Google', icon: Search, match: 'Google' },
+    { name: 'Telegram', icon: Send, match: 'Telegram' },
+    { name: 'Discord', icon: MessageSquare, match: 'Discord' },
+    { name: 'Snapchat', icon: Video, match: 'Snapchat' },
+    { name: 'Twitch', icon: Music, match: 'Twitch' },
+    { name: 'Website Traffic', icon: Globe, match: 'Traffic' },
+    { name: 'Reviews', icon: Star, match: 'Reviews' },
+    { name: '+ Others', icon: Layers, match: 'CoinMarketCap' },
+    { name: 'Everything', icon: Zap, match: 'All' },
   ]
 
   function CameraIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -68,14 +71,18 @@ export default function DashboardPage() {
   }
 
   // Network selection toggle
-  const handleNetworkSelect = (netName: string, catName: string) => {
+  const handleNetworkSelect = (netName: string, matchKey: string) => {
     if (selectedNetwork === netName) {
       setSelectedNetwork(null)
+      setSelectedCategory('All')
     } else {
       setSelectedNetwork(netName)
-      if (catName !== 'All') {
-        setSelectedCategory(catName)
-        const firstSrv = SMM_SERVICES.find(s => s.category === catName)
+      if (matchKey === 'All') {
+        setSelectedCategory('All')
+      } else {
+        const foundCat = allCategories.find((c) => c.toLowerCase().includes(matchKey.toLowerCase())) || allCategories[0]
+        setSelectedCategory(foundCat)
+        const firstSrv = allServices.find((s) => s.category === foundCat)
         if (firstSrv) {
           setSelectedServiceId(firstSrv.id)
           setQuantity(firstSrv.min)
@@ -85,24 +92,25 @@ export default function DashboardPage() {
   }
 
   // Filter services by Category and Search Filter
-  const filteredServices = SMM_SERVICES.filter(s => {
+  const filteredServices = allServices.filter((s) => {
     const matchCat = selectedCategory === 'All' || s.category === selectedCategory
-    const matchQuery = searchFilter === '' || 
-      s.name.toLowerCase().includes(searchFilter.toLowerCase()) || 
+    const matchQuery =
+      searchFilter === '' ||
+      s.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
       String(s.id).includes(searchFilter) ||
       s.category.toLowerCase().includes(searchFilter.toLowerCase())
     return matchCat && matchQuery
   })
 
   // Selected Service object
-  const currentService: SmmServiceItem = SMM_SERVICES.find(s => s.id === Number(selectedServiceId)) || filteredServices[0] || SMM_SERVICES[0]
+  const currentService = allServices.find((s) => s.id === Number(selectedServiceId)) || filteredServices[0] || allServices[0]
 
   // Calculated charge
-  const rateUsd = currentService.usdRate !== undefined ? currentService.usdRate : currentService.rate / 600
-  const chargeUsd = currentService.min === 1 && currentService.max === 1 
-    ? rateUsd 
+  const rateUsd = currentService?.rate_usd || 1.0
+  const chargeUsd = currentService?.min === 1 && currentService?.max === 1
+    ? rateUsd
     : (rateUsd * (quantity / 1000))
-  const chargeXaf = Math.ceil(chargeUsd * 600)
+  const chargeXaf = Math.ceil(chargeUsd * 600 * 1.25)
 
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -166,7 +174,7 @@ export default function DashboardPage() {
               return (
                 <button
                   key={net.name}
-                  onClick={() => handleNetworkSelect(net.name, net.cat)}
+                  onClick={() => handleNetworkSelect(net.name, net.match)}
                   className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl border text-xs font-bold transition ${
                     isSelected
                       ? 'bg-[#ff5722] border-[#ff5722] text-white shadow-sm'
@@ -261,7 +269,7 @@ export default function DashboardPage() {
                   onChange={(e) => {
                     const cat = e.target.value
                     setSelectedCategory(cat)
-                    const firstSrv = SMM_SERVICES.find(s => s.category === cat)
+                    const firstSrv = allServices.find((s) => s.category === cat)
                     if (firstSrv) {
                       setSelectedServiceId(firstSrv.id)
                       setQuantity(firstSrv.min)
@@ -269,7 +277,8 @@ export default function DashboardPage() {
                   }}
                   className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                 >
-                  {SMM_CATEGORIES.map((cat) => (
+                  <option value="All">All Categories ({allCategories.length})</option>
+                  {allCategories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -285,22 +294,16 @@ export default function DashboardPage() {
                   onChange={(e) => {
                     const sId = Number(e.target.value)
                     setSelectedServiceId(sId)
-                    const srv = SMM_SERVICES.find(s => s.id === sId)
+                    const srv = allServices.find((s) => s.id === sId)
                     if (srv) setQuantity(srv.min)
                   }}
                   className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition truncate font-mono"
                 >
-                  {filteredServices.map((srv) => {
-                    const priceFormatted = srv.usdRate !== undefined 
-                      ? `$${srv.usdRate}` 
-                      : `$${(srv.rate / 600).toFixed(4)}`
-                    const iconWatermark = srv.watermarkIcons ? ` ${srv.watermarkIcons}` : ''
-                    return (
-                      <option key={srv.id} value={srv.id}>
-                        {srv.id} - {srv.name}{iconWatermark} - {priceFormatted}
-                      </option>
-                    )
-                  })}
+                  {filteredServices.map((srv) => (
+                    <option key={srv.id} value={srv.id}>
+                      {srv.id} - {srv.name} - ${srv.rate_usd}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -386,15 +389,14 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4 shadow-2xs">
               <h3 className="text-sm font-bold text-gray-900">Your Favorite Services</h3>
               <div className="space-y-2">
-                {favoriteServiceIds.map(id => {
-                  const srv = SMM_SERVICES.find(s => s.id === id)
+                {favoriteServiceIds.map((id) => {
+                  const srv = allServices.find((s) => s.id === id)
                   if (!srv) return null
-                  const priceFormatted = srv.usdRate !== undefined ? `$${srv.usdRate}` : `$${(srv.rate / 600).toFixed(4)}`
                   return (
                     <div key={id} className="p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs">
                       <div>
                         <div className="font-bold text-gray-900">#{srv.id} - {srv.name}</div>
-                        <div className="text-[10px] text-gray-500">Rate: {priceFormatted}</div>
+                        <div className="text-[10px] text-gray-500">Rate: ${srv.rate_usd}</div>
                       </div>
                       <button
                         onClick={() => {
