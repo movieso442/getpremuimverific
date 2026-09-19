@@ -79,39 +79,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col justify-between">
-      
-      {/* HEADER */}
-      <header className="bg-white border-b border-gray-100 py-4 px-6 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#ff5722] to-[#ff7a00] flex items-center justify-center text-white font-extrabold shadow-sm group-hover:scale-105 transition">
-              <ThumbsUp className="w-5.5 h-5.5 fill-current stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="text-2xl font-black text-[#ff5722] tracking-tight">PV</span>
-                <span className="text-xs font-bold text-gray-800 uppercase tracking-tight">Premium Verify</span>
-              </div>
-              <span className="text-[9px] font-black text-[#ea580c] uppercase tracking-widest block leading-none">
-                WE LEAD. THEY FOLLOW
-              </span>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="px-5 py-2.5 rounded-xl text-xs font-extrabold text-white bg-[#ff5722] shadow-sm transition">
-              Sign In
-            </Link>
-            <Link href="/signup" className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 transition">
-              Sign Up
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* LOGIN CARD */}
-      <main className="py-16 px-6 max-w-md mx-auto w-full flex-1 flex flex-col justify-center">
+    <div className="py-12 px-6 max-w-md mx-auto w-full flex-1 flex flex-col justify-center">
         <div className="bg-white rounded-3xl border border-gray-200 p-8 md:p-10 shadow-sm space-y-6">
           <div>
             <h1 className="text-2xl font-black text-gray-900">Sign In to Your Account</h1>
@@ -181,13 +149,6 @@ export default function LoginPage() {
             </Link>
           </div>
         </div>
-      </main>
-
-      {/* FOOTER */}
-      <footer className="bg-white border-t border-gray-100 py-6 px-6 text-center text-xs text-gray-400">
-        © 2026 Premium Verify (premiumverific.com). All rights reserved. Support WhatsApp: +237 680209047
-      </footer>
-
     </div>
   )
 }

@@ -26,14 +26,14 @@ interface AppStateContextType {
 }
 
 const DEFAULT_PROFILE: Profile = {
-  id: 'usr_default_pv01',
-  user_id: 'auth_usr_pv01',
-  email: 'hello@premiumverific.com',
-  full_name: 'Premium Verify Partner',
+  id: '',
+  user_id: '',
+  email: '',
+  full_name: '',
   balance_xaf: 0,
   currency: 'XAF',
   avatar_url: null,
-  phone_number: '+237680209047',
+  phone_number: '',
   role: 'client',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString()
@@ -69,61 +69,65 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const { data: { user } } = await supabase.auth.getUser()
 
         if (user) {
-          // 1. Fetch profile from Supabase profiles table
-          const { data: dbProfile, error: profileErr } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', user.id)
-            .maybeSingle()
+          const fullName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Premium Partner'
+          const avatarUrl = user.user_metadata?.avatar_url || null
+          let activeProfile: Profile | null = null
 
-          let activeProfile: Profile
-
-          if (dbProfile) {
-            activeProfile = {
-              id: dbProfile.id,
-              user_id: dbProfile.user_id,
-              email: dbProfile.email,
-              full_name: dbProfile.full_name || user.email?.split('@')[0] || 'Premium Partner',
-              balance_xaf: Number(dbProfile.balance_xaf) || 0,
-              currency: dbProfile.currency || 'XAF',
-              avatar_url: dbProfile.avatar_url || user.user_metadata?.avatar_url || null,
-              phone_number: dbProfile.phone_number || '+237680209047',
-              role: dbProfile.role || 'client',
-              created_at: dbProfile.created_at,
-              updated_at: dbProfile.updated_at
-            }
-          } else {
-            // 2. Insert new profile into Supabase if missing
-            const fullName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Premium Partner'
-            const avatarUrl = user.user_metadata?.avatar_url || null
-
-            const { data: inserted, error: insertErr } = await supabase
-              .from('profiles')
-              .insert({
+          // 1. Sync / Create user profile using Admin API route to bypass RLS safely
+          try {
+            const res = await fetch('/api/auth/sync-user', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
                 user_id: user.id,
-                email: user.email!,
+                email: user.email,
                 full_name: fullName,
                 avatar_url: avatarUrl,
-                balance_xaf: 0,
-                currency: 'XAF',
                 phone_number: '+237680209047'
               })
-              .select()
-              .single()
-
-            if (inserted) {
+            })
+            const syncData = await res.json()
+            if (syncData.success && syncData.profile) {
+              const dbP = syncData.profile
               activeProfile = {
-                id: inserted.id,
-                user_id: inserted.user_id,
-                email: inserted.email,
-                full_name: inserted.full_name,
-                balance_xaf: Number(inserted.balance_xaf) || 0,
-                currency: inserted.currency || 'XAF',
-                avatar_url: inserted.avatar_url,
-                phone_number: inserted.phone_number || '+237680209047',
-                role: inserted.role || 'client',
-                created_at: inserted.created_at,
-                updated_at: inserted.updated_at
+                id: dbP.id,
+                user_id: dbP.user_id || user.id,
+                email: dbP.email || user.email!,
+                full_name: dbP.full_name || fullName,
+                balance_xaf: Number(dbP.balance_xaf) || 0,
+                currency: dbP.currency || 'XAF',
+                avatar_url: dbP.avatar_url || avatarUrl,
+                phone_number: dbP.phone_number || '+237680209047',
+                role: dbP.role || 'client',
+                created_at: dbP.created_at || new Date().toISOString(),
+                updated_at: dbP.updated_at || new Date().toISOString()
+              }
+            }
+          } catch (apiErr) {
+            console.error('[Sync User API Route Error]:', apiErr)
+          }
+
+          // Fallback client select if API route failed
+          if (!activeProfile) {
+            const { data: dbProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('user_id', user.id)
+              .maybeSingle()
+
+            if (dbProfile) {
+              activeProfile = {
+                id: dbProfile.id,
+                user_id: dbProfile.user_id,
+                email: dbProfile.email,
+                full_name: dbProfile.full_name || fullName,
+                balance_xaf: Number(dbProfile.balance_xaf) || 0,
+                currency: dbProfile.currency || 'XAF',
+                avatar_url: dbProfile.avatar_url || avatarUrl,
+                phone_number: dbProfile.phone_number || '+237680209047',
+                role: dbProfile.role || 'client',
+                created_at: dbProfile.created_at,
+                updated_at: dbProfile.updated_at
               }
             } else {
               activeProfile = {
@@ -144,7 +148,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
           setProfileState(activeProfile)
 
-          // 3. Fetch user's real orders & transactions from Supabase tables
+          // 2. Fetch user's real orders & transactions from Supabase tables
           const { data: dbTx } = await supabase.from('wallet_transactions').select('*').eq('profile_id', activeProfile.id).order('created_at', { ascending: false })
           const { data: dbSmm } = await supabase.from('smm_orders').select('*').eq('profile_id', activeProfile.id).order('created_at', { ascending: false })
           const { data: dbSms } = await supabase.from('sms_orders').select('*').eq('profile_id', activeProfile.id).order('created_at', { ascending: false })
@@ -409,6 +413,32 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const updatedSmm = [newOrder, ...smmOrders]
     const updatedTx = [newTx, ...transactions]
     saveState(updatedProfile, updatedTx, smsOrders, updatedSmm)
+
+    if (profile.id) {
+      supabase.from('profiles').update({ balance_xaf: newBalance }).eq('id', profile.id).then()
+      supabase.from('smm_orders').insert({
+        profile_id: profile.id,
+        service_id: serviceId,
+        service_name: serviceName,
+        category: category,
+        target_link: link,
+        quantity: quantity,
+        charge_xaf: price,
+        start_count: newOrder.start_count,
+        remains: newOrder.remains,
+        status: newOrder.status,
+        api_order_id: newOrder.api_order_id
+      }).then()
+      supabase.from('wallet_transactions').insert({
+        profile_id: profile.id,
+        amount: price,
+        type: 'smm_order',
+        payment_method: 'mtn_momo',
+        reference: 'SMM-' + newOrder.id,
+        status: 'completed',
+        description: `SMM Order: ${quantity.toLocaleString()} x ${serviceName}`
+      }).then()
+    }
 
     return newOrder
   }

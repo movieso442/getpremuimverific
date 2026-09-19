@@ -20,15 +20,16 @@ interface JapHeaderProps {
 }
 
 export const JapHeader: React.FC<JapHeaderProps> = ({ onToggleSidebar, onOpenDeposit }) => {
-  const { profile, smmOrders } = useAppState()
+  const { profile, smmOrders, smsOrders, accountOrders } = useAppState()
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [currency, setCurrency] = useState<'USD' | 'XAF'>('USD')
   const [searchQuery, setSearchQuery] = useState('')
   const [isAuthOpen, setIsAuthOpen] = useState(false)
 
-  // Balance calculation: default $8.240 as in screenshot or XAF converted
+  // Balance calculation
   const balanceUsd = (profile.balance_xaf / 600).toFixed(3)
-  const totalOrdersCount = smmOrders.length > 0 ? smmOrders.length : 3
+  const totalOrdersCount = (smmOrders?.length || 0) + (smsOrders?.length || 0) + (accountOrders?.length || 0)
+  const displayName = profile.full_name || profile.email?.split('@')[0] || 'Guest'
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
@@ -48,7 +49,7 @@ export const JapHeader: React.FC<JapHeaderProps> = ({ onToggleSidebar, onOpenDep
         <div className="bg-[#f0f7ff] text-[#2563eb] text-xs font-semibold px-4 py-2 rounded-full flex items-center gap-1.5 shadow-2xs">
           <span>Welcome:</span>
           <span className="font-bold text-[#1d4ed8]">
-            {profile.full_name ? profile.full_name.split(' ')[0].toLowerCase() : 'moviso'}
+            {displayName}
           </span>
         </div>
 

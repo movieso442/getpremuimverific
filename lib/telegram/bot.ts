@@ -15,7 +15,8 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getpremuimverific.vercel.app'
 
   // 1. /START OR /MENU COMMAND
-  if (lowerText === '/start' || lowerText === '/menu' || lowerText === '/help' || lowerText === 'menu') {
+  const greetings = ['/start', 'start', '/menu', 'menu', '/help', 'help', 'hi', 'hello', 'yo', 'hey', 'hallo', 'hola']
+  if (greetings.includes(lowerText)) {
     return (
       `👋 *Welcome to Premium Verify Telegram Bot!* (@getpremuimverific_bot)\n\n` +
       `I am your automated assistant for SMS verification numbers, social media growth, and instant wallet funding.\n\n` +

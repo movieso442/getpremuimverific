@@ -70,23 +70,39 @@ export default function DashboardPage() {
     )
   }
 
+  // 1. Categories filtered by selected network
+  const availableCategories = selectedNetwork && selectedNetwork !== 'Everything'
+    ? allCategories.filter((c) => {
+        const netObj = networks.find(n => n.name === selectedNetwork)
+        const matchKey = netObj ? netObj.match : selectedNetwork
+        if (matchKey === 'All') return true
+        return c.toLowerCase().includes(matchKey.toLowerCase())
+      })
+    : allCategories
+
   // Network selection toggle
   const handleNetworkSelect = (netName: string, matchKey: string) => {
     if (selectedNetwork === netName) {
       setSelectedNetwork(null)
-      setSelectedCategory('All')
+      const firstCat = allCategories[0] || 'CoinMarketCap'
+      setSelectedCategory(firstCat)
+      const firstSrv = allServices.find((s) => s.category === firstCat)
+      if (firstSrv) {
+        setSelectedServiceId(firstSrv.id)
+        setQuantity(firstSrv.min)
+      }
     } else {
       setSelectedNetwork(netName)
-      if (matchKey === 'All') {
-        setSelectedCategory('All')
-      } else {
-        const foundCat = allCategories.find((c) => c.toLowerCase().includes(matchKey.toLowerCase())) || allCategories[0]
-        setSelectedCategory(foundCat)
-        const firstSrv = allServices.find((s) => s.category === foundCat)
-        if (firstSrv) {
-          setSelectedServiceId(firstSrv.id)
-          setQuantity(firstSrv.min)
-        }
+      const matchedCats = matchKey === 'All'
+        ? allCategories
+        : allCategories.filter((c) => c.toLowerCase().includes(matchKey.toLowerCase()))
+
+      const targetCat = matchedCats[0] || allCategories[0]
+      setSelectedCategory(targetCat)
+      const firstSrv = allServices.find((s) => s.category === targetCat)
+      if (firstSrv) {
+        setSelectedServiceId(firstSrv.id)
+        setQuantity(firstSrv.min)
       }
     }
   }
@@ -277,8 +293,8 @@ export default function DashboardPage() {
                   }}
                   className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                 >
-                  <option value="All">All Categories ({allCategories.length})</option>
-                  {allCategories.map((cat) => (
+                  <option value="All">All Categories ({availableCategories.length})</option>
+                  {availableCategories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>

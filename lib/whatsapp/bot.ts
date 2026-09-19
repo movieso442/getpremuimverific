@@ -15,7 +15,8 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getpremuimverific.vercel.app'
 
   // 1. HELP / MENU COMMAND
-  if (text === 'menu' || text === 'help' || text === 'hi' || text === 'hello' || text === 'start' || text === '1') {
+  const greetings = ['menu', 'help', 'hi', 'hello', 'yo', 'hey', 'start', '/start', '1', 'hallo', 'hola']
+  if (greetings.includes(text)) {
     return (
       `👋 *Welcome to Premium Verify WhatsApp Bot!*\n\n` +
       `I am your automated assistant. You can order verification numbers, social media growth, and top up your wallet right here!\n\n` +

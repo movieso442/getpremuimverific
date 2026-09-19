@@ -35,69 +35,7 @@ export default function OrdersPage() {
     'Refunds'
   ]
 
-  // Default sample mock orders matching Screenshot 4 if none in state
-  const displayOrders: DisplayOrder[] = smmOrders.length > 0 ? smmOrders : [
-    {
-      id: 1012848023,
-      created_at: '2026-09-14T21:10:18Z',
-      target_link: 'https://t.me/earlyusvisaappointmentdates/62',
-      charge_xaf: 10,
-      charge_usd: 0.0123,
-      start_count: 0,
-      quantity: 246,
-      service_name: 'ID 9174 - Telegram Auto Post Reactions + Views [🔥] [Refill: No] [Max: 40K] [Start Time: 0-1 Hour] [Speed: 40K/Day]',
-      remains: 0,
-      status: 'Completed'
-    },
-    {
-      id: 1012848022,
-      created_at: '2026-09-14T21:10:18Z',
-      target_link: 'https://t.me/earlyusvisaappointmentdates/62',
-      charge_xaf: 42,
-      charge_usd: 0.0698,
-      start_count: 0,
-      quantity: 1396,
-      service_name: 'ID 9174 - Telegram Auto Post Reactions + Views [🔥] [Refill: No] [Max: 40K] [Start Time: 0-1 Hour] [Speed: 40K/Day]',
-      remains: 0,
-      status: 'Completed'
-    },
-    {
-      id: 1012838771,
-      created_at: '2026-09-14T20:45:03Z',
-      target_link: 'https://t.me/earlyusvisaappointmentdates/60',
-      charge_xaf: 8,
-      charge_usd: 0.0103,
-      start_count: 0,
-      quantity: 206,
-      service_name: 'ID 9174 - Telegram Auto Post Reactions + Views [🔥] [Refill: No] [Max: 40K] [Start Time: 0-1 Hour] [Speed: 40K/Day]',
-      remains: 206,
-      status: 'Processing'
-    },
-    {
-      id: 1012838769,
-      created_at: '2026-09-14T20:45:03Z',
-      target_link: 'https://t.me/earlyusvisaappointmentdates/58',
-      charge_xaf: 7,
-      charge_usd: 0.01005,
-      start_count: 0,
-      quantity: 201,
-      service_name: 'ID 9174 - Telegram Auto Post Reactions + Views [🔥] [Refill: No] [Max: 40K] [Start Time: 0-1 Hour] [Speed: 40K/Day]',
-      remains: 201,
-      status: 'Processing'
-    },
-    {
-      id: 1012838767,
-      created_at: '2026-09-14T20:45:00Z',
-      target_link: 'https://t.me/earlyusvisaappointmentdates/56',
-      charge_xaf: 9,
-      charge_usd: 0.01225,
-      start_count: 0,
-      quantity: 245,
-      service_name: 'ID 9174 - Telegram Auto Post Reactions + Views [🔥] [Refill: No] [Max: 40K] [Start Time: 0-1 Hour] [Speed: 40K/Day]',
-      remains: 245,
-      status: 'Processing'
-    }
-  ]
+  const displayOrders: DisplayOrder[] = smmOrders
 
   const handleCopy = (id: string | number) => {
     navigator.clipboard.writeText(String(id))
@@ -165,7 +103,14 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
-              {filteredOrders.map((order) => (
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="p-8 text-center text-gray-400 font-medium">
+                    No orders found. Place your first order from the <a href="/dashboard" className="text-[#ff5722] font-bold underline">New Order Dashboard</a>.
+                  </td>
+                </tr>
+              ) : (
+                filteredOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50/80 transition">
                   {/* ID + Copy Button */}
                   <td className="p-3.5">
@@ -233,7 +178,7 @@ export default function OrdersPage() {
                     </span>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

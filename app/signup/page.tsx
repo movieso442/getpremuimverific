@@ -99,42 +99,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-gray-900 font-sans flex flex-col justify-between">
-      
-      {/* PUBLIC HEADER matching JAP Header */}
-      <header className="bg-white border-b border-gray-200 py-4 px-6 sticky top-0 z-30 shadow-2xs">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#ff5722] to-[#ff7a00] flex items-center justify-center text-white font-extrabold shadow-sm group-hover:scale-105 transition">
-              <ThumbsUp className="w-5.5 h-5.5 fill-current stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1">
-                <span className="text-2xl font-black text-[#ff5722] tracking-tighter">PV</span>
-                <span className="text-xs font-bold text-gray-800 uppercase tracking-tight">Premium Verify</span>
-              </div>
-              <span className="text-[9px] font-black text-[#ea580c] uppercase tracking-widest block leading-none">
-                WE LEAD. THEY FOLLOW
-              </span>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 transition">
-              Sign In
-            </Link>
-            <Link href="/signup" className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-[#ff5722] hover:bg-[#ea580c] shadow-xs transition">
-              Sign Up
-            </Link>
-            <Link href="/developer" className="hidden sm:inline-block px-4 py-2 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 border border-gray-200 transition">
-              API
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* MAIN SIGNUP CONTENT (Exact JAP layout: Form on Left, Testimonials Chat List on Right) */}
-      <main className="py-12 px-6 max-w-7xl mx-auto w-full flex-1">
+    <div className="py-12 px-6 max-w-7xl mx-auto w-full flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
           {/* Left Column: Sign Up Form Box */}
@@ -315,33 +280,7 @@ export default function SignupPage() {
 
             </div>
           </div>
-
         </div>
-      </main>
-
-      {/* FOOTER PAYMENT METHODS */}
-      <footer className="bg-white border-t border-gray-200 py-8 px-6 text-center text-xs text-gray-500">
-        <div className="max-w-7xl mx-auto space-y-4">
-          <div className="font-bold text-gray-800 uppercase tracking-wider text-[11px]">Accepted Payment Methods</div>
-          <div className="flex flex-wrap items-center justify-center gap-6 font-bold text-gray-600">
-            <span>MTN Mobile Money</span>
-            <span>•</span>
-            <span>Orange Money</span>
-            <span>•</span>
-            <span>USDT TRC20</span>
-            <span>•</span>
-            <span>Visa Card</span>
-            <span>•</span>
-            <span>Mastercard</span>
-            <span>•</span>
-            <span>PayPal</span>
-          </div>
-          <div className="text-gray-400 text-[11px] pt-2">
-            © 2026 Premium Verify (premiumverific.com). All rights reserved. Support WhatsApp: +237 680209047
-          </div>
-        </div>
-      </footer>
-
     </div>
   )
 }

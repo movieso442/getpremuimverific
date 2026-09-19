@@ -8,36 +8,9 @@ export default function SubscriptionsPage() {
 
   const tabs = ['All', 'Active', 'Paused', 'Completed', 'Expired', 'Canceled']
 
-  const mockSubscriptions = [
-    {
-      id: 1012699391,
-      username: 'earlyusvisaappointmentdates',
-      quantity: '100-1500',
-      posts: '16 / 0',
-      oldPosts: '0 / 0',
-      delay: '300 minutes',
-      service: 'ID 9174 - Telegram Auto Post Reactions + Views [🔥] [Refill: No] [Max: 40K] [Start Time: 0-1 Hour] [Speed: 40K/Day]',
-      status: 'Active',
-      created: '2026-09-14 14:10:41',
-      updated: '2026-09-14 14:10:58',
-      expiry: '2026-09-14'
-    },
-    {
-      id: 1012677614,
-      username: 'earlyusvisaappointmentdates',
-      quantity: '100-300',
-      posts: '16 / 0',
-      oldPosts: '0 / 0',
-      delay: '300 minutes',
-      service: 'ID 9174 - Telegram Auto Post Reactions + Views [🔥] [Refill: No] [Max: 40K] [Start Time: 0-1 Hour] [Speed: 40K/Day]',
-      status: 'Active',
-      created: '2026-09-14 12:53:25',
-      updated: '2026-09-14 12:53:49',
-      expiry: '2026-11-30'
-    }
-  ]
+  const subscriptions: any[] = []
 
-  const filtered = mockSubscriptions.filter(s => {
+  const filtered = subscriptions.filter(s => {
     const matchStatus = activeFilter === 'All' || s.status.toLowerCase() === activeFilter.toLowerCase()
     const matchQuery = String(s.id).includes(searchQuery) || s.username.includes(searchQuery) || s.service.toLowerCase().includes(searchQuery.toLowerCase())
     return matchStatus && matchQuery
@@ -96,7 +69,14 @@ export default function SubscriptionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
-              {filtered.map((sub) => (
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="p-8 text-center text-gray-400 font-medium">
+                    No active auto subscriptions found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((sub) => (
                 <tr key={sub.id} className="hover:bg-gray-50/80 transition">
                   <td className="p-3.5 font-bold font-mono text-gray-900 flex items-center gap-2">
                     <span>{sub.id}</span>
@@ -132,7 +112,7 @@ export default function SubscriptionsPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

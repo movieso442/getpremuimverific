@@ -9446,7 +9446,7 @@
     "max": 25000,
     "type": "Default",
     "refill": false,
-    "cancel": true,
+    "cancel": false,
     "dripfeed": true
   },
   {
@@ -9460,7 +9460,7 @@
     "max": 100000,
     "type": "Default",
     "refill": false,
-    "cancel": true,
+    "cancel": false,
     "dripfeed": true
   },
   {
@@ -19624,7 +19624,7 @@
     "max": 100000,
     "type": "Default",
     "refill": false,
-    "cancel": true,
+    "cancel": false,
     "dripfeed": true
   },
   {
@@ -19652,7 +19652,7 @@
     "max": 100000,
     "type": "Default",
     "refill": false,
-    "cancel": true,
+    "cancel": false,
     "dripfeed": true
   },
   {
@@ -19778,7 +19778,7 @@
     "max": 50000,
     "type": "Default",
     "refill": false,
-    "cancel": true,
+    "cancel": false,
     "dripfeed": true
   },
   {

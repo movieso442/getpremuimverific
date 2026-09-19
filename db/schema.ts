@@ -90,3 +90,38 @@ export const accountOrders = pgTable('account_orders', {
   status: text('status').default('completed').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 })
+
+// 7. Developer API Keys Table
+export const apiKeys = pgTable('api_keys', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }),
+  keyName: text('key_name').notNull(),
+  apiKey: text('api_key').notNull().unique(),
+  keyPrefix: text('key_prefix').notNull(),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+})
+
+// 8. Webhook Endpoints Table
+export const webhooks = pgTable('webhooks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }),
+  url: text('url').notNull(),
+  events: jsonb('events').notNull(),
+  secret: text('secret').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+})
+
+// 9. Virtual SMS Services Catalog Table
+export const smsServices = pgTable('sms_services', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  serviceCode: text('service_code').notNull().unique(),
+  serviceName: text('service_name').notNull(),
+  category: text('category').default('SMS Verification').notNull(),
+  countryName: text('country_name').default('United Kingdom').notNull(),
+  countryCode: text('country_code').default('GB').notNull(),
+  priceXaf: numeric('price_xaf', { precision: 12, scale: 2 }).notNull(),
+  isAvailable: boolean('is_available').default(true).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+})

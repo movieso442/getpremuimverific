@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { createClient } from '@supabase/supabase-js'
 
 export interface JapServiceItem {
   service: number
@@ -73,8 +74,46 @@ async function seedLiveServices() {
 
     const outputPath = path.join(process.cwd(), 'lib', 'liveServices.json')
     fs.writeFileSync(outputPath, JSON.stringify(formattedList, null, 2))
+    console.log(`🎉 Saved ${formattedList.length} services to local file: ${outputPath}`)
 
-    console.log(`🎉 Successfully seeded ${formattedList.length} SMM services to ${outputPath}!`)
+    // Also populate Supabase table smm_services
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cdfmfxfkbqlcjbesymxd.supabase.co'
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkZm1meGZrYnFsY2piZXN5bXhkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTY4NTM3MywiZXhwIjoyMTA1MjYxMzczfQ.D--kRu7ExbhY_wloJ-KGdbecL9ynMgaIbWAW_k6oMI4'
+
+    if (supabaseUrl && serviceRoleKey) {
+      console.log('📡 Syncing services into Supabase smm_services database table...')
+      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
+
+      const dbRows = formattedList.map(s => ({
+        service_id: s.service_id,
+        name: s.name,
+        category: s.category,
+        rate_usd: s.rate_usd,
+        rate_xaf: s.rate_xaf,
+        min: s.min,
+        max: s.max,
+        refill: s.refill,
+        cancel: s.cancel,
+        dripfeed: s.dripfeed,
+        service_type: s.type
+      }))
+
+      // Batch insert 500 rows at a time
+      const batchSize = 500
+      for (let i = 0; i < dbRows.length; i += batchSize) {
+        const batch = dbRows.slice(i, i + batchSize)
+        const { error } = await supabaseAdmin
+          .from('smm_services')
+          .upsert(batch, { onConflict: 'service_id' })
+
+        if (error) {
+          console.error(`❌ Error inserting batch ${i}-${i + batch.length}:`, error.message)
+        } else {
+          console.log(`✅ Synced services ${i + 1} to ${Math.min(i + batchSize, dbRows.length)} / ${dbRows.length}`)
+        }
+      }
+      console.log('✨ All live services successfully populated into Supabase database smm_services table!')
+    }
   } catch (err) {
     console.error('❌ Error seeding live services:', err)
   }
