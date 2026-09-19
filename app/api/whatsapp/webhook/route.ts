@@ -39,7 +39,13 @@ export async function POST(request: Request) {
       if (messages && messages.length > 0) {
         const msg = messages[0]
         const fromPhone = msg.from
-        const messageText = msg.text?.body || msg.caption || ''
+        let messageText = msg.text?.body || msg.caption || ''
+        if (msg.type === 'interactive') {
+          messageText = msg.interactive?.button_reply?.id || msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.id || msg.interactive?.list_reply?.title || ''
+        } else if (msg.type === 'button') {
+          messageText = msg.button?.text || msg.button?.payload || ''
+        }
+
         const contactName = value.contacts?.[0]?.profile?.name || fromPhone
 
         console.log(`[WhatsApp Webhook] Incoming message from ${contactName} (${fromPhone}): "${messageText}"`)
