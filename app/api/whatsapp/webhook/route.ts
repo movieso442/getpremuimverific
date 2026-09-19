@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { processWhatsAppMessage, sendWhatsAppMessage } from '@/lib/whatsapp/bot'
 
+export const dynamic = 'force-dynamic'
+
 // Meta WhatsApp Webhook GET Verification Challenge
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { processTelegramMessage, sendTelegramMessage } from '@/lib/telegram/bot'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   return NextResponse.json({ status: 'Telegram Bot Webhook Endpoint Active (@getpremuimverific_bot)' })
 }
