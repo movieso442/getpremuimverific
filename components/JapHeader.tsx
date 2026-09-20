@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useAppState } from '@/lib/store'
 import { AuthModal } from '@/components/AuthModal'
+import Link from 'next/link'
 
 interface JapHeaderProps {
   onToggleSidebar?: () => void
@@ -90,13 +91,13 @@ export const JapHeader: React.FC<JapHeaderProps> = ({ onToggleSidebar, onOpenDep
 
         {/* Action Controls */}
         <div className="flex items-center gap-1 text-gray-500">
-          <button
-            onClick={() => alert('Settings: Account preferences and API keys in Profile tab.')}
+          <Link
+            href="/profile"
             className="p-2 rounded-full hover:bg-gray-100 hover:text-gray-900 transition"
-            title="Settings"
+            title="Profile & Settings"
           >
             <Settings className="w-4 h-4" />
-          </button>
+          </Link>
 
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}

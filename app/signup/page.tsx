@@ -59,7 +59,7 @@ export default function SignupPage() {
           full_name: `${firstName} ${lastName}`.trim() || username || 'Premium Partner',
           email,
           phone_number: phone || '+237 680209047',
-          balance_xaf: 5000
+          balance_xaf: 0
         })
       } else if (data.user) {
         setProfile({
@@ -67,12 +67,11 @@ export default function SignupPage() {
           email: data.user.email || email,
           full_name: `${firstName} ${lastName}`.trim() || username || 'Premium Partner',
           phone_number: phone || '+237 680209047',
-          balance_xaf: 5000
+          balance_xaf: 0
         })
       }
 
       confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } })
-      alert('Registration successful! Welcome to Premium Verify.')
       router.push('/dashboard')
     } catch (err: any) {
       setErrorMsg(err.message || 'Signup failed')
@@ -92,7 +91,7 @@ export default function SignupPage() {
         full_name: 'Google Member',
         email: 'user@google.com',
         phone_number: '+237 680209047',
-        balance_xaf: 5000
+        balance_xaf: 0
       })
       router.push('/dashboard')
     }

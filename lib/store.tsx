@@ -272,7 +272,6 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Buy SMS Virtual Number
   const buySmsNumber = (serviceName: string, serviceCode: string, countryName: string, countryCode: string, price: number): SmsOrder | null => {
     if (profile.balance_xaf < price) {
-      alert(`Insufficient balance (${profile.balance_xaf.toLocaleString()} XAF). Please top up your wallet.`)
       return null
     }
 
@@ -373,7 +372,6 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // SMM Order Creation
   const createSmmOrder = (serviceId: number, serviceName: string, category: string, link: string, quantity: number, price: number): SmmOrder | null => {
     if (profile.balance_xaf < price) {
-      alert(`Insufficient wallet balance (${profile.balance_xaf.toLocaleString()} XAF). Please deposit funds to place order.`)
       return null
     }
 
@@ -446,7 +444,6 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Account Purchase
   const purchaseAccount = (title: string, category: string, price: number, deliveryType: 'instant' | 'manual'): AccountOrder | null => {
     if (profile.balance_xaf < price) {
-      alert(`Insufficient balance (${profile.balance_xaf.toLocaleString()} XAF). Please add funds to your wallet.`)
       return null
     }
 

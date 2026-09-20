@@ -1,15 +1,19 @@
 'use client'
 
 import React, { useState } from 'react'
-import { PhoneCall, Calendar, ShieldCheck, Check, Clock } from 'lucide-react'
+import { PhoneCall, Calendar, Check, Clock, AlertTriangle, ArrowRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { COUNTRIES, CountryItem } from '@/lib/mockData'
 import { useAppState } from '@/lib/store'
 
 export default function RentNumberPage() {
-  const { profile, topUpBalance } = useAppState()
+  const router = useRouter()
+  const { profile } = useAppState()
   const [selectedDuration, setSelectedDuration] = useState<'7' | '30' | '90'>('30')
   const [selectedCountry, setSelectedCountry] = useState<CountryItem>(COUNTRIES[0])
   const [rentedNumbers, setRentedNumbers] = useState<any[]>([])
+  const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   const rates: Record<string, number> = {
     '7': 3500,   // 7 Days: 3,500 XAF
@@ -20,8 +24,15 @@ export default function RentNumberPage() {
   const price = rates[selectedDuration]
 
   const handleRentSubmit = () => {
+    setShowInsufficientBanner(false)
+    setSuccessMsg(null)
+
     if (profile.balance_xaf < price) {
-      alert(`Insufficient balance (${profile.balance_xaf.toLocaleString()} XAF). Please deposit funds to rent number.`)
+      setShowInsufficientBanner(true)
+      // Redirect to top-up page with amount pre-filled
+      setTimeout(() => {
+        router.push(`/add-funds?amount=${price}&reason=insufficient_balance`)
+      }, 1500)
       return
     }
 
@@ -40,7 +51,7 @@ export default function RentNumberPage() {
     }
 
     setRentedNumbers([newRent, ...rentedNumbers])
-    alert(`Successfully rented dedicated virtual number ${generatedPhone} for ${selectedDuration} days!`)
+    setSuccessMsg(`Successfully rented dedicated virtual number ${generatedPhone} for ${selectedDuration} days!`)
   }
 
   return (
@@ -51,6 +62,33 @@ export default function RentNumberPage() {
           Get dedicated long-term virtual phone numbers for receiving unlimited SMS verification codes over 7, 30, or 90 days.
         </p>
       </div>
+
+      {/* In-App Insufficient Balance Banner */}
+      {showInsufficientBanner && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-4 text-amber-900 animate-in fade-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="text-xs">
+              <span className="font-extrabold text-sm block">Insufficient Balance ({profile.balance_xaf.toLocaleString()} XAF)</span>
+              <span>You need {price.toLocaleString()} XAF to rent this line. Redirecting you to the Top Up page...</span>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/add-funds?amount=${price}&reason=insufficient_balance`)}
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shrink-0 flex items-center gap-1 transition"
+          >
+            <span>Top Up Now</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Success Notification */}
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-green-50 border border-green-200 text-xs font-bold text-green-800">
+          {successMsg}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         

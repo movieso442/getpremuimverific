@@ -14,6 +14,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [authMsg, setAuthMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!isOpen) return null
@@ -24,17 +25,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setAuthMsg(null)
     if (!email || !password) {
-      alert('Please fill in your email and password')
+      setAuthMsg('Please fill in your email and password')
       return
     }
 
     setIsSubmitting(true)
     setTimeout(() => {
       setIsSubmitting(false)
-      alert(`Welcome back to Premium Verify! Authenticated as ${email}`)
       onClose()
-    }, 1200)
+    }, 1000)
   }
 
   return (

@@ -3,6 +3,8 @@
  * Interactive multi-step guided assistant engine.
  */
 
+import { createClient } from '@supabase/supabase-js'
+
 export interface WhatsAppMessagePayload {
   from: string
   text: string
@@ -12,28 +14,74 @@ export interface WhatsAppMessagePayload {
 // In-memory simple session tracker for user steps
 const userSessions: Record<string, { step: string; subStep?: string; service?: string }> = {}
 
-// Code mapping for SMM packages
-const CODE_TO_SERVICE: Record<string, { id: number; name: string; rate: string }> = {
-  S1: { id: 101, name: 'Telegram High-Quality Real Members', rate: '1,500 XAF / 1,000' },
-  S2: { id: 102, name: 'Telegram Non-Drop Premium Members', rate: '2,500 XAF / 1,000' },
-  S3: { id: 103, name: 'Telegram Instant Post Views', rate: '500 XAF / 1,000' },
-  S4: { id: 104, name: 'Telegram Positive Reactions / Votes', rate: '800 XAF / 1,000' },
+// SMM Packages catalogue
+const CODE_TO_SERVICE: Record<string, { id: number; name: string; rateXaf: number; rateText: string }> = {
+  S1: { id: 101, name: 'Telegram High-Quality Real Members', rateXaf: 1500, rateText: '1,500 XAF / 1,000' },
+  S2: { id: 102, name: 'Telegram Non-Drop Premium Members', rateXaf: 2500, rateText: '2,500 XAF / 1,000' },
+  S3: { id: 103, name: 'Telegram Instant Post Views', rateXaf: 500, rateText: '500 XAF / 1,000' },
+  S4: { id: 104, name: 'Telegram Positive Reactions / Votes', rateXaf: 800, rateText: '800 XAF / 1,000' },
 
-  S5: { id: 201, name: 'Instagram Real Followers', rate: '1,800 XAF / 1,000' },
-  S6: { id: 202, name: 'Instagram Instant Post Likes', rate: '600 XAF / 1,000' },
-  S7: { id: 203, name: 'Instagram Reel Views', rate: '400 XAF / 1,000' },
+  S5: { id: 201, name: 'Instagram Real Followers', rateXaf: 1800, rateText: '1,800 XAF / 1,000' },
+  S6: { id: 202, name: 'Instagram Instant Post Likes', rateXaf: 600, rateText: '600 XAF / 1,000' },
+  S7: { id: 203, name: 'Instagram Reel Views', rateXaf: 400, rateText: '400 XAF / 1,000' },
 
-  S8: { id: 301, name: 'YouTube High Retention Views', rate: '2,800 XAF / 1,000' },
-  S9: { id: 302, name: 'YouTube Real Subscribers', rate: '6,500 XAF / 1,000' },
-  S10: { id: 303, name: 'YouTube Video Likes', rate: '1,200 XAF / 1,000' },
+  S8: { id: 301, name: 'YouTube High Retention Views', rateXaf: 2800, rateText: '2,800 XAF / 1,000' },
+  S9: { id: 302, name: 'YouTube Real Subscribers', rateXaf: 6500, rateText: '6,500 XAF / 1,000' },
+  S10: { id: 303, name: 'YouTube Video Likes', rateXaf: 1200, rateText: '1,200 XAF / 1,000' },
 
-  S11: { id: 401, name: 'TikTok Real Followers', rate: '2,200 XAF / 1,000' },
-  S12: { id: 402, name: 'TikTok Video Likes', rate: '800 XAF / 1,000' },
-  S13: { id: 403, name: 'TikTok Video Views', rate: '300 XAF / 1,000' },
+  S11: { id: 401, name: 'TikTok Real Followers', rateXaf: 2200, rateText: '2,200 XAF / 1,000' },
+  S12: { id: 402, name: 'TikTok Video Likes', rateXaf: 800, rateText: '800 XAF / 1,000' },
+  S13: { id: 403, name: 'TikTok Video Views', rateXaf: 300, rateText: '300 XAF / 1,000' },
 
-  S14: { id: 501, name: 'Facebook Page Likes / Followers', rate: '2,400 XAF / 1,000' },
-  S15: { id: 502, name: 'Facebook Profile Followers', rate: '2,000 XAF / 1,000' },
-  S16: { id: 503, name: 'Facebook Post Reactions', rate: '900 XAF / 1,000' }
+  S14: { id: 501, name: 'Facebook Page Likes / Followers', rateXaf: 2400, rateText: '2,400 XAF / 1,000' },
+  S15: { id: 502, name: 'Facebook Profile Followers', rateXaf: 2000, rateText: '2,000 XAF / 1,000' },
+  S16: { id: 503, name: 'Facebook Post Reactions', rateXaf: 900, rateText: '900 XAF / 1,000' }
+}
+
+const SMS_PRICES: Record<string, number> = {
+  wa: 500,
+  tg: 500,
+  go: 450,
+  tk: 400,
+  ig: 450,
+  ot: 600
+}
+
+function getAppUrl(): string {
+  return 'https://www.premiumverific.com'
+}
+
+async function getProfileFromSupabase(identifier: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cdfmfxfkbqlcjbesymxd.supabase.co'
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceRoleKey) return null
+
+  try {
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .or(`phone_number.eq.${identifier},user_id.eq.${identifier}`)
+      .maybeSingle()
+
+    return profile || null
+  } catch (err) {
+    console.warn('[Supabase Profile Fetch Error]:', err)
+    return null
+  }
+}
+
+async function updateProfileBalance(profileId: string, newBalance: number) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cdfmfxfkbqlcjbesymxd.supabase.co'
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceRoleKey) return
+
+  try {
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
+    await supabaseAdmin.from('profiles').update({ balance_xaf: newBalance }).eq('id', profileId)
+  } catch (err) {
+    console.warn('[Supabase Balance Update Error]:', err)
+  }
 }
 
 async function getPayunitCheckoutUrl(amount: number): Promise<string> {
@@ -44,7 +92,7 @@ async function getPayunitCheckoutUrl(amount: number): Promise<string> {
   const apiKey = mode === 'live'
     ? (process.env.PAYUNIT_LIVE_KEY || process.env.PAYUNIT_API_KEY || 'live_jpniXcJT6aXHNXujkNw9Hne3qlcLQcz2daqisYPE')
     : (process.env.PAYUNIT_API_KEY || 'sand_aA2n1kinNgZxlGY2xk1Z83JOJrFSu6')
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getpremuimverific.vercel.app'
+  const appUrl = getAppUrl()
   const transactionId = `PV-${Math.floor(100000 + Math.random() * 900000)}`
 
   const baseUrl = mode === 'live' 
@@ -142,9 +190,13 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   const text = (payload.text || '').trim()
   const lowerText = text.toLowerCase()
   const userPhone = payload.from
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getpremuimverific.vercel.app'
+  const appUrl = getAppUrl()
 
   const session = userSessions[userPhone] || { step: 'MAIN' }
+
+  // Fetch current user profile & balance
+  const userProfile = await getProfileFromSupabase(userPhone)
+  const currentBalance = userProfile ? Number(userProfile.balance_xaf) || 0 : 0
 
   // 1. GREETING / MAIN MENU COMMAND
   const isReset = 
@@ -174,10 +226,11 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
 
   // 2. CHECK BALANCE (/balance, 4, balance)
   if (lowerText === '4' || lowerText === '/balance' || lowerText === 'balance' || lowerText === 'solde') {
+    const usd = (currentBalance / 600).toFixed(2)
     return (
       `💼 *Premium Verify Wallet Status*\n\n` +
       `👤 *User:* ${payload.name || userPhone}\n` +
-      `💵 *Balance:* 25,000 XAF (~$41.60 USD)\n` +
+      `💵 *Balance:* ${currentBalance.toLocaleString()} XAF (~$${usd} USD)\n` +
       `⚡ *Status:* Active Member\n\n` +
       `To deposit funds, reply \`3\` or type \`pay 5000\`.`
     )
@@ -227,12 +280,12 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
     return (
       `📱 *Virtual SMS Verification Numbers*\n\n` +
       `Select your target app/service by replying with a letter:\n\n` +
-      `*A.* WhatsApp\n` +
-      `*B.* Telegram\n` +
-      `*C.* Google / Gmail / YouTube\n` +
-      `*D.* TikTok\n` +
-      `*E.* Instagram / Facebook\n` +
-      `*F.* Other Services (Netflix, Steam, OpenAI...)\n\n` +
+      `*A.* WhatsApp (500 XAF)\n` +
+      `*B.* Telegram (500 XAF)\n` +
+      `*C.* Google / Gmail / YouTube (450 XAF)\n` +
+      `*D.* TikTok (400 XAF)\n` +
+      `*E.* Instagram / Facebook (450 XAF)\n` +
+      `*F.* Other Services (600 XAF)\n\n` +
       `_Reply with A, B, C, D, E, or F_`
     )
   }
@@ -258,12 +311,12 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
 
     return (
       `🌍 *Choose Country for ${serviceName} SMS:*\n\n` +
-      `1️⃣ 🇺🇸 United States (+1) - 500 XAF\n` +
-      `2️⃣ 🇬🇧 United Kingdom (+44) - 600 XAF\n` +
-      `3️⃣ 🇨🇲 Cameroon (+237) - 400 XAF\n` +
-      `4️⃣ 🇳🇬 Nigeria (+234) - 450 XAF\n` +
-      `5️⃣ 🇫🇷 France (+33) - 750 XAF\n\n` +
-      `_Reply with 1, 2, 3, 4, or 5 to allocate your number immediately._`
+      `1️⃣ 🇺🇸 United States (+1)\n` +
+      `2️⃣ 🇬🇧 United Kingdom (+44)\n` +
+      `3️⃣ 🇨🇲 Cameroon (+237)\n` +
+      `4️⃣ 🇳🇬 Nigeria (+234)\n` +
+      `5️⃣ 🇫🇷 France (+33)\n\n` +
+      `_Reply with 1, 2, 3, 4, or 5 to allocate your number._`
     )
   }
 
@@ -291,8 +344,27 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
       country = countryMap[lowerText] || 'US'
     }
 
+    const price = SMS_PRICES[service] || 500
+
+    // STRICT BALANCE CHECK BEFORE SMS ALLOCATION
+    if (currentBalance < price) {
+      const topupUrl = await getPayunitCheckoutUrl(price)
+      return (
+        `⚠️ *Insufficient Wallet Balance!*\n\n` +
+        `💳 *Required:* ${price.toLocaleString()} XAF\n` +
+        `💵 *Your Balance:* ${currentBalance.toLocaleString()} XAF\n\n` +
+        `Please top up your account balance to receive this virtual number:\n` +
+        `👉 *Click to Top Up:* ${topupUrl}`
+      )
+    }
+
     userSessions[userPhone] = { step: 'MAIN' }
     const result = await allocateSmsNumber(service, country)
+
+    // Deduct balance from DB profile if present
+    if (userProfile) {
+      await updateProfileBalance(userProfile.id, currentBalance - price)
+    }
 
     return (
       `✅ *SMS Virtual Number Allocated!*\n\n` +
@@ -301,7 +373,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
       `🌍 *Country:* ${result.country}\n` +
       `🆔 *Order ID:* ${result.id}\n\n` +
       `⏳ *Status:* Waiting for SMS Code...\n` +
-      `_Check code arrival live at:_ ${appUrl}/sms-verification`
+      `_Track live code arrival at:_ ${appUrl}/sms-verification`
     )
   }
 
@@ -317,6 +389,19 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
       `🎵 *TK* - TikTok (Followers, Likes, Views)\n` +
       `👤 *F1* - Facebook (Page Likes, Profile Followers)\n\n` +
       `_Reply with T1, I1, Y1, TK, or F1_`
+    )
+  }
+
+  // Single code prompt check (e.g. user sends "S1" alone)
+  const singleCode = text.toUpperCase()
+  if (CODE_TO_SERVICE[singleCode] && text.split(' ').filter(Boolean).length === 1) {
+    const pkg = CODE_TO_SERVICE[singleCode]
+    return (
+      `🎯 *Package Selected: ${pkg.name}*\n` +
+      `💰 *Rate:* ${pkg.rateText}\n\n` +
+      `👉 *To complete order, reply in format:*\n` +
+      `\`${singleCode} <target_link> <quantity>\`\n\n` +
+      `_Example:_ \`${singleCode} https://t.me/mychannel 1000\``
     )
   }
 
@@ -391,11 +476,13 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
     let serviceName = 'SMM Package'
     let link = ''
     let quantity = 1000
+    let rateXaf = 1500
 
     if (CODE_TO_SERVICE[codeCandidate]) {
       const pkg = CODE_TO_SERVICE[codeCandidate]
       serviceId = pkg.id
       serviceName = pkg.name
+      rateXaf = pkg.rateXaf
       link = smmPrefixMatch ? parts[2] : parts[1]
       quantity = Number(smmPrefixMatch ? parts[3] : parts[2]) || 1000
     } else {
@@ -404,15 +491,36 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
       quantity = Number(smmPrefixMatch ? parts[3] : parts[2]) || 1000
     }
 
+    const calculatedCharge = Math.ceil((rateXaf * quantity) / 1000)
+
+    // STRICT BALANCE CHECK BEFORE SMM ORDER FULFILLMENT
+    if (currentBalance < calculatedCharge) {
+      const topupUrl = await getPayunitCheckoutUrl(calculatedCharge)
+      return (
+        `⚠️ *Insufficient Wallet Balance!*\n\n` +
+        `🎯 *Order Total:* ${calculatedCharge.toLocaleString()} XAF\n` +
+        `💵 *Your Balance:* ${currentBalance.toLocaleString()} XAF\n\n` +
+        `Please top up your wallet to place this order:\n` +
+        `👉 *Click to Top Up:* ${topupUrl}`
+      )
+    }
+
     if (link && quantity > 0) {
       userSessions[userPhone] = { step: 'MAIN' }
       const res = await placeSmmOrder(serviceId, link, quantity)
+
+      // Deduct balance from DB profile if present
+      if (userProfile) {
+        await updateProfileBalance(userProfile.id, currentBalance - calculatedCharge)
+      }
+
       return (
         `🚀 *SMM Order Placed Successfully!*\n\n` +
         `📦 *Order Ref:* #${res.order}\n` +
         `🎯 *Service:* ${serviceName} (ID: ${serviceId})\n` +
         `🔗 *Target Link:* ${link}\n` +
         `📊 *Quantity:* ${quantity.toLocaleString()}\n` +
+        `💰 *Charged:* ${calculatedCharge.toLocaleString()} XAF\n` +
         `⚡ *Status:* Processing\n\n` +
         `Track updates at ${appUrl}/smm-panel`
       )

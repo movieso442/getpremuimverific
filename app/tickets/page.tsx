@@ -11,8 +11,11 @@ export default function TicketsPage() {
     { id: 402, subject: 'UK Phone Number SMS delivery confirmation', status: 'Pending', date: '2026-09-14' }
   ])
 
+  const [ticketMsg, setTicketMsg] = useState<string | null>(null)
+
   const handleCreateTicket = (e: React.FormEvent) => {
     e.preventDefault()
+    setTicketMsg(null)
     if (!subject || !message) return
     const newT = {
       id: Math.floor(100 + Math.random() * 900),
@@ -23,7 +26,7 @@ export default function TicketsPage() {
     setTickets([newT, ...tickets])
     setSubject('')
     setMessage('')
-    alert('Ticket submitted successfully! Response within 15 minutes.')
+    setTicketMsg('Ticket submitted successfully! Our team responds within 15 minutes.')
   }
 
   return (
@@ -37,6 +40,12 @@ export default function TicketsPage() {
             <MessageSquare className="w-5 h-5 text-[#ff5722]" />
             <span>Open a Support Ticket</span>
           </h2>
+
+          {ticketMsg && (
+            <div className="p-3 bg-green-50 border border-green-200 text-green-800 text-xs font-bold rounded-xl">
+              {ticketMsg}
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-bold uppercase text-gray-400 block mb-1">Subject</label>

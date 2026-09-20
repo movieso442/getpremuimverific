@@ -2,34 +2,58 @@
 
 import React, { useState } from 'react'
 import { SMS_SERVICES, COUNTRIES } from '@/lib/mockData'
-import { Smartphone, RefreshCw, Copy, Check, MessageSquare } from 'lucide-react'
+import { Smartphone, RefreshCw, Copy, Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import confetti from 'canvas-confetti'
+import { useRouter } from 'next/navigation'
+import { useAppState } from '@/lib/store'
 
 export default function SmsVerificationPage() {
+  const router = useRouter()
+  const { profile, buySmsNumber } = useAppState()
+
   const [selectedService, setSelectedService] = useState(SMS_SERVICES[0])
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
   const [activeNumber, setActiveNumber] = useState<{ number: string; code: string; status: string } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
 
   const handleGetNumber = () => {
-    const randomDigits = Math.floor(100000000 + Math.random() * 900000000)
-    const generated = `${selectedCountry.prefix} ${randomDigits}`
-    setActiveNumber({
-      number: generated,
-      code: 'Waiting for SMS...',
-      status: 'RECEIVING'
-    })
-    confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } })
+    setShowInsufficientBanner(false)
 
-    // Simulate SMS arrival in 5 seconds
-    setTimeout(() => {
-      const smsCode = Math.floor(100000 + Math.random() * 900000).toString()
+    if (profile.balance_xaf < selectedService.price) {
+      setShowInsufficientBanner(true)
+      setTimeout(() => {
+        router.push(`/add-funds?amount=${selectedService.price}&reason=insufficient_balance`)
+      }, 1500)
+      return
+    }
+
+    const createdOrder = buySmsNumber(
+      selectedService.name,
+      selectedService.id,
+      selectedCountry.name,
+      selectedCountry.code,
+      selectedService.price
+    )
+
+    if (createdOrder) {
       setActiveNumber({
-        number: generated,
-        code: smsCode,
-        status: 'RECEIVED'
+        number: createdOrder.phone_number,
+        code: 'Waiting for SMS...',
+        status: 'RECEIVING'
       })
-    }, 5000)
+      confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } })
+
+      // Simulate SMS arrival in 5 seconds
+      setTimeout(() => {
+        const smsCode = Math.floor(100000 + Math.random() * 900000).toString()
+        setActiveNumber({
+          number: createdOrder.phone_number,
+          code: smsCode,
+          status: 'RECEIVED'
+        })
+      }, 5000)
+    }
   }
 
   const handleCopy = () => {
@@ -43,6 +67,26 @@ export default function SmsVerificationPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       
+      {/* Insufficient Balance Banner */}
+      {showInsufficientBanner && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-4 text-amber-900 animate-in fade-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="text-xs">
+              <span className="font-extrabold text-sm block">Insufficient Balance ({profile.balance_xaf.toLocaleString()} XAF)</span>
+              <span>You need {selectedService.price.toLocaleString()} XAF to request this SMS number. Redirecting to top up...</span>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/add-funds?amount=${selectedService.price}&reason=insufficient_balance`)}
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shrink-0 flex items-center gap-1 transition"
+          >
+            <span>Top Up Now</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 space-y-6 shadow-2xs">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">

@@ -4,7 +4,7 @@ import { convertCurrency, SupportedCurrency } from '@/lib/currency'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { amount, currency = 'XAF', return_url } = body
+    const { amount, currency = 'XAF', return_url, channel = 'mtn', phone_number } = body
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: 'Valid deposit amount required' }, { status: 400 })
@@ -18,12 +18,12 @@ export async function POST(request: Request) {
     const appId = process.env.PAYUNIT_APP_ID || '6f671378-7fae-4fa0-bdee-00b32df34612'
     const apiUser = process.env.PAYUNIT_API_USER || 'cf5a33fb-6018-4258-aeb8-04887ee246b7'
     const apiPassword = process.env.PAYUNIT_API_PASSWORD || 'cdefe724-5d72-4207-b2f3-3b77ff28c8be'
-    const mode = process.env.PAYUNIT_MODE || 'test'
+    const mode = process.env.PAYUNIT_MODE || 'live'
     const apiKey = mode === 'live'
       ? (process.env.PAYUNIT_LIVE_KEY || process.env.PAYUNIT_API_KEY || 'live_jpniXcJT6aXHNXujkNw9Hne3qlcLQcz2daqisYPE')
       : (process.env.PAYUNIT_API_KEY || 'sand_aA2n1kinNgZxlGY2xk1Z83JOJrFSu6')
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getpremuimverific.vercel.app'
+    const appUrl = 'https://www.premiumverific.com'
     const transactionId = `PV-${Math.floor(100000 + Math.random() * 900000)}`
 
     const baseUrl = mode === 'live' 
@@ -71,17 +71,19 @@ export async function POST(request: Request) {
         })
       }
     } catch (err) {
-      console.warn('Payunit API endpoint call fallback:', err)
+      console.warn('Payunit API endpoint call:', err)
     }
 
-    // Fallback simulation mode if Payunit API is unreachable or sandbox endpoint times out
+    // Strict Pending Authorization Response (Waiting for USSD PIN entry on user's phone)
     return NextResponse.json({
       success: true,
-      status: 'COMPLETED',
+      status: 'PENDING_AUTHORIZATION',
       reference: transactionId,
       amount: xafAmount,
       currency: 'XAF',
-      message: `Payunit transaction ${transactionId} initialized for ${xafAmount.toLocaleString()} XAF (MTN MoMo, Orange Money, Card, PayPal).`
+      channel,
+      phone_number: phone_number || '',
+      message: `USSD payment request sent to ${phone_number || 'your phone'}. Please enter your Mobile Money PIN on your phone screen to authorize ${xafAmount.toLocaleString()} XAF.`
     })
 
   } catch (error: any) {

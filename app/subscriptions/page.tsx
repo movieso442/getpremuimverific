@@ -104,7 +104,7 @@ export default function SubscriptionsPage() {
 
                   <td className="p-3.5">
                     <button
-                      onClick={() => alert(`Subscription #${sub.id} paused/stopped.`)}
+                      onClick={() => {}}
                       className="w-5 h-5 rounded bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition"
                       title="Stop Subscription"
                     >

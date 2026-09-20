@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Video,
   Music,
@@ -17,14 +18,16 @@ import {
   Share2,
   Tv,
   MessageCircle,
-  HelpCircle
+  HelpCircle,
+  AlertTriangle,
+  ArrowRight
 } from 'lucide-react'
 import liveServices from '@/lib/liveServices.json'
 import { useAppState } from '@/lib/store'
 import confetti from 'canvas-confetti'
 
 export default function DashboardPage() {
-  const { createSmmOrder } = useAppState()
+  const { createSmmOrder, profile } = useAppState()
 
   const allServices = liveServices as any[]
   const allCategories = Array.from(new Set(allServices.map((s) => s.category)))
@@ -128,14 +131,30 @@ export default function DashboardPage() {
     : (rateUsd * (quantity / 1000))
   const chargeXaf = Math.ceil(chargeUsd * 600 * 1.25)
 
+  const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
+  const router = useRouter()
+
+  const [orderStatusMsg, setOrderStatusMsg] = useState<{ type: 'success' | 'error'; text: string; link?: string } | null>(null)
+
   const handleOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setShowInsufficientBanner(false)
+    setOrderStatusMsg(null)
+
     if (!targetLink.trim()) {
-      alert('Please enter a target link, username, or order detail keywords!')
+      setOrderStatusMsg({ type: 'error', text: 'Please enter a target link, username, or order detail keywords!' })
       return
     }
     if (quantity < currentService.min || quantity > currentService.max) {
-      alert(`Quantity must be between ${currentService.min.toLocaleString()} and ${currentService.max.toLocaleString()}`)
+      setOrderStatusMsg({ type: 'error', text: `Quantity must be between ${currentService.min.toLocaleString()} and ${currentService.max.toLocaleString()}` })
+      return
+    }
+
+    if (profile.balance_xaf < chargeXaf) {
+      setShowInsufficientBanner(true)
+      setTimeout(() => {
+        router.push(`/add-funds?amount=${chargeXaf}&reason=insufficient_balance`)
+      }, 1500)
       return
     }
 
@@ -150,14 +169,18 @@ export default function DashboardPage() {
 
     if (newOrder) {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
-      alert(`Order #${newOrder.id} placed successfully! Check status in Orders tab.`)
+      setOrderStatusMsg({
+        type: 'success',
+        text: `Order #${newOrder.id} placed successfully!`,
+        link: '/orders'
+      })
       setTargetLink('')
     }
   }
 
   const toggleFavorite = (id: number) => {
     if (favoriteServiceIds.includes(id)) {
-      setFavoriteServiceIds(favoriteServiceIds.filter(f => f !== id))
+      setFavoriteServiceIds(favoriteServiceIds.filter((f: number) => f !== id))
     } else {
       setFavoriteServiceIds([...favoriteServiceIds, id])
     }
@@ -223,6 +246,25 @@ export default function DashboardPage() {
         
         {/* Left 2 Cols: Order Form */}
         <div className="lg:col-span-2 space-y-4">
+          
+          {showInsufficientBanner && (
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-4 text-amber-900 animate-in fade-in slide-in-from-top duration-200">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="text-xs">
+                  <span className="font-extrabold text-sm block">Insufficient Balance ({profile.balance_xaf.toLocaleString()} XAF)</span>
+                  <span>You need {chargeXaf.toLocaleString()} XAF to place this SMM order. Redirecting you to the Top Up page...</span>
+                </div>
+              </div>
+              <button
+                onClick={() => router.push(`/add-funds?amount=${chargeXaf}&reason=insufficient_balance`)}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shrink-0 flex items-center gap-1 transition"
+              >
+                <span>Top Up Now</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           
           {/* Tabs: NEW ORDER / MY FAVORITE / AUTO SUBSCRIPTION */}
           <div className="flex items-center gap-2 border-b border-gray-200 pb-3">
@@ -390,6 +432,19 @@ export default function DashboardPage() {
                 </button>
               </div>
 
+              {orderStatusMsg && (
+                <div className={`p-4 rounded-xl text-xs font-semibold flex items-center justify-between gap-3 ${
+                  orderStatusMsg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  <span>{orderStatusMsg.text}</span>
+                  {orderStatusMsg.link && (
+                    <Link href={orderStatusMsg.link} className="font-extrabold text-[#ff5722] hover:underline shrink-0">
+                      View Orders &rarr;
+                    </Link>
+                  )}
+                </div>
+              )}
+
               {/* SUBMIT Button (Exact Orange matching JAP Screenshots 1, 2, 4) */}
               <button
                 type="submit"
@@ -405,7 +460,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4 shadow-2xs">
               <h3 className="text-sm font-bold text-gray-900">Your Favorite Services</h3>
               <div className="space-y-2">
-                {favoriteServiceIds.map((id) => {
+                {favoriteServiceIds.map((id: number) => {
                   const srv = allServices.find((s) => s.id === id)
                   if (!srv) return null
                   return (

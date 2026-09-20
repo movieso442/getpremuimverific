@@ -42,10 +42,13 @@ export default function DeveloperPage() {
     }
   }
 
+  const [devMsg, setDevMsg] = useState<string | null>(null)
+
   const handleCreateApiKey = (e: React.FormEvent) => {
     e.preventDefault()
+    setDevMsg(null)
     if (!keyNameInput.trim()) {
-      alert('Please enter a key name (e.g., Production API Key)')
+      setDevMsg('Please enter a key name (e.g., Production API Key)')
       return
     }
     const created = addApiKey(keyNameInput)
@@ -55,13 +58,14 @@ export default function DeveloperPage() {
 
   const handleAddWebhook = (e: React.FormEvent) => {
     e.preventDefault()
+    setDevMsg(null)
     if (!webhookUrlInput.trim()) {
-      alert('Please enter a valid webhook target URL')
+      setDevMsg('Please enter a valid webhook target URL')
       return
     }
     addWebhook(webhookUrlInput, selectedEvents)
     setWebhookUrlInput('')
-    alert('Webhook endpoint registered successfully!')
+    setDevMsg('Webhook endpoint registered successfully!')
   }
 
   const handleCopyKey = (keyString: string, id: string) => {
@@ -72,6 +76,13 @@ export default function DeveloperPage() {
 
   return (
     <div className="space-y-8">
+      {devMsg && (
+        <div className="p-4 rounded-xl bg-orange-50 border border-orange-200 text-xs font-bold text-[#ea580c] flex items-center justify-between">
+          <span>{devMsg}</span>
+          <button onClick={() => setDevMsg(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+      )}
+
       {/* Title Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>

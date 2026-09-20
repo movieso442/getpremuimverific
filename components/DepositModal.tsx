@@ -24,7 +24,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
   const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (amount <= 0) {
-      alert('Please enter a valid deposit amount')
+      setStatusMessage('Please enter a valid deposit amount')
       return
     }
 
@@ -73,7 +73,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
       }, 2000)
 
     } catch (err: any) {
-      alert(err.message || 'Payment processing failed')
+      setStatusMessage(err.message || 'Payment processing failed')
     } finally {
       setIsProcessing(false)
     }
