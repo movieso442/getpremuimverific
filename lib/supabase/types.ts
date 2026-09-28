@@ -35,6 +35,7 @@ export interface WalletTransaction {
 export interface SmsOrder {
   id: string
   profile_id: string
+  provider_order_id?: string
   service_name: string
   service_code: string
   country_name: string

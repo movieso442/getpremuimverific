@@ -32,6 +32,7 @@ export const walletTransactions = pgTable('wallet_transactions', {
 export const smsOrders = pgTable('sms_orders', {
   id: uuid('id').defaultRandom().primaryKey(),
   profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }),
+  providerOrderId: text('provider_order_id').unique(),
   serviceName: text('service_name').notNull(),
   serviceCode: text('service_code').notNull(),
   countryName: text('country_name').notNull(),

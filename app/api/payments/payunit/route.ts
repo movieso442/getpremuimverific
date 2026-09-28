@@ -1,92 +1,65 @@
 import { NextResponse } from 'next/server'
 import { convertCurrency, SupportedCurrency } from '@/lib/currency'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { amount, currency = 'XAF', return_url, channel = 'mtn', phone_number } = body
-
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'Valid deposit amount required' }, { status: 400 })
+    const { amount, currency = 'XAF', return_url, phone_number } = await request.json() as {
+      amount?: number; currency?: string; return_url?: string; phone_number?: string
     }
+    if (!amount || amount <= 0) return NextResponse.json({ error: 'Valid deposit amount required.' }, { status: 400 })
 
-    const inputCurrency = (currency as string).toUpperCase() as SupportedCurrency
-    const xafAmount = inputCurrency === 'USD'
-      ? Math.round(convertCurrency(amount, 'USD', 'XAF'))
-      : Math.round(amount)
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Sign in before adding funds.' }, { status: 401 })
+    const admin = createAdminClient()
+    const { data: profile, error: profileError } = await admin.from('profiles').select('id').eq('user_id', user.id).single()
+    if (profileError || !profile) return NextResponse.json({ error: 'Your wallet profile is unavailable.' }, { status: 409 })
 
-    const appId = process.env.PAYUNIT_APP_ID || '6f671378-7fae-4fa0-bdee-00b32df34612'
-    const apiUser = process.env.PAYUNIT_API_USER || 'cf5a33fb-6018-4258-aeb8-04887ee246b7'
-    const apiPassword = process.env.PAYUNIT_API_PASSWORD || 'cdefe724-5d72-4207-b2f3-3b77ff28c8be'
+    const inputCurrency = currency.toUpperCase() as SupportedCurrency
+    const xafAmount = inputCurrency === 'USD' ? Math.round(convertCurrency(amount, 'USD', 'XAF')) : Math.round(amount)
+    const appId = process.env.PAYUNIT_APP_ID
+    const apiUser = process.env.PAYUNIT_API_USER
+    const apiPassword = process.env.PAYUNIT_API_PASSWORD
     const mode = process.env.PAYUNIT_MODE || 'live'
-    const apiKey = mode === 'live'
-      ? (process.env.PAYUNIT_LIVE_KEY || process.env.PAYUNIT_API_KEY || 'live_jpniXcJT6aXHNXujkNw9Hne3qlcLQcz2daqisYPE')
-      : (process.env.PAYUNIT_API_KEY || 'sand_aA2n1kinNgZxlGY2xk1Z83JOJrFSu6')
+    const apiKey = mode === 'live' ? process.env.PAYUNIT_LIVE_KEY : process.env.PAYUNIT_API_KEY
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!appId || !apiUser || !apiPassword || !apiKey || !appUrl)
+      return NextResponse.json({ error: 'Payunit is not fully configured. No wallet credit was created.' }, { status: 503 })
 
-    const appUrl = 'https://www.premiumverific.com'
-    const transactionId = `PV-${Math.floor(100000 + Math.random() * 900000)}`
-
-    const baseUrl = mode === 'live' 
-      ? 'https://gateway.payunit.net/api/gateway/initialize'
-      : 'https://sandbox.payunit.net/api/gateway/initialize'
-
-    const payunitPayload = {
-      total_amount: xafAmount,
-      currency: 'XAF',
-      transaction_id: transactionId,
-      return_url: return_url || `${appUrl}/add-funds?status=success&ref=${transactionId}`,
-      notify_url: `${appUrl}/api/payments/webhooks/payunit`,
-      app_id: appId,
-      description: `Premium Verify Wallet Topup (${xafAmount.toLocaleString()} XAF)`
-    }
-
-    const headers: Record<string, string> = {
-      'x-api-key': apiKey,
-      'mode': mode,
-      'Content-Type': 'application/json'
-    }
-
-    if (apiUser && apiPassword) {
-      const basicAuth = Buffer.from(`${apiUser}:${apiPassword}`).toString('base64')
-      headers['Authorization'] = `Basic ${basicAuth}`
-    }
-
-    try {
-      const response = await fetch(baseUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payunitPayload)
-      })
-
-      const data = await response.json()
-
-      if (data.status === 'SUCCESS' && (data.data?.transaction_url || data.data?.payment_url)) {
-        return NextResponse.json({
-          success: true,
-          status: 'REDIRECT',
-          payment_url: data.data.transaction_url || data.data.payment_url,
-          transaction_id: transactionId,
-          reference: transactionId,
-          amount: xafAmount
-        })
-      }
-    } catch (err) {
-      console.warn('Payunit API endpoint call:', err)
-    }
-
-    // Strict Pending Authorization Response (Waiting for USSD PIN entry on user's phone)
-    return NextResponse.json({
-      success: true,
-      status: 'PENDING_AUTHORIZATION',
-      reference: transactionId,
-      amount: xafAmount,
-      currency: 'XAF',
-      channel,
-      phone_number: phone_number || '',
-      message: `USSD payment request sent to ${phone_number || 'your phone'}. Please enter your Mobile Money PIN on your phone screen to authorize ${xafAmount.toLocaleString()} XAF.`
+    const transactionId = `PV${Date.now()}${Math.floor(Math.random() * 1000)}`
+    const { error: pendingError } = await admin.from('wallet_transactions').insert({
+      profile_id: profile.id, amount: xafAmount, type: 'deposit', payment_method: 'mtn_momo', reference: transactionId,
+      status: 'pending', description: 'Payunit wallet top-up awaiting payment confirmation',
     })
+    if (pendingError) throw pendingError
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Payunit transaction processing failed' }, { status: 500 })
+    const baseUrl = mode === 'live' ? 'https://gateway.payunit.net' : 'https://sandbox.payunit.net'
+    const headers = {
+      'x-api-key': apiKey, mode, 'Content-Type': 'application/json',
+      Authorization: `Basic ${Buffer.from(`${apiUser}:${apiPassword}`).toString('base64')}`,
+    }
+    const paymentResponse = await fetch(`${baseUrl}/api/gateway/initialize`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        total_amount: xafAmount, currency: 'XAF', transaction_id: transactionId,
+        return_url: return_url || `${appUrl}/add-funds?ref=${transactionId}`,
+        notify_url: `${appUrl}/api/payments/webhooks/payunit`, payment_country: 'CM',
+        description: `Premium Verify wallet top-up (${xafAmount} XAF)`,
+      }), signal: AbortSignal.timeout(20_000),
+    })
+    const payment = await paymentResponse.json().catch(() => ({})) as { status?: string; data?: { transaction_url?: string; payment_url?: string }; message?: string }
+    const paymentUrl = payment.data?.transaction_url || payment.data?.payment_url
+    if (!paymentResponse.ok || payment.status !== 'SUCCESS' || !paymentUrl) {
+      await admin.from('wallet_transactions').update({ status: 'failed' }).eq('reference', transactionId)
+      return NextResponse.json({ error: payment.message || 'Payunit could not initialize the payment.' }, { status: 502 })
+    }
+    return NextResponse.json({ success: true, status: 'REDIRECT', payment_url: paymentUrl, reference: transactionId, amount: xafAmount })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Payunit transaction processing failed'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

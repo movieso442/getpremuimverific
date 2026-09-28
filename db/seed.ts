@@ -33,8 +33,9 @@ export interface FormattedSmmService {
 async function seedLiveServices() {
   console.log('🚀 Fetching live services catalog from JustAnotherPanel API...')
 
-  const apiKey = process.env.SMM_PROVIDER_API_KEY || 'e9053f2fe8fd9f8a8facdc6009cb6873'
+  const apiKey = process.env.SMM_PROVIDER_API_KEY
   const apiUrl = process.env.SMM_PROVIDER_API_URL || 'https://justanotherpanel.com/api/v2'
+  if (!apiKey) throw new Error('SMM_PROVIDER_API_KEY is required to seed the live catalog.')
 
   try {
     const res = await fetch(apiUrl, {

@@ -47,7 +47,26 @@ CREATE TABLE IF NOT EXISTS public.sms_orders (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Create SMM Panel Orders Table (JustAnotherPanel Integration)
+ALTER TABLE public.sms_orders ADD COLUMN IF NOT EXISTS provider_order_id TEXT UNIQUE;
+
+-- 4. Create SMM Services Catalog (used by `npm run db:seed`)
+CREATE TABLE IF NOT EXISTS public.smm_services (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  service_id INT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  rate_usd NUMERIC(10, 4) NOT NULL,
+  rate_xaf NUMERIC(12, 2) NOT NULL,
+  min INT NOT NULL,
+  max INT NOT NULL,
+  dripfeed BOOLEAN DEFAULT FALSE,
+  refill BOOLEAN DEFAULT FALSE,
+  cancel BOOLEAN DEFAULT FALSE,
+  service_type TEXT DEFAULT 'Default',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Create SMM Panel Orders Table (JustAnotherPanel Integration)
 CREATE TABLE IF NOT EXISTS public.smm_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -109,6 +128,14 @@ ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.webhooks ENABLE ROW LEVEL SECURITY;
 
 -- Create basic RLS Policies for user ownership access
+DROP POLICY IF EXISTS "Users can access own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view own transactions" ON public.wallet_transactions;
+DROP POLICY IF EXISTS "Users can access own SMS orders" ON public.sms_orders;
+DROP POLICY IF EXISTS "Users can access own SMM orders" ON public.smm_orders;
+DROP POLICY IF EXISTS "Users can access own account orders" ON public.account_orders;
+DROP POLICY IF EXISTS "Users can manage API keys" ON public.api_keys;
+DROP POLICY IF EXISTS "Users can manage webhooks" ON public.webhooks;
+
 CREATE POLICY "Users can access own profile" ON public.profiles FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can view own transactions" ON public.wallet_transactions FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
 CREATE POLICY "Users can access own SMS orders" ON public.sms_orders FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
