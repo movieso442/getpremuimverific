@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp/bot'
 import { sendTelegramMessage } from '@/lib/telegram/bot'
+import { SMS_SERVICES } from '@/lib/mockData'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   try {
@@ -8,7 +11,7 @@ export async function POST(request: Request) {
     const { action = 'getNumber', service = 'wa', country = 'US', id, user_phone, chat_id } = body
 
     const smsApiKey = process.env.SMS_PROVIDER_API_KEY
-    const smsBaseUrl = process.env.SMS_PROVIDER_BASE_URL || 'https://api.sms-activate.org/stubs/handler_api.php'
+    const smsBaseUrl = process.env.SMS_PROVIDER_BASE_URL
 
     // Check status of an existing SMS order & auto-forward code if arrived
     if (action === 'getStatus' || action === 'getSms') {
@@ -53,38 +56,53 @@ export async function POST(request: Request) {
       })
     }
 
-    // Allocate new virtual SMS number
-    if (smsApiKey) {
-      try {
-        const smsRes = await fetch(`${smsBaseUrl}?api_key=${smsApiKey}&action=getNumber&service=${service}&country=${country}`)
+    // Allocate a real number. Provider country IDs are intentionally configured server-side.
+    const catalogService = SMS_SERVICES.find((item) => item.code === service)
+    if (!catalogService) return NextResponse.json({ error: 'Unknown SMS service.' }, { status: 400 })
+
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Sign in before requesting a number.' }, { status: 401 })
+
+    const admin = createAdminClient()
+    const { data: profile, error: profileError } = await admin.from('profiles').select('*').eq('user_id', user.id).single()
+    if (profileError || !profile) return NextResponse.json({ error: 'Your wallet profile is unavailable. Please sign in again.' }, { status: 409 })
+    if (Number(profile.balance_xaf) < catalogService.price)
+      return NextResponse.json({ error: 'Insufficient wallet balance.', required_xaf: catalogService.price }, { status: 402 })
+
+    let countryMap: Record<string, string>
+    try {
+      countryMap = JSON.parse(process.env.SMS_PROVIDER_COUNTRY_MAP || '{}')
+    } catch {
+      return NextResponse.json({ error: 'SMS provider country mapping is invalid. No funds were charged.' }, { status: 503 })
+    }
+    const providerCountry = countryMap[country]
+    if (!smsApiKey || !smsBaseUrl || !providerCountry)
+      return NextResponse.json({ error: 'Live SMS provider is not configured for this country. No funds were charged.' }, { status: 503 })
+
+    try {
+        const smsRes = await fetch(`${smsBaseUrl}?api_key=${encodeURIComponent(smsApiKey)}&action=getNumber&service=${encodeURIComponent(service)}&country=${encodeURIComponent(providerCountry)}`, { signal: AbortSignal.timeout(20_000) })
         const textData = await smsRes.text()
         
         if (textData.includes('ACCESS_NUMBER')) {
           const parts = textData.split(':')
-          return NextResponse.json({
-            id: parts[1],
-            phone: parts[2],
-            status: 'WAITING_SMS'
+          const { data: order, error: orderError } = await admin.from('sms_orders').insert({
+            profile_id: profile.id, service_name: catalogService.name, service_code: service,
+            country_name: country, country_code: country, phone_number: parts[2], price_xaf: catalogService.price,
+            status: 'waiting_sms', expires_at: new Date(Date.now() + 20 * 60 * 1000).toISOString()
+          }).select().single()
+          if (orderError) throw orderError
+          const { error: transactionError } = await admin.from('wallet_transactions').insert({
+            profile_id: profile.id, amount: catalogService.price, type: 'sms_purchase', payment_method: 'mtn_momo',
+            reference: `SMS-${order.id}`, status: 'completed', description: `Live ${catalogService.name} activation`
           })
+          if (transactionError) throw transactionError
+          return NextResponse.json({ id: parts[1], order, phone: parts[2], status: 'WAITING_SMS' }, { status: 201 })
         }
-      } catch (err) {
-        console.warn('SMS Provider API fallback:', err)
-      }
+        return NextResponse.json({ error: textData || 'The SMS provider has no number available. No funds were charged.' }, { status: 502 })
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message || 'Could not contact the SMS provider. No funds were charged.' }, { status: 502 })
     }
-
-    // Default response generator for instant demo execution
-    const randomDigits = Math.floor(100000000 + Math.random() * 900000000)
-    const prefixes: Record<string, string> = { US: '+1 (407)', GB: '+44 7911', CA: '+1 (604)', CM: '+237 677', NG: '+234 803' }
-    const phone = `${prefixes[country] || '+1 (555)'} ${randomDigits}`
-
-    return NextResponse.json({
-      id: `sms_${Math.random().toString(36).substring(2, 9)}`,
-      phone,
-      service,
-      country,
-      status: 'WAITING_SMS',
-      expires_in_seconds: 1200
-    })
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Internal server error' }, { status: 500 })
   }

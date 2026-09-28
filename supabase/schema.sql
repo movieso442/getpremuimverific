@@ -121,15 +121,19 @@ CREATE POLICY "Users can manage webhooks" ON public.webhooks FOR ALL USING (auth
 CREATE OR REPLACE FUNCTION update_user_balance()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.status = 'completed' AND NEW.type = 'deposit' THEN
+  IF (TG_OP = 'INSERT' AND NEW.status = 'completed')
+     OR (TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM 'completed' AND NEW.status = 'completed') THEN
+    IF NEW.type = 'deposit' THEN
     UPDATE public.profiles SET balance_xaf = balance_xaf + NEW.amount WHERE id = NEW.profile_id;
-  ELSIF NEW.status = 'completed' AND NEW.type IN ('sms_purchase', 'smm_order', 'account_purchase') THEN
+    ELSIF NEW.type IN ('sms_purchase', 'smm_order', 'account_purchase') THEN
     UPDATE public.profiles SET balance_xaf = GREATEST(0, balance_xaf - NEW.amount) WHERE id = NEW.profile_id;
+    END IF;
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER on_wallet_transaction_insert
-AFTER INSERT OR UPDATE ON public.wallet_transactions
+DROP TRIGGER IF EXISTS on_wallet_transaction_insert ON public.wallet_transactions;
+CREATE TRIGGER on_wallet_transaction_insert
+AFTER INSERT OR UPDATE OF status ON public.wallet_transactions
 FOR EACH ROW EXECUTE FUNCTION update_user_balance();

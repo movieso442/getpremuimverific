@@ -1,24 +1,21 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { user_id, email, full_name, avatar_url, phone_number } = body
+    const { full_name, avatar_url, phone_number } = body
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.email) return NextResponse.json({ error: 'Sign in before syncing a profile.' }, { status: 401 })
+    const email = user.email
 
     if (!email) {
       return NextResponse.json({ error: 'User email is required' }, { status: 400 })
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cdfmfxfkbqlcjbesymxd.supabase.co'
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!serviceRoleKey) {
-      return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY not configured' }, { status: 500 })
-    }
-
-    // Initialize Supabase Admin Client using Service Role Key (bypasses RLS)
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
+    const supabaseAdmin = createAdminClient()
 
     // Check if profile exists
     const { data: existingProfile, error: fetchErr } = await supabaseAdmin
@@ -40,7 +37,7 @@ export async function POST(request: Request) {
     const { data: newProfile, error: insertErr } = await supabaseAdmin
       .from('profiles')
       .insert({
-        user_id: user_id || null,
+        user_id: user.id,
         email: email,
         full_name: displayName,
         avatar_url: avatar_url || null,

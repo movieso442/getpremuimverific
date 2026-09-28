@@ -1,16 +1,14 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useAppState } from '@/lib/store'
-import { SMM_SERVICES } from '@/lib/mockData'
+import liveServices from '@/lib/liveServices.json'
 import confetti from 'canvas-confetti'
 
 export default function MassOrderPage() {
-  const { createSmmOrder } = useAppState()
   const [massText, setMassText] = useState('')
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setStatusMsg(null)
     if (!massText.trim()) {
@@ -20,26 +18,37 @@ export default function MassOrderPage() {
 
     const lines = massText.trim().split('\n')
     let successCount = 0
+    const failures: string[] = []
 
-    lines.forEach((line) => {
+    for (const line of lines) {
       const parts = line.split('|')
       if (parts.length >= 3) {
         const srvId = parseInt(parts[0].trim(), 10)
         const link = parts[1].trim()
         const qty = parseInt(parts[2].trim(), 10)
-        const srv = SMM_SERVICES.find(s => s.id === srvId)
+        const srv = (liveServices as any[]).find(s => s.id === srvId)
 
         if (srv && link && qty > 0) {
-          const cost = Math.ceil((srv.rate * qty) / 1000)
-          createSmmOrder(srv.id, srv.name, srv.category, link, qty, cost)
-          successCount++
+          try {
+            const response = await fetch('/api/v1/smm/order', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ service_id: srv.id, link, quantity: qty })
+            })
+            const data = await response.json()
+            if (response.ok) successCount++
+            else failures.push(data.error || `Service ${srvId} failed`)
+          } catch {
+            failures.push(`Service ${srvId} could not reach the live provider`)
+          }
+        } else {
+          failures.push(`Invalid line: ${line}`)
         }
       }
-    })
+    }
 
     if (successCount > 0) {
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } })
-      setStatusMsg({ type: 'success', text: `Successfully placed ${successCount} mass orders! View status in Orders tab.` })
+      setStatusMsg({ type: failures.length ? 'error' : 'success', text: `${successCount} live order(s) placed.${failures.length ? ` ${failures.length} failed: ${failures[0]}` : ' View status in Orders.'}` })
       setMassText('')
     } else {
       setStatusMsg({ type: 'error', text: 'Could not parse orders. Format should be: service_id | link | quantity' })

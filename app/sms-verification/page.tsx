@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { SMS_SERVICES, COUNTRIES } from '@/lib/mockData'
 import { Smartphone, RefreshCw, Copy, Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import confetti from 'canvas-confetti'
@@ -9,16 +9,20 @@ import { useAppState } from '@/lib/store'
 
 export default function SmsVerificationPage() {
   const router = useRouter()
-  const { profile, buySmsNumber } = useAppState()
+  const { profile } = useAppState()
 
   const [selectedService, setSelectedService] = useState(SMS_SERVICES[0])
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
   const [activeNumber, setActiveNumber] = useState<{ number: string; code: string; status: string } | null>(null)
+  const [providerOrderId, setProviderOrderId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
+  const [requestError, setRequestError] = useState<string | null>(null)
+  const [isRequesting, setIsRequesting] = useState(false)
 
-  const handleGetNumber = () => {
+  const handleGetNumber = async () => {
     setShowInsufficientBanner(false)
+    setRequestError(null)
 
     if (profile.balance_xaf < selectedService.price) {
       setShowInsufficientBanner(true)
@@ -28,33 +32,50 @@ export default function SmsVerificationPage() {
       return
     }
 
-    const createdOrder = buySmsNumber(
-      selectedService.name,
-      selectedService.id,
-      selectedCountry.name,
-      selectedCountry.code,
-      selectedService.price
-    )
-
-    if (createdOrder) {
+    setIsRequesting(true)
+    try {
+      const response = await fetch('/api/v1/sms/order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service: selectedService.code, country: selectedCountry.code })
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setRequestError(result.error || 'Could not allocate a live number. No funds were charged.')
+        return
+      }
       setActiveNumber({
-        number: createdOrder.phone_number,
+        number: result.phone,
         code: 'Waiting for SMS...',
         status: 'RECEIVING'
       })
+      setProviderOrderId(result.id)
       confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } })
-
-      // Simulate SMS arrival in 5 seconds
-      setTimeout(() => {
-        const smsCode = Math.floor(100000 + Math.random() * 900000).toString()
-        setActiveNumber({
-          number: createdOrder.phone_number,
-          code: smsCode,
-          status: 'RECEIVED'
-        })
-      }, 5000)
+    } catch {
+      setRequestError('Could not contact the live SMS service. No funds were charged.')
+    } finally {
+      setIsRequesting(false)
     }
   }
+
+  useEffect(() => {
+    if (!providerOrderId || activeNumber?.status !== 'RECEIVING') return
+
+    const poll = async () => {
+      const response = await fetch('/api/v1/sms/order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getStatus', id: providerOrderId })
+      })
+      if (!response.ok) return
+      const result = await response.json()
+      if (result.status === 'RECEIVED' && result.code) {
+        setActiveNumber((current) => current ? { ...current, code: result.code, status: 'RECEIVED' } : current)
+      }
+    }
+
+    void poll()
+    const timer = window.setInterval(() => void poll(), 8_000)
+    return () => window.clearInterval(timer)
+  }, [providerOrderId, activeNumber?.status])
 
   const handleCopy = () => {
     if (activeNumber) {
@@ -140,11 +161,13 @@ export default function SmsVerificationPage() {
 
         <button
           onClick={handleGetNumber}
+          disabled={isRequesting}
           className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-xs uppercase shadow-md transition flex items-center justify-center gap-2"
         >
           <Smartphone className="w-4 h-4" />
-          <span>GET VIRTUAL NUMBER ({selectedService.price} XAF)</span>
+          <span>{isRequesting ? 'REQUESTING LIVE NUMBER...' : `GET VIRTUAL NUMBER (${selectedService.price} XAF)`}</span>
         </button>
+        {requestError && <p className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">{requestError}</p>}
       </div>
 
       {/* Number Status & Code Box */}

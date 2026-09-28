@@ -27,7 +27,7 @@ import { useAppState } from '@/lib/store'
 import confetti from 'canvas-confetti'
 
 export default function DashboardPage() {
-  const { createSmmOrder, profile } = useAppState()
+  const { profile } = useAppState()
 
   const allServices = liveServices as any[]
   const allCategories = Array.from(new Set(allServices.map((s) => s.category)))
@@ -136,7 +136,7 @@ export default function DashboardPage() {
 
   const [orderStatusMsg, setOrderStatusMsg] = useState<{ type: 'success' | 'error'; text: string; link?: string } | null>(null)
 
-  const handleOrderSubmit = (e: React.FormEvent) => {
+  const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setShowInsufficientBanner(false)
     setOrderStatusMsg(null)
@@ -158,23 +158,26 @@ export default function DashboardPage() {
       return
     }
 
-    const newOrder = createSmmOrder(
-      currentService.id,
-      currentService.name,
-      currentService.category,
-      targetLink,
-      quantity,
-      chargeXaf
-    )
+    try {
+      const response = await fetch('/api/v1/smm/order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service_id: currentService.id, link: targetLink, quantity })
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        setOrderStatusMsg({ type: 'error', text: result.error || 'Unable to place the live order.' })
+        return
+      }
 
-    if (newOrder) {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
       setOrderStatusMsg({
         type: 'success',
-        text: `Order #${newOrder.id} placed successfully!`,
+        text: `Live order #${result.order.id} placed successfully. Provider reference: ${result.provider_order_id}.`,
         link: '/orders'
       })
       setTargetLink('')
+    } catch {
+      setOrderStatusMsg({ type: 'error', text: 'Could not connect to the live order service. No funds were charged.' })
     }
   }
 
