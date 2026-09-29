@@ -48,7 +48,7 @@ const SMS_PRICES: Record<string, number> = {
 }
 
 function getAppUrl(): string {
-  return 'https://www.premiumverific.com'
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://premiumverific.com'
 }
 
 async function getProfileFromSupabase(identifier: string) {
@@ -542,7 +542,7 @@ export async function sendWhatsAppMessage(toPhone: string, messageText: string):
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
 
   if (!phoneNumberId || !accessToken || accessToken.startsWith('demo_')) {
-    console.warn('[WhatsApp Bot] Meta Cloud API credentials not configured. Logged reply text:', messageText)
+    console.error('[WhatsApp Bot] Meta Cloud API credentials are not configured; no reply was sent.')
     return false
   }
 
