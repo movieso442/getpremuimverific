@@ -3,8 +3,10 @@
 import React from 'react'
 import Link from 'next/link'
 import { ThumbsUp, Shield, MessageCircle } from 'lucide-react'
+import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 export const PublicFooter: React.FC = () => {
+  const settings = usePlatformSettings()
   return (
     <footer className="bg-white border-t border-gray-100 text-sm text-gray-600 mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -51,10 +53,10 @@ export const PublicFooter: React.FC = () => {
           <div className="space-y-3">
             <h3 className="font-extrabold text-gray-900 text-sm">Customer Support</h3>
             <div className="text-xs space-y-2">
-              <div>Email: <strong className="text-gray-900">hello@premiumverific.com</strong></div>
-              <div>WhatsApp Support: <strong className="text-gray-900">+237 680209047</strong></div>
+              <div>Email: <strong className="text-gray-900">{settings.support_email}</strong></div>
+              <div>WhatsApp Support: <strong className="text-gray-900">{settings.support_phone}</strong></div>
               <a
-                href="https://wa.me/237680209047"
+                href={`https://wa.me/${settings.whatsapp_number}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition mt-2"

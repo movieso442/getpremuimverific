@@ -124,6 +124,17 @@ export const financialEntries = pgTable('financial_entries', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
+export const platformSettings = pgTable('platform_settings', {
+  id: boolean('id').default(true).primaryKey(),
+  supportEmail: text('support_email').notNull(),
+  supportPhone: text('support_phone').notNull(),
+  whatsappNumber: text('whatsapp_number').notNull(),
+  smmMarkupMultiplier: numeric('smm_markup_multiplier', { precision: 5, scale: 2 }).default('3.00').notNull(),
+  smsMarkupMultiplier: numeric('sms_markup_multiplier', { precision: 5, scale: 2 }).default('3.00').notNull(),
+  updatedBy: uuid('updated_by').references(() => profiles.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
 // 9. Virtual SMS Services Catalog Table
 export const smsServices = pgTable('sms_services', {
   id: uuid('id').defaultRandom().primaryKey(),

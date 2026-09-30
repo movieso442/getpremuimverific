@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -25,9 +25,12 @@ import {
 import liveServices from '@/lib/liveServices.json'
 import { useAppState } from '@/lib/store'
 import confetti from 'canvas-confetti'
+import { retailPrice } from '@/lib/platform/settings'
+import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 export default function DashboardPage() {
   const { profile } = useAppState()
+  const platformSettings = usePlatformSettings()
 
   const allServices = liveServices as any[]
   const allCategories = Array.from(new Set(allServices.map((s) => s.category)))
@@ -129,12 +132,22 @@ export default function DashboardPage() {
   const chargeUsd = currentService?.min === 1 && currentService?.max === 1
     ? rateUsd
     : (rateUsd * (quantity / 1000))
-  const chargeXaf = Math.ceil(chargeUsd * 600 * 1.25)
+  const chargeXaf = retailPrice(chargeUsd * 600, platformSettings.smm_markup_multiplier)
 
   const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
   const router = useRouter()
 
   const [orderStatusMsg, setOrderStatusMsg] = useState<{ type: 'success' | 'error'; text: string; link?: string } | null>(null)
+
+  useEffect(() => {
+    const requestedService = Number(new URLSearchParams(window.location.search).get('service'))
+    const service = allServices.find((item) => item.id === requestedService)
+    if (service) {
+      setSelectedCategory(service.category)
+      setSelectedServiceId(service.id)
+      setQuantity(service.min)
+    }
+  }, [])
 
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -147,6 +160,11 @@ export default function DashboardPage() {
     }
     if (quantity < currentService.min || quantity > currentService.max) {
       setOrderStatusMsg({ type: 'error', text: `Quantity must be between ${currentService.min.toLocaleString()} and ${currentService.max.toLocaleString()}` })
+      return
+    }
+
+    if (!profile.id) {
+      router.push(`/signup?next=${encodeURIComponent(`/dashboard?service=${currentService.id}`)}`)
       return
     }
 

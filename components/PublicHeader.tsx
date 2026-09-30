@@ -40,10 +40,10 @@ export const PublicHeader: React.FC = () => {
             Sign In
           </Link>
           <Link
-            href="/dashboard"
+            href="/sms-verification"
             className="px-6 py-2.5 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-sm shadow-md shadow-orange-500/20 hover:shadow-lg transition flex items-center gap-2"
           >
-            <span>Client Dashboard</span>
+            <span>Get a Number</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

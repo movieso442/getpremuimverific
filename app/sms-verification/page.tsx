@@ -6,10 +6,13 @@ import { Smartphone, RefreshCw, Copy, Check, AlertTriangle, ArrowRight } from 'l
 import confetti from 'canvas-confetti'
 import { useRouter } from 'next/navigation'
 import { useAppState } from '@/lib/store'
+import { retailPrice } from '@/lib/platform/settings'
+import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 export default function SmsVerificationPage() {
   const router = useRouter()
   const { profile } = useAppState()
+  const platformSettings = usePlatformSettings()
 
   const [selectedService, setSelectedService] = useState(SMS_SERVICES[0])
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
@@ -19,15 +22,21 @@ export default function SmsVerificationPage() {
   const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
   const [requestError, setRequestError] = useState<string | null>(null)
   const [isRequesting, setIsRequesting] = useState(false)
+  const priceXaf = retailPrice(selectedService.price, platformSettings.sms_markup_multiplier)
 
   const handleGetNumber = async () => {
     setShowInsufficientBanner(false)
     setRequestError(null)
 
-    if (profile.balance_xaf < selectedService.price) {
+    if (!profile.id) {
+      router.push(`/signup?next=${encodeURIComponent('/sms-verification')}`)
+      return
+    }
+
+    if (profile.balance_xaf < priceXaf) {
       setShowInsufficientBanner(true)
       setTimeout(() => {
-        router.push(`/add-funds?amount=${selectedService.price}&reason=insufficient_balance`)
+        router.push(`/add-funds?amount=${priceXaf}&reason=insufficient_balance`)
       }, 1500)
       return
     }
@@ -95,11 +104,11 @@ export default function SmsVerificationPage() {
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
             <div className="text-xs">
               <span className="font-extrabold text-sm block">Insufficient Balance ({profile.balance_xaf.toLocaleString()} XAF)</span>
-              <span>You need {selectedService.price.toLocaleString()} XAF to request this SMS number. Redirecting to top up...</span>
+              <span>You need {priceXaf.toLocaleString()} XAF to request this SMS number. Redirecting to top up...</span>
             </div>
           </div>
           <button
-            onClick={() => router.push(`/add-funds?amount=${selectedService.price}&reason=insufficient_balance`)}
+            onClick={() => router.push(`/add-funds?amount=${priceXaf}&reason=insufficient_balance`)}
             className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shrink-0 flex items-center gap-1 transition"
           >
             <span>Top Up Now</span>
@@ -133,7 +142,7 @@ export default function SmsVerificationPage() {
             >
               {SMS_SERVICES.map((srv) => (
                 <option key={srv.id} value={srv.id}>
-                  {srv.name} — {srv.price} XAF (${(srv.price/600).toFixed(2)})
+                  {srv.name} — {retailPrice(srv.price, platformSettings.sms_markup_multiplier).toLocaleString()} XAF
                 </option>
               ))}
             </select>
@@ -165,7 +174,7 @@ export default function SmsVerificationPage() {
           className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-xs uppercase shadow-md transition flex items-center justify-center gap-2"
         >
           <Smartphone className="w-4 h-4" />
-          <span>{isRequesting ? 'REQUESTING LIVE NUMBER...' : `GET VIRTUAL NUMBER (${selectedService.price} XAF)`}</span>
+          <span>{isRequesting ? 'REQUESTING LIVE NUMBER...' : `GET VIRTUAL NUMBER (${priceXaf.toLocaleString()} XAF)`}</span>
         </button>
         {requestError && <p className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">{requestError}</p>}
       </div>

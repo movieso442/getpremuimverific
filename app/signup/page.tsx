@@ -12,6 +12,8 @@ export default function SignupPage() {
   const router = useRouter()
   const { setProfile } = useAppState()
   const supabase = createClient()
+  const requestedNext = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next')
+  const nextPath = requestedNext?.startsWith('/') ? requestedNext : '/dashboard'
 
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -54,14 +56,8 @@ export default function SignupPage() {
         }
       })
 
-      if (error) {
-        setProfile({
-          full_name: `${firstName} ${lastName}`.trim() || username || 'Premium Partner',
-          email,
-          phone_number: phone || '+237 680209047',
-          balance_xaf: 0
-        })
-      } else if (data.user) {
+      if (error) throw error
+      if (data.user) {
         setProfile({
           id: data.user.id,
           email: data.user.email || email,
@@ -71,8 +67,12 @@ export default function SignupPage() {
         })
       }
 
+      if (!data.session) {
+        setErrorMsg('Check your email to confirm your account, then sign in to continue.')
+        return
+      }
       confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } })
-      router.push('/dashboard')
+      router.push(nextPath)
     } catch (err: any) {
       setErrorMsg(err.message || 'Signup failed')
     } finally {
@@ -84,16 +84,10 @@ export default function SignupPage() {
     try {
       await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/dashboard` }
+        options: { redirectTo: `${window.location.origin}${nextPath}` }
       })
-    } catch (err) {
-      setProfile({
-        full_name: 'Google Member',
-        email: 'user@google.com',
-        phone_number: '+237 680209047',
-        balance_xaf: 0
-      })
-      router.push('/dashboard')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Google sign-in could not be started.')
     }
   }
 

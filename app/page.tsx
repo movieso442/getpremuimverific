@@ -84,22 +84,22 @@ export default function LandingPage() {
             <div className="pt-4 flex flex-wrap items-center justify-center gap-4 w-full">
               
               {/* CTA 1: Get a UK Number */}
-              <button
-                onClick={() => handleCtaClick('Get a Dedicated UK Phone Number')}
+              <Link
+                href="/sms-verification"
                 className="px-7 py-4.5 rounded-2xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-black text-base transition shadow-lg shadow-orange-500/25 flex items-center gap-3"
               >
                 <Smartphone className="w-5 h-5" />
                 <span>Get a UK Number</span>
-              </button>
+              </Link>
 
               {/* CTA 2: Boost Social Media */}
-              <button
-                onClick={() => handleCtaClick('Boost Your Social Media Accounts')}
+              <Link
+                href="/dashboard"
                 className="px-7 py-4.5 rounded-2xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-black text-base transition shadow-lg shadow-blue-500/25 flex items-center gap-3"
               >
                 <Share2 className="w-5 h-5" />
                 <span>Boost Social Media</span>
-              </button>
+              </Link>
 
               {/* CTA 3: Get Verified */}
               <button

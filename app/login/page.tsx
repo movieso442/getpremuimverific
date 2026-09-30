@@ -12,6 +12,8 @@ export default function LoginPage() {
   const router = useRouter()
   const { setProfile } = useAppState()
   const supabase = createClient()
+  const requestedNext = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next')
+  const nextPath = requestedNext?.startsWith('/') ? requestedNext : '/dashboard'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -34,25 +36,19 @@ export default function LoginPage() {
         password
       })
 
-      if (error) {
-        setProfile({
-          full_name: email.split('@')[0] || 'Premium Partner',
-          email,
-          phone_number: '+237 680209047',
-          balance_xaf: 5000
-        })
-      } else if (data.user) {
+      if (error) throw error
+      if (data.user) {
         setProfile({
           id: data.user.id,
           email: data.user.email || email,
           full_name: data.user.user_metadata?.full_name || email.split('@')[0],
           phone_number: data.user.user_metadata?.phone || '+237 680209047',
-          balance_xaf: 5000
+          balance_xaf: 0
         })
       }
 
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } })
-      router.push('/dashboard')
+      router.push(nextPath)
     } catch (err: any) {
       setErrorMsg(err.message || 'Login failed')
     } finally {
@@ -64,17 +60,11 @@ export default function LoginPage() {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/dashboard` }
+        options: { redirectTo: `${window.location.origin}${nextPath}` }
       })
       if (error) throw error
-    } catch (err) {
-      setProfile({
-        full_name: 'Google Partner',
-        email: 'user@google.com',
-        phone_number: '+237 680209047',
-        balance_xaf: 5000
-      })
-      router.push('/dashboard')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Google sign-in could not be started.')
     }
   }
 

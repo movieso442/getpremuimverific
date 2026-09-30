@@ -130,6 +130,19 @@ CREATE TABLE IF NOT EXISTS public.financial_entries (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 9. Single source of truth for customer-facing support details and pricing.
+CREATE TABLE IF NOT EXISTS public.platform_settings (
+  id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+  support_email TEXT NOT NULL DEFAULT 'hello@premiumverific.com',
+  support_phone TEXT NOT NULL DEFAULT '+237 680209047',
+  whatsapp_number TEXT NOT NULL DEFAULT '237680209047',
+  smm_markup_multiplier NUMERIC(5, 2) NOT NULL DEFAULT 3.00 CHECK (smm_markup_multiplier >= 1 AND smm_markup_multiplier <= 10),
+  sms_markup_multiplier NUMERIC(5, 2) NOT NULL DEFAULT 3.00 CHECK (sms_markup_multiplier >= 1 AND sms_markup_multiplier <= 10),
+  updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+INSERT INTO public.platform_settings (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
+
 -- Enable Row Level Security (RLS) on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
@@ -139,6 +152,7 @@ ALTER TABLE public.account_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.webhooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.financial_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
 
 -- Create basic RLS Policies for user ownership access
 DROP POLICY IF EXISTS "Users can access own profile" ON public.profiles;
@@ -149,6 +163,7 @@ DROP POLICY IF EXISTS "Users can access own account orders" ON public.account_or
 DROP POLICY IF EXISTS "Users can manage API keys" ON public.api_keys;
 DROP POLICY IF EXISTS "Users can manage webhooks" ON public.webhooks;
 DROP POLICY IF EXISTS "Admins can manage financial entries" ON public.financial_entries;
+DROP POLICY IF EXISTS "Admins can manage platform settings" ON public.platform_settings;
 
 CREATE POLICY "Users can access own profile" ON public.profiles FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can view own transactions" ON public.wallet_transactions FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
@@ -158,6 +173,9 @@ CREATE POLICY "Users can access own account orders" ON public.account_orders FOR
 CREATE POLICY "Users can manage API keys" ON public.api_keys FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
 CREATE POLICY "Users can manage webhooks" ON public.webhooks FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
 CREATE POLICY "Admins can manage financial entries" ON public.financial_entries FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Admins can manage platform settings" ON public.platform_settings FOR ALL USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
 );
 

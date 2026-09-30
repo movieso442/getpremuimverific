@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin/auth'
+import { getPlatformSettings } from '@/lib/platform/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,13 +12,14 @@ export async function GET() {
     const access = await requireAdmin()
     if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
 
-    const [profilesResult, transactionsResult, smmResult, smsResult, accountsResult, entriesResult] = await Promise.all([
+    const [profilesResult, transactionsResult, smmResult, smsResult, accountsResult, entriesResult, settings] = await Promise.all([
       access.admin.from('profiles').select('id, email, full_name, phone_number, balance_xaf, role, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('wallet_transactions').select('id, profile_id, amount, type, payment_method, reference, status, description, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('smm_orders').select('id, profile_id, service_name, category, quantity, charge_xaf, start_count, remains, status, api_order_id, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('sms_orders').select('id, profile_id, service_name, country_name, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('account_orders').select('id, profile_id, item_title, category, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('financial_entries').select('id, kind, amount_xaf, description, reference, created_at').order('created_at', { ascending: false }).limit(250),
+      getPlatformSettings(access.admin),
     ])
 
     if (profilesResult.error || transactionsResult.error || smmResult.error || smsResult.error || accountsResult.error) {
@@ -30,6 +32,25 @@ export async function GET() {
     const refunds = transactions.filter((row) => row.type === 'refund' && completed(row))
     const expenses = entriesResult.error ? [] : (entriesResult.data || [])
     const totalExpenses = expenses.reduce((total, item) => total + Number(item.amount_xaf || 0), 0)
+
+    const dayKey = (date: string) => date.slice(0, 10)
+    const analyticsMap = new Map<string, { date: string; deposits_xaf: number; sales_xaf: number; orders: number }>()
+    for (let index = 6; index >= 0; index -= 1) {
+      const date = new Date()
+      date.setUTCDate(date.getUTCDate() - index)
+      const key = date.toISOString().slice(0, 10)
+      analyticsMap.set(key, { date: key, deposits_xaf: 0, sales_xaf: 0, orders: 0 })
+    }
+    for (const transaction of transactions.filter(completed)) {
+      const row = analyticsMap.get(dayKey(transaction.created_at))
+      if (!row) continue
+      if (transaction.type === 'deposit') row.deposits_xaf += Number(transaction.amount)
+      if (['smm_order', 'sms_purchase', 'account_purchase'].includes(transaction.type)) row.sales_xaf += Number(transaction.amount)
+    }
+    for (const order of [...(smmResult.data || []), ...(smsResult.data || []), ...(accountsResult.data || [])]) {
+      const row = analyticsMap.get(dayKey(order.created_at))
+      if (row) row.orders += 1
+    }
 
     return NextResponse.json({
       generated_at: new Date().toISOString(),
@@ -45,7 +66,11 @@ export async function GET() {
         pending_payments_count: transactions.filter((row) => row.type === 'deposit' && row.status === 'pending').length,
         active_smm_orders: (smmResult.data || []).filter((row) => ['pending', 'processing', 'in_progress'].includes(row.status)).length,
         customers: (profilesResult.data || []).length,
+        completed_orders: (smmResult.data || []).filter(completed).length + (smsResult.data || []).filter((row) => row.status === 'received').length + (accountsResult.data || []).filter(completed).length,
+        failed_orders: (smmResult.data || []).filter((row) => ['canceled', 'partial'].includes(row.status)).length + (smsResult.data || []).filter((row) => ['canceled', 'expired'].includes(row.status)).length + (accountsResult.data || []).filter((row) => row.status === 'failed').length,
       },
+      settings,
+      analytics: Array.from(analyticsMap.values()),
       profiles: profilesResult.data || [],
       transactions,
       smm_orders: smmResult.data || [],
