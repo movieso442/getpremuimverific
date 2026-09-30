@@ -13,7 +13,8 @@ export default function LoginPage() {
   const { setProfile } = useAppState()
   const supabase = createClient()
   const requestedNext = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next')
-  const nextPath = requestedNext?.startsWith('/') ? requestedNext : '/dashboard'
+  const isAdministratorHost = typeof window !== 'undefined' && window.location.hostname.startsWith('admin.')
+  const nextPath = requestedNext?.startsWith('/') ? requestedNext : isAdministratorHost ? '/admin' : '/dashboard'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

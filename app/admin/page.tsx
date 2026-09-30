@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { AlertTriangle, Banknote, ClipboardList, Loader2, RefreshCw, ShieldCheck, Users } from 'lucide-react'
 
 type Overview = {
@@ -113,7 +114,10 @@ export default function AdminPage() {
   }
 
   if (loading) return <div className="min-h-screen grid place-items-center bg-slate-950 text-white"><Loader2 className="w-7 h-7 animate-spin" /></div>
-  if (error && !data) return <div className="min-h-screen grid place-items-center bg-slate-950 p-6"><div className="max-w-md rounded-2xl bg-white p-7 text-center"><ShieldCheck className="mx-auto text-orange-600 w-10 h-10 mb-3" /><h1 className="font-extrabold text-xl">Administrator portal</h1><p className="text-sm text-gray-600 mt-2">{error}</p><p className="text-xs text-gray-500 mt-4">Sign in with a profile whose role is <code>admin</code>.</p></div></div>
+  if (error && !data) {
+    const needsSignIn = error === 'Sign in is required.'
+    return <div className="min-h-screen grid place-items-center bg-slate-950 p-6"><div className="max-w-md rounded-2xl bg-white p-7 text-center"><ShieldCheck className="mx-auto text-orange-600 w-10 h-10 mb-3" /><h1 className="font-extrabold text-xl">Administrator portal</h1><p className="text-sm text-gray-600 mt-2">{error}</p><p className="text-xs text-gray-500 mt-4">Sign in with a profile whose role is <code>admin</code>.</p>{needsSignIn && <Link href="/login?next=/admin" className="inline-flex mt-5 rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 text-sm font-bold text-white">Sign in to administrator portal</Link>}</div></div>
+  }
   if (!data) return null
 
   const cards = [
