@@ -4,8 +4,11 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { fetchFiveSimCountries, fetchFiveSimProducts } from '@/lib/providers/fivesim'
+import { fetchFiveSimCountries, fetchFiveSimProducts, fetchFiveSimQuote } from '@/lib/providers/fivesim'
 import { getOrCreateWhatsAppCustomer } from '@/lib/bots/customers'
+import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
+import { createBotCheckoutLink } from '@/lib/bots/checkout'
+import { checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
 
 export interface WhatsAppMessagePayload {
   from: string
@@ -55,24 +58,76 @@ function getAppUrl(): string {
 
 const fiveSimBaseUrl = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
 
-async function liveCountryMenu(page = 1) {
+async function legacyLiveCountryMenu(page = 1) {
   const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
   const size = 20
   const safePage = Math.max(1, Math.min(page, Math.ceil(countries.length / size)))
   const items = countries.slice((safePage - 1) * size, safePage * size)
-  return `*Live 5SIM countries — page ${safePage}/${Math.ceil(countries.length / size)}*\n\n${items.map((country, index) => `${(safePage - 1) * size + index + 1}. ${country.label} (\`${country.slug}\`)`).join('\n')}\n\nReply \`services <country>\` to see live services. Example: \`services england\`\nType \`countries ${safePage + 1}\` for the next page.`
+  return `*Available countries — page ${safePage}/${Math.ceil(countries.length / size)}*\n\n${items.map((country, index) => `${(safePage - 1) * size + index + 1}. ${country.label}`).join('\n')}\n\nReply \`services <country>\` to see available verification services. Type \`countries ${safePage + 1}\` for the next page.`
 }
 
-async function liveServiceMenu(countryInput: string, page = 1) {
+async function legacyLiveServiceMenu(countryInput: string, page = 1) {
   const country = countryInput.toLowerCase().replace(/\s+/g, '')
   const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
-  if (!countries.some((item) => item.slug === country)) return `I could not find “${countryInput}” in 5SIM. Type \`countries\` to browse the live country list.`
+  if (!countries.some((item) => item.slug === country)) return `I could not find “${countryInput}”. Type \`countries\` to browse the country list.`
   const services = await fetchFiveSimProducts(fiveSimBaseUrl, country)
-  if (!services.length) return `5SIM currently has no activation inventory for ${country}. Try another country or type \`countries\`.`
+  if (!services.length) return `There are no verification numbers available for ${country} right now. Try another country or type \`countries\`.`
   const size = 15
   const safePage = Math.max(1, Math.min(page, Math.ceil(services.length / size)))
   const items = services.slice((safePage - 1) * size, safePage * size)
-  return `*Live 5SIM services — ${country} — page ${safePage}/${Math.ceil(services.length / size)}*\n\n${items.map((item, index) => `${(safePage - 1) * size + index + 1}. \`${item.product}\` — ${item.available.toLocaleString()} available`).join('\n')}\n\nReply \`services ${country} ${safePage + 1}\` for more, or \`find ${country} telegram\` to check one service and its current availability.`
+  return `*Available verification services — ${country} — page ${safePage}/${Math.ceil(services.length / size)}*\n\n${items.map((item, index) => `${(safePage - 1) * size + index + 1}. \`${item.product}\` — ${item.available.toLocaleString()} available`).join('\n')}\n\nReply \`services ${country} ${safePage + 1}\` for more.`
+}
+
+type ListChoice = { id: string; title: string; description?: string }
+
+function listMarker(button: string, title: string, choices: ListChoice[]) {
+  return `\n[[PV_LIST:${encodeURIComponent(JSON.stringify({ button, title, choices }))}]]`
+}
+
+function friendlyProductName(product: string) {
+  return product.replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+function resolveCountry(input: string, countries: Awaited<ReturnType<typeof fetchFiveSimCountries>>) {
+  const normalized = input.trim().toLowerCase().replace(/\s+/g, '')
+  if (/^\d+$/.test(normalized)) return countries[Number(normalized) - 1]
+  return countries.find((country) => country.slug === normalized || country.label.toLowerCase().replace(/\s+/g, '') === normalized)
+}
+
+async function liveCountryMenu(page = 1) {
+  const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
+  const size = 10
+  const safePage = Math.max(1, Math.min(page, Math.ceil(countries.length / size)))
+  const items = countries.slice((safePage - 1) * size, safePage * size)
+  const next = safePage < Math.ceil(countries.length / size) ? ` Reply \`page ${safePage + 1}\` for more countries.` : ''
+  return `*Choose a country for your temporary verification number*\n\nTap *Select country* below to choose from the available countries.${next}\n\nYou can also type a country name, for example \`Cameroon\`.` + listMarker('Select country', 'Available countries', items.map((country) => ({ id: `country:${country.slug}`, title: country.label, description: 'View available services' })))
+}
+
+async function liveServiceMenu(countryInput: string, page = 1) {
+  const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
+  const selectedCountry = resolveCountry(countryInput, countries)
+  if (!selectedCountry) return `I could not find "${countryInput}". Tap *Select country* again or type \`countries\` to browse.`
+  const services = await fetchFiveSimProducts(fiveSimBaseUrl, selectedCountry.slug)
+  if (!services.length) return `There are no temporary verification numbers available for ${selectedCountry.label} at the moment. Please choose another country.`
+  const size = 10
+  const safePage = Math.max(1, Math.min(page, Math.ceil(services.length / size)))
+  const items = services.slice((safePage - 1) * size, safePage * size)
+  const next = safePage < Math.ceil(services.length / size) ? ` Reply \`more ${selectedCountry.slug} ${safePage + 1}\` for more.` : ''
+  return `*Available verification services in ${selectedCountry.label}*\n\nTap *Select service* to see the current price and availability.${next}` + listMarker('Select service', `${selectedCountry.label} services`, items.map((item) => ({ id: `service:${selectedCountry.slug}:${encodeURIComponent(item.product)}`, title: friendlyProductName(item.product), description: `${item.available.toLocaleString()} available` })))
+}
+
+async function liveProductQuote(countryInput: string, productInput: string) {
+  const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
+  const country = resolveCountry(countryInput, countries)
+  if (!country) return 'That country is no longer available. Please choose a country again.'
+  const product = decodeURIComponent(productInput).toLowerCase()
+  const quote = await fetchFiveSimQuote(fiveSimBaseUrl, country.slug, product)
+  if (!quote) return `${friendlyProductName(product)} is not available in ${country.label} right now. Please choose another service or country.`
+  const adminUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const settings = adminUrl && adminKey ? await getPlatformSettings(createClient(adminUrl, adminKey)) : { sms_markup_multiplier: 3 }
+  const price = retailPrice(quote.costUsd * 600, settings.sms_markup_multiplier)
+  return `*${friendlyProductName(product)} verification number*\n\nCountry: ${country.label}\nCurrent price: *${price.toLocaleString()} XAF*\nAvailable now: ${quote.available.toLocaleString()}\n\nTap *Reserve number* to use your wallet.` + listMarker('Reserve number', 'Confirm reservation', [{ id: `reserve:${country.slug}:${encodeURIComponent(product)}`, title: 'Reserve number', description: `${price.toLocaleString()} XAF from wallet` }])
 }
 
 async function getProfileFromSupabase(identifier: string) {
@@ -108,10 +163,8 @@ async function updateProfileBalance(profileId: string, newBalance: number) {
   }
 }
 
-async function getPayunitCheckoutUrl(amount: number): Promise<string> {
-  // Bot chat IDs are not authenticated web sessions. Send users to the
-  // website checkout, where the signed-in profile owns the payment record.
-  return `${getAppUrl()}/add-funds?amount=${amount}`
+async function getPayunitCheckoutUrl(profileId: string | undefined, amount: number): Promise<string | null> {
+  return profileId ? createBotCheckoutLink(profileId, amount) : null
 }
 
 async function allocateSmsNumber(service: string, country: string) {
@@ -131,13 +184,7 @@ async function allocateSmsNumber(service: string, country: string) {
     }
   }
 
-  const randomDigits = Math.floor(100000000 + Math.random() * 900000000)
-  const prefixes: Record<string, string> = { 
-    US: '+1 (407)', GB: '+44 7911', CA: '+1 (604)', CM: '+237 677', NG: '+234 803', FR: '+33 644' 
-  }
-  const phone = `${prefixes[country.toUpperCase()] || '+1 (555)'} ${randomDigits}`
-  const id = `sms_${Math.random().toString(36).substring(2, 9)}`
-  return { id, phone, service, country }
+  return null
 }
 
 async function placeSmmOrder(serviceId: number, link: string, quantity: number) {
@@ -167,13 +214,12 @@ async function placeSmmOrder(serviceId: number, link: string, quantity: number) 
     }
   }
 
-  const orderId = Math.floor(100000 + Math.random() * 900000)
-  return { order: orderId, serviceId, link, quantity }
+  return null
 }
 
 export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): Promise<string> {
   const text = (payload.text || '').trim()
-  const lowerText = text.toLowerCase()
+  const lowerText = text.normalize('NFKC').toLowerCase().trim().replace(/\s+/g, ' ')
   const userPhone = payload.from
   const appUrl = getAppUrl()
 
@@ -183,6 +229,14 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   // profile on first contact, then use that same profile on every message.
   const userProfile = await getOrCreateWhatsAppCustomer(userPhone, payload.name)
   const currentBalance = userProfile ? Number(userProfile.balance_xaf) || 0 : 0
+
+  if (lowerText === 'check code' || lowerText === 'sms status' || lowerText === 'check sms') {
+    if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
+    const status = await checkLatestBotSms(userProfile.id)
+    if (status.kind === 'received') return `*Your verification code:* \`${status.code}\``
+    if (status.kind === 'waiting') return `Your number is still waiting for the SMS code. Please try \`check code\` again shortly.${status.expiresAt ? ` It expires at ${new Date(status.expiresAt).toLocaleTimeString()}.` : ''}`
+    return status.message
+  }
 
   // 1. GREETING / MAIN MENU COMMAND
   const isReset = 
@@ -211,7 +265,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   }
 
   // 2. CHECK BALANCE (/balance, 4, balance)
-  if (lowerText === '4' || lowerText === '/balance' || lowerText === 'balance' || lowerText === 'solde') {
+  if ((lowerText === '4' && session.step !== 'SMS_CATALOG') || lowerText === '/balance' || lowerText === 'balance' || lowerText === 'solde') {
     const usd = (currentBalance / 600).toFixed(2)
     return (
       `💼 *Premium Verify Wallet Status*\n\n` +
@@ -223,13 +277,14 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   }
 
   // 3. TOP UP WALLET (3, /pay, pay, deposit, topup)
-  if (lowerText === '3' || lowerText.startsWith('pay ') || lowerText.startsWith('/pay ') || lowerText.startsWith('topup ') || lowerText === 'deposit') {
+  if ((lowerText === '3' && session.step !== 'SMS_CATALOG') || lowerText.startsWith('pay ') || lowerText.startsWith('/pay ') || lowerText.startsWith('topup ') || lowerText === 'deposit') {
     userSessions[userPhone] = { step: 'PAY' }
     const parts = text.split(' ').filter(Boolean)
     const amount = Number(parts[1])
 
     if (amount && amount > 0) {
-      const checkoutUrl = await getPayunitCheckoutUrl(amount)
+      const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
+      if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
       return (
         `💳 *Payunit Payment Link Generated!*\n\n` +
         `💰 *Deposit Amount:* ${amount.toLocaleString()} XAF\n` +
@@ -250,7 +305,8 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
     const amount = Number(text)
     if (amount >= 500) {
       userSessions[userPhone] = { step: 'MAIN' }
-      const checkoutUrl = await getPayunitCheckoutUrl(amount)
+      const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
+      if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
       return (
         `💳 *Payunit Payment Link Generated!*\n\n` +
         `💰 *Deposit Amount:* ${amount.toLocaleString()} XAF\n` +
@@ -260,25 +316,31 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
     }
   }
 
-  // 4. LIVE 5SIM SMS CATALOGUE. WhatsApp is deliberately paginated: 5SIM has
-  // hundreds of countries and thousands of products, so a giant chat message
-  // would be unreadable and rejected by some clients.
-  const countriesMatch = lowerText.match(/^countries(?:\s+(\d+))?$/)
-  if (countriesMatch) return liveCountryMenu(Number(countriesMatch[1] || 1))
-
-  const servicesMatch = lowerText.match(/^services\s+([a-z\s]+?)(?:\s+(\d+))?$/)
-  if (servicesMatch) return liveServiceMenu(servicesMatch[1].trim(), Number(servicesMatch[2] || 1))
-
-  const findMatch = lowerText.match(/^find\s+([a-z\s]+?)\s+([a-z0-9_-]+)$/)
-  if (findMatch) {
-    const country = findMatch[1].trim().replace(/\s+/g, '')
-    const product = findMatch[2]
-    const services = await fetchFiveSimProducts(fiveSimBaseUrl, country)
-    const match = services.find((item) => item.product === product)
-    return match
-      ? `*${product} in ${country}*\n${match.available.toLocaleString()} activation numbers are available now from 5SIM.\n\nReply \`services ${country}\` to browse more live services.`
-      : `5SIM has no live availability for \`${product}\` in ${country} right now. Try \`services ${country}\` or another country.`
+  // Live temporary-number catalogue. Interactive list replies arrive as the
+  // IDs below; text replies work too, so the flow remains accessible on every
+  // WhatsApp client and after a conversation window changes.
+  const countryReply = lowerText.match(/^country:([a-z0-9_-]+)$/)
+  if (countryReply) return liveServiceMenu(countryReply[1])
+  const serviceReply = text.match(/^service:([a-z0-9_-]+):(.+)$/i)
+  if (serviceReply) return liveProductQuote(serviceReply[1], serviceReply[2])
+  const reserveReply = text.match(/^reserve:([a-z0-9_-]+):(.+)$/i)
+  if (reserveReply) {
+    if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
+    const reservation = await reserveLiveBotSms(userProfile.id, reserveReply[1], reserveReply[2])
+    if (reservation.kind === 'success') return `*Verification number reserved*\n\nNumber: \`${reservation.phone}\`\nService: ${friendlyProductName(reservation.service)}\nCountry: ${reservation.country}\nCharged: ${reservation.priceXaf.toLocaleString()} XAF\n\nWhen the SMS arrives, reply \`check code\`.`
+    if (reservation.kind === 'insufficient') {
+      const topupUrl = await getPayunitCheckoutUrl(userProfile.id, reservation.requiredXaf - reservation.balanceXaf)
+      return `Your wallet needs ${reservation.requiredXaf.toLocaleString()} XAF; current balance is ${reservation.balanceXaf.toLocaleString()} XAF.${topupUrl ? `\n\nTop up securely: ${topupUrl}` : ''}`
+    }
+    return reservation.message
   }
+  const pageMatch = lowerText.match(/^(?:page|countries)\s+(\d+)$/)
+  if (pageMatch) return liveCountryMenu(Number(pageMatch[1]))
+  const moreMatch = lowerText.match(/^(?:more|services)\s+([a-z\s-]+?)(?:\s+(\d+))?$/)
+  if (moreMatch) return liveServiceMenu(moreMatch[1], Number(moreMatch[2] || 1))
+  if (lowerText === 'countries') return liveCountryMenu()
+  if (lowerText.startsWith('country ')) return liveServiceMenu(lowerText.slice('country '.length))
+  if (session.step === 'SMS_CATALOG' && (/^\d+$/.test(lowerText) || /^[a-z][a-z\s-]+$/.test(lowerText))) return liveServiceMenu(lowerText)
 
   // 5. SMS FLOW (1, /sms, sms, virtual number)
   if (lowerText === '1' || lowerText === '/sms' || lowerText === 'sms' || /\b(number|sms|verification|code|otp)\b/.test(lowerText)) {
@@ -361,7 +423,8 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
 
     // STRICT BALANCE CHECK BEFORE SMS ALLOCATION
     if (currentBalance < price) {
-      const topupUrl = await getPayunitCheckoutUrl(price)
+      const topupUrl = await getPayunitCheckoutUrl(userProfile?.id, price)
+      if (!topupUrl) return 'Your balance is too low, and a secure top-up link could not be created. Please try again.'
       return (
         `⚠️ *Insufficient Wallet Balance!*\n\n` +
         `💳 *Required:* ${price.toLocaleString()} XAF\n` +
@@ -373,6 +436,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
 
     userSessions[userPhone] = { step: 'MAIN' }
     const result = await allocateSmsNumber(service, country)
+    if (!result) return 'The live verification-number service could not reserve a number. No wallet funds were charged. Please try again shortly.'
 
     // Deduct balance from DB profile if present
     if (userProfile) {
@@ -508,7 +572,8 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
 
     // STRICT BALANCE CHECK BEFORE SMM ORDER FULFILLMENT
     if (currentBalance < calculatedCharge) {
-      const topupUrl = await getPayunitCheckoutUrl(calculatedCharge)
+      const topupUrl = await getPayunitCheckoutUrl(userProfile?.id, calculatedCharge)
+      if (!topupUrl) return 'Your balance is too low, and a secure top-up link could not be created. Please try again.'
       return (
         `⚠️ *Insufficient Wallet Balance!*\n\n` +
         `🎯 *Order Total:* ${calculatedCharge.toLocaleString()} XAF\n` +
@@ -521,6 +586,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
     if (link && quantity > 0) {
       userSessions[userPhone] = { step: 'MAIN' }
       const res = await placeSmmOrder(serviceId, link, quantity)
+      if (!res) return 'The live social-media service could not accept this order. No wallet funds were charged. Please try again shortly.'
 
       // Deduct balance from DB profile if present
       if (userProfile) {
@@ -567,18 +633,41 @@ export async function sendWhatsAppMessage(toPhone: string, messageText: string):
   }
 
   try {
+    const marker = messageText.match(/\s*\[\[PV_LIST:([^\]]+)\]\]\s*$/)
+    const cleanText = marker ? messageText.slice(0, marker.index).trim() : messageText
+    let message: Record<string, unknown> = {
+      messaging_product: 'whatsapp',
+      to: toPhone.replace('+', ''),
+      type: 'text',
+      text: { body: cleanText },
+    }
+    if (marker) {
+      try {
+        const menu = JSON.parse(decodeURIComponent(marker[1])) as { button?: string; title?: string; choices?: ListChoice[] }
+        const rows = (menu.choices || []).slice(0, 10).map((choice) => ({ id: choice.id.slice(0, 200), title: choice.title.slice(0, 24), description: choice.description?.slice(0, 72) }))
+        if (rows.length) {
+          message = {
+            messaging_product: 'whatsapp',
+            to: toPhone.replace('+', ''),
+            type: 'interactive',
+            interactive: {
+              type: 'list',
+              body: { text: cleanText.slice(0, 1024) },
+              action: { button: (menu.button || 'Choose').slice(0, 20), sections: [{ title: (menu.title || 'Options').slice(0, 24), rows }] },
+            },
+          }
+        }
+      } catch (error) {
+        console.warn('[WhatsApp list menu encoding failed]', error)
+      }
+    }
     const res = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: toPhone.replace('+', ''),
-        type: 'text',
-        text: { body: messageText }
-      })
+      body: JSON.stringify(message)
     })
 
     const data = await res.json()

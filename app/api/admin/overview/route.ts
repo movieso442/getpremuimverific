@@ -12,13 +12,14 @@ export async function GET() {
     const access = await requireAdmin()
     if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
 
-    const [profilesResult, transactionsResult, smmResult, smsResult, accountsResult, entriesResult, settings] = await Promise.all([
+    const [profilesResult, transactionsResult, smmResult, smsResult, accountsResult, entriesResult, claimsResult, settings] = await Promise.all([
       access.admin.from('profiles').select('id, email, full_name, phone_number, balance_xaf, role, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('wallet_transactions').select('id, profile_id, amount, type, payment_method, reference, status, description, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('smm_orders').select('id, profile_id, service_name, category, quantity, charge_xaf, start_count, remains, status, api_order_id, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('sms_orders').select('id, profile_id, service_name, country_name, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('account_orders').select('id, profile_id, item_title, category, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('financial_entries').select('id, kind, amount_xaf, description, reference, created_at').order('created_at', { ascending: false }).limit(250),
+      access.admin.from('manual_payment_claims').select('id, profile_id, amount_xaf, payment_method, payer_phone, transfer_reference, status, created_at').order('created_at', { ascending: false }).limit(200),
       getPlatformSettings(access.admin),
     ])
 
@@ -54,7 +55,7 @@ export async function GET() {
 
     return NextResponse.json({
       generated_at: new Date().toISOString(),
-      schema_notice: entriesResult.error ? 'Run the latest Supabase schema SQL to enable expense and profit tracking.' : null,
+      schema_notice: entriesResult.error || claimsResult.error ? 'Run the latest Supabase SQL upgrades to enable all administrator accounting and manual-payment features.' : null,
       metrics: {
         cash_received_xaf: sum(completedDeposits),
         service_sales_xaf: sum(customerSales),
@@ -77,6 +78,7 @@ export async function GET() {
       sms_orders: smsResult.data || [],
       account_orders: accountsResult.data || [],
       expenses,
+      manual_claims: claimsResult.error ? [] : (claimsResult.data || []),
     })
   } catch (error: unknown) {
     console.error('[Admin overview failed]', error)

@@ -5,6 +5,10 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { getOrCreateTelegramCustomer } from '@/lib/bots/customers'
+import { createBotCheckoutLink } from '@/lib/bots/checkout'
+import { fetchFiveSimCountries, fetchFiveSimProducts, fetchFiveSimQuote } from '@/lib/providers/fivesim'
+import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
+import { checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
 
 export interface TelegramMessagePayload {
   chatId: number | string
@@ -52,6 +56,61 @@ function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || 'https://premiumverific.com'
 }
 
+const fiveSimBaseUrl = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
+type InlineChoice = { id: string; label: string }
+
+function inlineMarker(choices: InlineChoice[]) {
+  return `\n[[PV_INLINE:${encodeURIComponent(JSON.stringify(choices))}]]`
+}
+
+function friendlyProductName(product: string) {
+  return product.replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+function resolveCountry(input: string, countries: Awaited<ReturnType<typeof fetchFiveSimCountries>>) {
+  const normalized = input.trim().toLowerCase().replace(/\s+/g, '')
+  if (/^\d+$/.test(normalized)) return countries[Number(normalized) - 1]
+  return countries.find((country) => country.slug === normalized || country.label.toLowerCase().replace(/\s+/g, '') === normalized)
+}
+
+async function liveCountryMenu(page = 1) {
+  const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
+  const size = 8
+  const safePage = Math.max(1, Math.min(page, Math.ceil(countries.length / size)))
+  const items = countries.slice((safePage - 1) * size, safePage * size)
+  const choices = items.map((country) => ({ id: `country:${country.slug}`, label: country.label }))
+  if (safePage < Math.ceil(countries.length / size)) choices.push({ id: `page:${safePage + 1}`, label: 'More countries' })
+  return `<b>Choose a country for your temporary verification number</b>\n\nTap a country below. You can also type its name.` + inlineMarker(choices)
+}
+
+async function liveServiceMenu(countryInput: string, page = 1) {
+  const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
+  const country = resolveCountry(countryInput, countries)
+  if (!country) return 'I could not find that country. Please choose a country again.'
+  const services = await fetchFiveSimProducts(fiveSimBaseUrl, country.slug)
+  if (!services.length) return `There are no temporary verification numbers available for ${country.label} at the moment. Please choose another country.`
+  const size = 8
+  const safePage = Math.max(1, Math.min(page, Math.ceil(services.length / size)))
+  const items = services.slice((safePage - 1) * size, safePage * size)
+  const choices = items.map((service) => ({ id: `service:${country.slug}:${encodeURIComponent(service.product)}`, label: friendlyProductName(service.product) }))
+  if (safePage < Math.ceil(services.length / size)) choices.push({ id: `more:${country.slug}:${safePage + 1}`, label: 'More services' })
+  return `<b>Available verification services in ${country.label}</b>\n\nTap a service to view its live availability and current price.` + inlineMarker(choices)
+}
+
+async function liveProductQuote(countryInput: string, productInput: string) {
+  const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
+  const country = resolveCountry(countryInput, countries)
+  if (!country) return 'That country is no longer available. Please choose a country again.'
+  const product = decodeURIComponent(productInput).toLowerCase()
+  const quote = await fetchFiveSimQuote(fiveSimBaseUrl, country.slug, product)
+  if (!quote) return `${friendlyProductName(product)} is not available in ${country.label} right now. Please choose another service or country.`
+  const adminUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const settings = adminUrl && adminKey ? await getPlatformSettings(createClient(adminUrl, adminKey)) : { sms_markup_multiplier: 3 }
+  const price = retailPrice(quote.costUsd * 600, settings.sms_markup_multiplier)
+  return `<b>${friendlyProductName(product)} verification number</b>\n\nCountry: ${country.label}\nCurrent price: <b>${price.toLocaleString()} XAF</b>\nAvailable now: ${quote.available.toLocaleString()}\n\nTap Reserve number to use your wallet.` + inlineMarker([{ id: `reserve:${country.slug}:${encodeURIComponent(product)}`, label: 'Reserve number' }])
+}
+
 async function getProfileFromSupabase(identifier: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cdfmfxfkbqlcjbesymxd.supabase.co'
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -85,10 +144,8 @@ async function updateProfileBalance(profileId: string, newBalance: number) {
   }
 }
 
-async function getPayunitCheckoutUrl(amount: number): Promise<string> {
-  // Bot chat IDs are not authenticated web sessions. Send users to the
-  // website checkout, where the signed-in profile owns the payment record.
-  return `${getAppUrl()}/add-funds?amount=${amount}`
+async function getPayunitCheckoutUrl(profileId: string | undefined, amount: number): Promise<string | null> {
+  return profileId ? createBotCheckoutLink(profileId, amount) : null
 }
 
 async function allocateSmsNumber(service: string, country: string) {
@@ -108,13 +165,7 @@ async function allocateSmsNumber(service: string, country: string) {
     }
   }
 
-  const randomDigits = Math.floor(100000000 + Math.random() * 900000000)
-  const prefixes: Record<string, string> = { 
-    US: '+1 (407)', GB: '+44 7911', CA: '+1 (604)', CM: '+237 677', NG: '+234 803', FR: '+33 644' 
-  }
-  const phone = `${prefixes[country.toUpperCase()] || '+1 (555)'} ${randomDigits}`
-  const id = `sms_${Math.random().toString(36).substring(2, 9)}`
-  return { id, phone, service, country }
+  return null
 }
 
 async function placeSmmOrder(serviceId: number, link: string, quantity: number) {
@@ -144,8 +195,7 @@ async function placeSmmOrder(serviceId: number, link: string, quantity: number) 
     }
   }
 
-  const orderId = Math.floor(100000 + Math.random() * 900000)
-  return { order: orderId, serviceId, link, quantity }
+  return null
 }
 
 export async function processTelegramMessage(payload: TelegramMessagePayload): Promise<string> {
@@ -160,6 +210,14 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   // stable customer identity and the Telegram display name is stored as name.
   const userProfile = await getOrCreateTelegramCustomer(chatId, payload.fromName)
   const currentBalance = userProfile ? Number(userProfile.balance_xaf) || 0 : 0
+
+  if (lowerText === 'check code' || lowerText === 'sms status' || lowerText === 'check sms') {
+    if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
+    const status = await checkLatestBotSms(userProfile.id)
+    if (status.kind === 'received') return `<b>Your verification code:</b> <code>${status.code}</code>`
+    if (status.kind === 'waiting') return `Your number is still waiting for the SMS code. Please try <code>check code</code> again shortly.${status.expiresAt ? ` It expires at ${new Date(status.expiresAt).toLocaleTimeString()}.` : ''}`
+    return status.message
+  }
 
   // 1. GREETING / MAIN MENU COMMAND
   const isReset = 
@@ -188,7 +246,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   }
 
   // 2. CHECK BALANCE (/balance, 4, balance)
-  if (lowerText === '4' || lowerText === '/balance' || lowerText === 'balance' || lowerText === 'solde') {
+  if ((lowerText === '4' && session.step !== 'SMS_CATALOG') || lowerText === '/balance' || lowerText === 'balance' || lowerText === 'solde') {
     const usd = (currentBalance / 600).toFixed(2)
     return (
       `💼 <b>Premium Verify Wallet Status</b>\n\n` +
@@ -200,13 +258,14 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   }
 
   // 3. TOP UP WALLET (3, /pay, pay, deposit, topup)
-  if (lowerText === '3' || lowerText.startsWith('pay ') || lowerText.startsWith('/pay ') || lowerText.startsWith('topup ') || lowerText === 'deposit') {
+  if ((lowerText === '3' && session.step !== 'SMS_CATALOG') || lowerText.startsWith('pay ') || lowerText.startsWith('/pay ') || lowerText.startsWith('topup ') || lowerText === 'deposit') {
     userSessions[chatId] = { step: 'PAY' }
     const parts = text.split(' ').filter(Boolean)
     const amount = Number(parts[1])
 
     if (amount && amount > 0) {
-      const checkoutUrl = await getPayunitCheckoutUrl(amount)
+      const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
+      if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
       return (
         `💳 <b>Payunit Payment Link Generated!</b>\n\n` +
         `💰 <b>Deposit Amount:</b> ${amount.toLocaleString()} XAF\n` +
@@ -227,7 +286,8 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
     const amount = Number(text)
     if (amount >= 500) {
       userSessions[chatId] = { step: 'MAIN' }
-      const checkoutUrl = await getPayunitCheckoutUrl(amount)
+      const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
+      if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
       return (
         `💳 <b>Payunit Payment Link Generated!</b>\n\n` +
         `💰 <b>Deposit Amount:</b> ${amount.toLocaleString()} XAF\n` +
@@ -237,8 +297,38 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
     }
   }
 
+  // Live temporary-number catalogue. Telegram callback buttons deliver the
+  // compact IDs below; users can still type the country name when preferred.
+  const countryReply = lowerText.match(/^country:([a-z0-9_-]+)$/)
+  if (countryReply) return liveServiceMenu(countryReply[1])
+  const serviceReply = text.match(/^service:([a-z0-9_-]+):(.+)$/i)
+  if (serviceReply) return liveProductQuote(serviceReply[1], serviceReply[2])
+  const reserveReply = text.match(/^reserve:([a-z0-9_-]+):(.+)$/i)
+  if (reserveReply) {
+    if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
+    const reservation = await reserveLiveBotSms(userProfile.id, reserveReply[1], reserveReply[2])
+    if (reservation.kind === 'success') return `<b>Verification number reserved</b>\n\nNumber: <code>${reservation.phone}</code>\nService: ${friendlyProductName(reservation.service)}\nCountry: ${reservation.country}\nCharged: ${reservation.priceXaf.toLocaleString()} XAF\n\nWhen the SMS arrives, send <code>check code</code>.`
+    if (reservation.kind === 'insufficient') {
+      const topupUrl = await getPayunitCheckoutUrl(userProfile.id, reservation.requiredXaf - reservation.balanceXaf)
+      return `Your wallet needs ${reservation.requiredXaf.toLocaleString()} XAF; current balance is ${reservation.balanceXaf.toLocaleString()} XAF.${topupUrl ? `\n\n<a href="${topupUrl}">Top up securely</a>` : ''}`
+    }
+    return reservation.message
+  }
+  const pageReply = lowerText.match(/^page:(\d+)$/)
+  if (pageReply) return liveCountryMenu(Number(pageReply[1]))
+  const moreReply = lowerText.match(/^more:([a-z0-9_-]+):(\d+)$/)
+  if (moreReply) return liveServiceMenu(moreReply[1], Number(moreReply[2]))
+  if (lowerText === 'countries') return liveCountryMenu()
+  if (lowerText.startsWith('country ')) return liveServiceMenu(lowerText.slice('country '.length))
+  if (session.step === 'SMS_CATALOG' && (/^\d+$/.test(lowerText) || /^[a-z][a-z\s-]+$/.test(lowerText))) return liveServiceMenu(lowerText)
+
   // 4. SMS FLOW (1, /sms, sms, virtual number)
   if (lowerText === '1' || lowerText === '/sms' || lowerText === 'sms' || lowerText.includes('sms number')) {
+    userSessions[chatId] = { step: 'SMS_CATALOG' }
+    return liveCountryMenu()
+
+    // Retained below only as a reference for existing source history; the bot
+    // now always uses the live catalogue above.
     userSessions[chatId] = { step: 'SMS_PLATFORM' }
     return (
       `📱 <b>Virtual SMS Verification Numbers</b>\n\n` +
@@ -311,7 +401,8 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
 
     // STRICT BALANCE CHECK BEFORE SMS ALLOCATION
     if (currentBalance < price) {
-      const topupUrl = await getPayunitCheckoutUrl(price)
+      const topupUrl = await getPayunitCheckoutUrl(userProfile?.id, price)
+      if (!topupUrl) return 'Your balance is too low, and a secure top-up link could not be created. Please try again.'
       return (
         `⚠️ <b>Insufficient Wallet Balance!</b>\n\n` +
         `💳 <b>Required:</b> ${price.toLocaleString()} XAF\n` +
@@ -323,6 +414,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
 
     userSessions[chatId] = { step: 'MAIN' }
     const result = await allocateSmsNumber(service, country)
+    if (!result) return 'The live verification-number service could not reserve a number. No wallet funds were charged. Please try again shortly.'
 
     // Deduct balance from DB profile if present
     if (userProfile) {
@@ -458,7 +550,8 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
 
     // STRICT BALANCE CHECK BEFORE SMM ORDER FULFILLMENT
     if (currentBalance < calculatedCharge) {
-      const topupUrl = await getPayunitCheckoutUrl(calculatedCharge)
+      const topupUrl = await getPayunitCheckoutUrl(userProfile?.id, calculatedCharge)
+      if (!topupUrl) return 'Your balance is too low, and a secure top-up link could not be created. Please try again.'
       return (
         `⚠️ <b>Insufficient Wallet Balance!</b>\n\n` +
         `🎯 <b>Order Total:</b> ${calculatedCharge.toLocaleString()} XAF\n` +
@@ -471,6 +564,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
     if (link && quantity > 0) {
       userSessions[chatId] = { step: 'MAIN' }
       const res = await placeSmmOrder(serviceId, link, quantity)
+      if (!res) return 'The live social-media service could not accept this order. No wallet funds were charged. Please try again shortly.'
 
       // Deduct balance from DB profile if present
       if (userProfile) {
@@ -514,13 +608,25 @@ export async function sendTelegramMessage(chatId: number | string, text: string)
   }
 
   try {
+    const marker = text.match(/\s*\[\[PV_INLINE:([^\]]+)\]\]\s*$/)
+    const cleanText = marker ? text.slice(0, marker.index).trim() : text
+    let replyMarkup: { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> } | undefined
+    if (marker) {
+      try {
+        const choices = JSON.parse(decodeURIComponent(marker[1])) as InlineChoice[]
+        replyMarkup = { inline_keyboard: choices.slice(0, 10).map((choice) => [{ text: choice.label.slice(0, 64), callback_data: choice.id.slice(0, 64) }]) }
+      } catch (error) {
+        console.warn('[Telegram inline menu encoding failed]', error)
+      }
+    }
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML'
+        text: cleanText,
+        parse_mode: 'HTML',
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {})
       })
     })
 

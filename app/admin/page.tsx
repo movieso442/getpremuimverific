@@ -14,6 +14,7 @@ type Overview = {
   sms_orders: Array<{ id: string; profile_id: string; service_name: string; price_xaf: number; status: string; created_at: string }>
   account_orders: Array<{ id: string; profile_id: string; item_title: string; price_xaf: number; status: string; created_at: string }>
   expenses: Array<{ id: string; kind: string; amount_xaf: number; description: string; reference?: string; created_at: string }>
+  manual_claims: Array<{ id: string; profile_id: string; amount_xaf: number; payment_method: string; payer_phone: string | null; transfer_reference: string; status: string; created_at: string }>
   settings: { support_email: string; support_phone: string; whatsapp_number: string; smm_markup_multiplier: number; sms_markup_multiplier: number }
   analytics: Array<{ date: string; deposits_xaf: number; sales_xaf: number; orders: number }>
 }
@@ -31,6 +32,7 @@ export default function AdminPage() {
   const [syncingCatalog, setSyncingCatalog] = useState(false)
   const [expense, setExpense] = useState({ kind: 'provider_cost', amount_xaf: '', description: '', reference: '' })
   const [settings, setSettings] = useState<Overview['settings'] | null>(null)
+  const [reviewingClaim, setReviewingClaim] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -99,6 +101,20 @@ export default function AdminPage() {
     }
   }
 
+  const reviewManualPayment = async (claimId: string, action: 'confirm' | 'reject') => {
+    setReviewingClaim(claimId)
+    try {
+      const response = await fetch('/api/admin/manual-payments', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ claim_id: claimId, action }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Could not review this payment.')
+      await load()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not review this payment.')
+    } finally {
+      setReviewingClaim(null)
+    }
+  }
+
   const syncCatalogue = async () => {
     setSyncingCatalog(true)
     try {
@@ -152,6 +168,8 @@ export default function AdminPage() {
           <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5"><ClipboardList className="text-sky-400 w-5 h-5" /><p className="text-2xl font-black mt-3">{data.metrics.active_smm_orders}</p><p className="text-sm text-slate-400">SMM orders pending provider completion</p></div>
           <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5"><Users className="text-violet-400 w-5 h-5" /><p className="text-2xl font-black mt-3">{data.metrics.customers}</p><p className="text-sm text-slate-400">Registered customer profiles</p></div>
         </section>
+
+        <section className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800"><h2 className="font-extrabold">Manual mobile-money review</h2><p className="text-xs text-slate-400 mt-1">Confirm only after matching the amount and reference in your MTN/Orange account. Confirmation creates one completed wallet deposit; claims do not credit a wallet by themselves.</p></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Customer</th><th className="p-3">Method</th><th className="p-3">Amount</th><th className="p-3">Payer / reference</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{data.manual_claims.map((claim) => <tr key={claim.id} className="border-t border-slate-800"><td className="p-3">{profileById.get(claim.profile_id)?.full_name || profileById.get(claim.profile_id)?.email || 'Unknown'}</td><td className="p-3">{claim.payment_method === 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}</td><td className="p-3 font-bold">{xaf(claim.amount_xaf)}</td><td className="p-3 text-xs"><p>{claim.payer_phone || 'No payer phone'}</p><p className="font-mono text-slate-400">{claim.transfer_reference}</p></td><td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${badge(claim.status)}`}>{claim.status}</span></td><td className="p-3">{claim.status === 'pending' ? <div className="flex gap-2"><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'confirm')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold">Confirm</button><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'reject')} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold">Reject</button></div> : <span className="text-xs text-slate-500">Reviewed</span>}</td></tr>)}</tbody></table>{data.manual_claims.length === 0 && <p className="p-5 text-sm text-slate-400">No manual payments awaiting review.</p>}</div></section>
 
         <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div><h2 className="font-extrabold">Live provider catalogue</h2><p className="text-xs text-slate-400 mt-1">Pull the current JAP services, limits, and supplier rates into Supabase. Customer prices use your SMM multiplier, and checkout verifies JAP again immediately before charging.</p></div>

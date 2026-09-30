@@ -1,0 +1,29 @@
+name: Semgrep Security Scan
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  schedule:
+    - cron: '0 0 * * 1' # Runs every Monday at midnight
+
+jobs:
+  semgrep:
+    name: Semgrep Scan
+    runs-on: ubuntu-latest
+    
+    # Skip scanning if the commit message contains [skip ci]
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep CI
+        uses: semgrep/semgrep-action@v1
+        with:
+          auditOnFailure: false # Change to true if you want to block PRs on findings
+        env:
+          # Get your token from https://semgrep.dev/orgs/-/settings/tokens
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}

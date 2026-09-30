@@ -11,11 +11,13 @@ export async function POST(request: Request) {
   try {
     const update = await request.json()
 
-    if (update.message) {
-      const msg = update.message
+    const msg = update.message || update.callback_query?.message
+    const callbackData = typeof update.callback_query?.data === 'string' ? update.callback_query.data : ''
+    if (msg) {
       const chatId = msg.chat?.id
-      const text = msg.text || ''
-      const fromName = msg.from?.first_name ? `${msg.from.first_name} ${msg.from.last_name || ''}`.trim() : 'User'
+      const text = callbackData || msg.text || ''
+      const sender = update.callback_query?.from || msg.from
+      const fromName = sender?.first_name ? `${sender.first_name} ${sender.last_name || ''}`.trim() : 'User'
 
       if (chatId && text) {
         console.log(`[Telegram Webhook] Incoming message from ${fromName} (${chatId}): "${text}"`)
@@ -29,6 +31,11 @@ export async function POST(request: Request) {
 
         // Dispatch reply back to Telegram user
         await sendTelegramMessage(chatId, replyText)
+        if (update.callback_query?.id && process.env.TELEGRAM_BOT_TOKEN) {
+          await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: update.callback_query.id }),
+          }).catch(() => undefined)
+        }
       }
     }
 
