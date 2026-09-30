@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   currency TEXT DEFAULT 'XAF',
   avatar_url TEXT,
   phone_number TEXT,
+  telegram_chat_id TEXT UNIQUE,
   role TEXT DEFAULT 'client',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

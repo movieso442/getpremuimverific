@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { getOrCreateTelegramCustomer } from '@/lib/bots/customers'
 
 export interface TelegramMessagePayload {
   chatId: number | string
@@ -155,8 +156,9 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
 
   const session = userSessions[chatId] || { step: 'MAIN' }
 
-  // Fetch current user profile & balance
-  const userProfile = await getProfileFromSupabase(chatId)
+  // Telegram does not provide a phone number reliably, so the chat ID is the
+  // stable customer identity and the Telegram display name is stored as name.
+  const userProfile = await getOrCreateTelegramCustomer(chatId, payload.fromName)
   const currentBalance = userProfile ? Number(userProfile.balance_xaf) || 0 : 0
 
   // 1. GREETING / MAIN MENU COMMAND
@@ -488,6 +490,11 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
     }
   }
 
+  if (session.step === 'MAIN') {
+    const name = userProfile?.full_name?.split(/\s+/)[0] || payload.fromName?.split(/\s+/)[0] || 'there'
+    return `Hi ${name}! <b>Welcome to Premium Verify.</b> I can help you get a temporary number, boost social media, top up, or check your balance.\n\nSay “get a number”, “boost followers”, “top up”, or “help”.`
+  }
+
   // DEFAULT FALLBACK RESPONSE
   return (
     `❓ Unrecognized input: "${payload.text}"\n\n` +
@@ -499,7 +506,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
  * Send a message via Telegram Bot API
  */
 export async function sendTelegramMessage(chatId: number | string, text: string): Promise<boolean> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN || '8838713622:AAG7_pPYAvpquaQH92JO0ebZ6iBlxa6Xxg4'
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
 
   if (!botToken) {
     console.warn('[Telegram Bot] TELEGRAM_BOT_TOKEN not set. Logged message:', text)

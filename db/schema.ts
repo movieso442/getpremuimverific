@@ -10,6 +10,7 @@ export const profiles = pgTable('profiles', {
   currency: text('currency').default('XAF'),
   avatarUrl: text('avatar_url'),
   phoneNumber: text('phone_number'),
+  telegramChatId: text('telegram_chat_id').unique(),
   role: text('role').default('client'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()

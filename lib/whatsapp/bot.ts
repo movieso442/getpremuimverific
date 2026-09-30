@@ -4,6 +4,8 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { fetchFiveSimCountries, fetchFiveSimProducts } from '@/lib/providers/fivesim'
+import { getOrCreateWhatsAppCustomer } from '@/lib/bots/customers'
 
 export interface WhatsAppMessagePayload {
   from: string
@@ -49,6 +51,28 @@ const SMS_PRICES: Record<string, number> = {
 
 function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || 'https://premiumverific.com'
+}
+
+const fiveSimBaseUrl = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
+
+async function liveCountryMenu(page = 1) {
+  const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
+  const size = 20
+  const safePage = Math.max(1, Math.min(page, Math.ceil(countries.length / size)))
+  const items = countries.slice((safePage - 1) * size, safePage * size)
+  return `*Live 5SIM countries — page ${safePage}/${Math.ceil(countries.length / size)}*\n\n${items.map((country, index) => `${(safePage - 1) * size + index + 1}. ${country.label} (\`${country.slug}\`)`).join('\n')}\n\nReply \`services <country>\` to see live services. Example: \`services england\`\nType \`countries ${safePage + 1}\` for the next page.`
+}
+
+async function liveServiceMenu(countryInput: string, page = 1) {
+  const country = countryInput.toLowerCase().replace(/\s+/g, '')
+  const countries = await fetchFiveSimCountries(fiveSimBaseUrl)
+  if (!countries.some((item) => item.slug === country)) return `I could not find “${countryInput}” in 5SIM. Type \`countries\` to browse the live country list.`
+  const services = await fetchFiveSimProducts(fiveSimBaseUrl, country)
+  if (!services.length) return `5SIM currently has no activation inventory for ${country}. Try another country or type \`countries\`.`
+  const size = 15
+  const safePage = Math.max(1, Math.min(page, Math.ceil(services.length / size)))
+  const items = services.slice((safePage - 1) * size, safePage * size)
+  return `*Live 5SIM services — ${country} — page ${safePage}/${Math.ceil(services.length / size)}*\n\n${items.map((item, index) => `${(safePage - 1) * size + index + 1}. \`${item.product}\` — ${item.available.toLocaleString()} available`).join('\n')}\n\nReply \`services ${country} ${safePage + 1}\` for more, or \`find ${country} telegram\` to check one service and its current availability.`
 }
 
 async function getProfileFromSupabase(identifier: string) {
@@ -155,8 +179,9 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
 
   const session = userSessions[userPhone] || { step: 'MAIN' }
 
-  // Fetch current user profile & balance
-  const userProfile = await getProfileFromSupabase(userPhone)
+  // Meta supplies the sender number and display name. Create one customer
+  // profile on first contact, then use that same profile on every message.
+  const userProfile = await getOrCreateWhatsAppCustomer(userPhone, payload.name)
   const currentBalance = userProfile ? Number(userProfile.balance_xaf) || 0 : 0
 
   // 1. GREETING / MAIN MENU COMMAND
@@ -235,7 +260,34 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
     }
   }
 
-  // 4. SMS FLOW (1, /sms, sms, virtual number)
+  // 4. LIVE 5SIM SMS CATALOGUE. WhatsApp is deliberately paginated: 5SIM has
+  // hundreds of countries and thousands of products, so a giant chat message
+  // would be unreadable and rejected by some clients.
+  const countriesMatch = lowerText.match(/^countries(?:\s+(\d+))?$/)
+  if (countriesMatch) return liveCountryMenu(Number(countriesMatch[1] || 1))
+
+  const servicesMatch = lowerText.match(/^services\s+([a-z\s]+?)(?:\s+(\d+))?$/)
+  if (servicesMatch) return liveServiceMenu(servicesMatch[1].trim(), Number(servicesMatch[2] || 1))
+
+  const findMatch = lowerText.match(/^find\s+([a-z\s]+?)\s+([a-z0-9_-]+)$/)
+  if (findMatch) {
+    const country = findMatch[1].trim().replace(/\s+/g, '')
+    const product = findMatch[2]
+    const services = await fetchFiveSimProducts(fiveSimBaseUrl, country)
+    const match = services.find((item) => item.product === product)
+    return match
+      ? `*${product} in ${country}*\n${match.available.toLocaleString()} activation numbers are available now from 5SIM.\n\nReply \`services ${country}\` to browse more live services.`
+      : `5SIM has no live availability for \`${product}\` in ${country} right now. Try \`services ${country}\` or another country.`
+  }
+
+  // 5. SMS FLOW (1, /sms, sms, virtual number)
+  if (lowerText === '1' || lowerText === '/sms' || lowerText === 'sms' || /\b(number|sms|verification|code|otp)\b/.test(lowerText)) {
+    userSessions[userPhone] = { step: 'SMS_CATALOG' }
+    return liveCountryMenu()
+  }
+
+  // Legacy flow retained below for active conversations created before the
+  // live catalogue rollout.
   if (lowerText === '1' || lowerText === '/sms' || lowerText === 'sms' || lowerText.includes('sms number')) {
     userSessions[userPhone] = { step: 'SMS_PLATFORM' }
     return (
@@ -486,6 +538,13 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
         `Track updates at ${appUrl}/smm-panel`
       )
     }
+  }
+
+  // Ordinary first messages are normal conversation, not an error. Give a
+  // simple intent-based welcome instead of echoing the customer's text back.
+  if (session.step === 'MAIN') {
+    const name = userProfile?.full_name?.split(/\s+/)[0] || payload.name?.split(/\s+/)[0] || 'there'
+    return `Hi ${name}! Welcome to Premium Verify. I can help you get a temporary number, boost social media, top up, or check your balance.\n\nJust say “get a number”, “boost followers”, “top up”, or “help”.`
   }
 
   // DEFAULT FALLBACK RESPONSE
