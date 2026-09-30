@@ -2,8 +2,6 @@
 
 import React, { useState } from 'react'
 import { X, CreditCard, Smartphone, ShieldCheck, CheckCircle2, DollarSign } from 'lucide-react'
-import { useAppState } from '@/lib/store'
-import confetti from 'canvas-confetti'
 
 interface DepositModalProps {
   isOpen: boolean
@@ -11,12 +9,10 @@ interface DepositModalProps {
 }
 
 export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) => {
-  const { topUpBalance } = useAppState()
   const [selectedMethod, setSelectedMethod] = useState<'mtn_momo' | 'orange_money' | 'visa_mastercard' | 'crypto_usdt'>('mtn_momo')
   const [amount, setAmount] = useState<number>(5000)
   const [phone, setPhone] = useState<string>('680209047')
   const [isProcessing, setIsProcessing] = useState<boolean>(false)
-  const [isSuccess, setIsSuccess] = useState<boolean>(false)
   const [statusMessage, setStatusMessage] = useState<string>('')
 
   if (!isOpen) return null
@@ -32,45 +28,24 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
     setStatusMessage('')
 
     try {
-      let endpoint = '/api/payments/momo'
-      let payload: any = { amount, phone, method: selectedMethod }
-
-      if (selectedMethod === 'visa_mastercard') {
-        endpoint = '/api/payments/stripe'
-        payload = { amount: (amount / 600).toFixed(2), currency: 'usd' }
-      } else if (selectedMethod === 'crypto_usdt') {
-        endpoint = '/api/payments/crypto'
-        payload = { amount: (amount / 600).toFixed(2), crypto: 'USDT' }
+      if (selectedMethod === 'crypto_usdt') {
+        setStatusMessage('USDT deposits are not available yet. Please choose Payunit for a verified payment.')
+        return
       }
 
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/payments/payunit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ amount, currency: 'XAF', phone_number: phone })
       })
 
       const data = await res.json()
 
-      if (data.status === 'REDIRECT' && data.payment_url) {
+      if (res.ok && data.status === 'REDIRECT' && data.payment_url) {
         window.location.href = data.payment_url
         return
       }
-
-      // Add balance to local state & persist
-      topUpBalance(amount, selectedMethod, data.reference || 'DEP-' + Math.floor(100000 + Math.random() * 900000))
-      setIsSuccess(true)
-      setStatusMessage(data.message || 'Payment successfully processed!')
-
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      })
-
-      setTimeout(() => {
-        setIsSuccess(false)
-        onClose()
-      }, 2000)
+      setStatusMessage(data.error || 'Payment could not be started. Your wallet was not credited.')
 
     } catch (err: any) {
       setStatusMessage(err.message || 'Payment processing failed')
@@ -102,19 +77,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
           </button>
         </div>
 
-        {isSuccess ? (
-          <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
-            <div className="w-16 h-16 rounded-full bg-orange-100 text-[#ff6b00] flex items-center justify-center animate-bounce">
-              <CheckCircle2 className="w-10 h-10" />
-            </div>
-            <h4 className="text-2xl font-bold text-gray-900">Payment Successful!</h4>
-            <p className="text-sm text-gray-600">
-              Added <span className="text-[#ea580c] font-bold">{amount.toLocaleString()} XAF</span> to your Premium Verify balance.
-            </p>
-            {statusMessage && <div className="text-xs text-green-600 font-semibold">{statusMessage}</div>}
-          </div>
-        ) : (
-          <form onSubmit={handleDepositSubmit} className="mt-5 space-y-5">
+        <form onSubmit={handleDepositSubmit} className="mt-5 space-y-5">
             {/* Payment Method Selector */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2 block">
@@ -277,7 +240,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({ isOpen, onClose }) =
               )}
             </button>
           </form>
-        )}
 
       </div>
     </div>

@@ -85,48 +85,9 @@ async function updateProfileBalance(profileId: string, newBalance: number) {
 }
 
 async function getPayunitCheckoutUrl(amount: number): Promise<string> {
-  const appId = process.env.PAYUNIT_APP_ID || '6f671378-7fae-4fa0-bdee-00b32df34612'
-  const apiUser = process.env.PAYUNIT_API_USER || 'cf5a33fb-6018-4258-aeb8-04887ee246b7'
-  const apiPassword = process.env.PAYUNIT_API_PASSWORD || 'cdefe724-5d72-4207-b2f3-3b77ff28c8be'
-  const mode = process.env.PAYUNIT_MODE || 'live'
-  const apiKey = mode === 'live'
-    ? (process.env.PAYUNIT_LIVE_KEY || process.env.PAYUNIT_API_KEY || 'live_jpniXcJT6aXHNXujkNw9Hne3qlcLQcz2daqisYPE')
-    : (process.env.PAYUNIT_API_KEY || 'sand_aA2n1kinNgZxlGY2xk1Z83JOJrFSu6')
-  const appUrl = getAppUrl()
-  const transactionId = `PV-${Math.floor(100000 + Math.random() * 900000)}`
-
-  const baseUrl = mode === 'live' 
-    ? 'https://gateway.payunit.net/api/gateway/initialize'
-    : 'https://sandbox.payunit.net/api/gateway/initialize'
-
-  try {
-    const basicAuth = Buffer.from(`${apiUser}:${apiPassword}`).toString('base64')
-    const res = await fetch(baseUrl, {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'mode': mode,
-        'Authorization': `Basic ${basicAuth}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        total_amount: amount,
-        currency: 'XAF',
-        transaction_id: transactionId,
-        return_url: `${appUrl}/add-funds?status=success&ref=${transactionId}`,
-        notify_url: `${appUrl}/api/payments/webhooks/payunit`,
-        app_id: appId,
-        description: `Premium Verify Topup ${amount} XAF`
-      })
-    })
-    const data = await res.json()
-    if (data.status === 'SUCCESS' && (data.data?.transaction_url || data.data?.payment_url)) {
-      return data.data.transaction_url || data.data.payment_url
-    }
-  } catch (e) {
-    console.warn('Payunit API call fallback:', e)
-  }
-  return `${appUrl}/add-funds?amount=${amount}&ref=${transactionId}`
+  // Bot chat IDs are not authenticated web sessions. Send users to the
+  // website checkout, where the signed-in profile owns the payment record.
+  return `${getAppUrl()}/add-funds?amount=${amount}`
 }
 
 async function allocateSmsNumber(service: string, country: string) {

@@ -114,6 +114,16 @@ export const webhooks = pgTable('webhooks', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 })
 
+export const financialEntries = pgTable('financial_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  kind: text('kind').notNull(),
+  amountXaf: numeric('amount_xaf', { precision: 12, scale: 2 }).notNull(),
+  description: text('description').notNull(),
+  reference: text('reference'),
+  createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
 // 9. Virtual SMS Services Catalog Table
 export const smsServices = pgTable('sms_services', {
   id: uuid('id').defaultRandom().primaryKey(),

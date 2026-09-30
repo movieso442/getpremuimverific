@@ -24,6 +24,7 @@ export default function RootLayout({
   // Public pages that should render with PublicHeader & PublicFooter instead of Dashboard Sidebar
   const publicRoutes = ['/', '/terms', '/privacy', '/refund-policy', '/login', '/signup']
   const isPublicPage = publicRoutes.includes(pathname)
+  const isAdminPage = pathname.startsWith('/admin')
 
   return (
     <html lang="en">
@@ -41,7 +42,9 @@ export default function RootLayout({
       </head>
       <body className="bg-[#f8fafc] text-gray-900 min-h-screen font-sans antialiased">
         <AppStateProvider>
-          {isPublicPage ? (
+          {isAdminPage ? (
+            <main className="min-h-screen">{children}</main>
+          ) : isPublicPage ? (
             /* Public Website Page View (Header, Body, Public Footer) */
             <div className="min-h-screen flex flex-col justify-between bg-white">
               <PublicHeader />
@@ -78,13 +81,13 @@ export default function RootLayout({
           )}
 
           {/* Floating WhatsApp Widget */}
-          <WhatsAppButton />
+          {!isAdminPage && <WhatsAppButton />}
 
           {/* Deposit Modal */}
-          <DepositModal
+          {!isAdminPage && <DepositModal
             isOpen={isDepositOpen}
             onClose={() => setIsDepositOpen(false)}
-          />
+          />}
         </AppStateProvider>
       </body>
     </html>

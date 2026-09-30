@@ -118,6 +118,18 @@ CREATE TABLE IF NOT EXISTS public.webhooks (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 8. Admin financial ledger. Expenses must be recorded here to calculate profit;
+-- customer deposits are wallet liabilities, not platform revenue.
+CREATE TABLE IF NOT EXISTS public.financial_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind TEXT NOT NULL CHECK (kind IN ('provider_cost', 'payment_fee', 'operating_expense', 'adjustment')),
+  amount_xaf NUMERIC(12, 2) NOT NULL CHECK (amount_xaf > 0),
+  description TEXT NOT NULL,
+  reference TEXT,
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Enable Row Level Security (RLS) on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
@@ -126,6 +138,7 @@ ALTER TABLE public.smm_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.account_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.webhooks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.financial_entries ENABLE ROW LEVEL SECURITY;
 
 -- Create basic RLS Policies for user ownership access
 DROP POLICY IF EXISTS "Users can access own profile" ON public.profiles;
@@ -135,6 +148,7 @@ DROP POLICY IF EXISTS "Users can access own SMM orders" ON public.smm_orders;
 DROP POLICY IF EXISTS "Users can access own account orders" ON public.account_orders;
 DROP POLICY IF EXISTS "Users can manage API keys" ON public.api_keys;
 DROP POLICY IF EXISTS "Users can manage webhooks" ON public.webhooks;
+DROP POLICY IF EXISTS "Admins can manage financial entries" ON public.financial_entries;
 
 CREATE POLICY "Users can access own profile" ON public.profiles FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can view own transactions" ON public.wallet_transactions FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
@@ -143,6 +157,9 @@ CREATE POLICY "Users can access own SMM orders" ON public.smm_orders FOR ALL USI
 CREATE POLICY "Users can access own account orders" ON public.account_orders FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
 CREATE POLICY "Users can manage API keys" ON public.api_keys FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
 CREATE POLICY "Users can manage webhooks" ON public.webhooks FOR ALL USING (auth.uid() = (SELECT user_id FROM public.profiles WHERE id = profile_id));
+CREATE POLICY "Admins can manage financial entries" ON public.financial_entries FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+);
 
 -- Trigger to update balance on deposits
 CREATE OR REPLACE FUNCTION update_user_balance()
