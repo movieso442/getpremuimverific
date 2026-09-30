@@ -41,7 +41,9 @@ export async function POST(request: Request) {
         email: email,
         full_name: displayName,
         avatar_url: avatar_url || null,
-        phone_number: phone_number || '+237680209047',
+        // A support/bot number must never be copied into a customer profile.
+        // Customers add their own contact number later from Profile settings.
+        phone_number: phone_number?.trim() || null,
         balance_xaf: 0,
         currency: 'XAF',
         role: 'client'
@@ -62,5 +64,27 @@ export async function POST(request: Request) {
   } catch (err: any) {
     console.error('[Sync User Route Error]:', err)
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { full_name, phone_number, currency } = await request.json()
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Sign in before updating your profile.' }, { status: 401 })
+
+    const updates = {
+      full_name: typeof full_name === 'string' ? full_name.trim().slice(0, 120) || null : undefined,
+      phone_number: typeof phone_number === 'string' ? phone_number.trim().slice(0, 32) || null : undefined,
+      currency: ['XAF', 'USD', 'EUR'].includes(currency) ? currency : undefined,
+      updated_at: new Date().toISOString(),
+    }
+    const admin = createAdminClient()
+    const { data: profile, error } = await admin.from('profiles').update(updates).eq('user_id', user.id).select().single()
+    if (error) throw error
+    return NextResponse.json({ success: true, profile })
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Could not update the profile.' }, { status: 500 })
   }
 }

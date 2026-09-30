@@ -43,7 +43,7 @@ export default function LoginPage() {
           id: data.user.id,
           email: data.user.email || email,
           full_name: data.user.user_metadata?.full_name || email.split('@')[0],
-          phone_number: data.user.user_metadata?.phone || '+237 680209047',
+          phone_number: data.user.user_metadata?.phone || '',
           balance_xaf: 0
         })
       }

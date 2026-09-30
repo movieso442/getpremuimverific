@@ -5,16 +5,29 @@ import { User, Mail, Phone, Lock, Save, ShieldCheck, DollarSign } from 'lucide-r
 import { useAppState } from '@/lib/store'
 
 export default function ProfilePage() {
-  const { profile } = useAppState()
+  const { profile, setProfile } = useAppState()
   const [fullName, setFullName] = useState(profile.full_name || 'Premium Verify Partner')
-  const [phone, setPhone] = useState(profile.phone_number || '+237680209047')
+  const [phone, setPhone] = useState(profile.phone_number || '')
   const [currency, setCurrency] = useState(profile.currency || 'XAF')
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 2500)
+    setError('')
+    try {
+      const response = await fetch('/api/auth/sync-user', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: fullName, phone_number: phone, currency }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Could not save your profile.')
+      setProfile(result.profile)
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 2500)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not save your profile.')
+    }
   }
 
   return (
@@ -46,6 +59,7 @@ export default function ProfilePage() {
             <span>Profile preferences updated successfully!</span>
           </div>
         )}
+        {error && <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold">{error}</div>}
 
         <form onSubmit={handleSave} className="space-y-4">
           <div>

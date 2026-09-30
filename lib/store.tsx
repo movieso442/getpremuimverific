@@ -83,7 +83,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 email: user.email,
                 full_name: fullName,
                 avatar_url: avatarUrl,
-                phone_number: '+237680209047'
+                phone_number: user.user_metadata?.phone || null
               })
             })
             const syncData = await res.json()
@@ -97,7 +97,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 balance_xaf: Number(dbP.balance_xaf) || 0,
                 currency: dbP.currency || 'XAF',
                 avatar_url: dbP.avatar_url || avatarUrl,
-                phone_number: dbP.phone_number || '+237680209047',
+                phone_number: dbP.phone_number || '',
                 role: dbP.role || 'client',
                 created_at: dbP.created_at || new Date().toISOString(),
                 updated_at: dbP.updated_at || new Date().toISOString()
@@ -124,7 +124,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 balance_xaf: Number(dbProfile.balance_xaf) || 0,
                 currency: dbProfile.currency || 'XAF',
                 avatar_url: dbProfile.avatar_url || avatarUrl,
-                phone_number: dbProfile.phone_number || '+237680209047',
+                phone_number: dbProfile.phone_number || '',
                 role: dbProfile.role || 'client',
                 created_at: dbProfile.created_at,
                 updated_at: dbProfile.updated_at
@@ -138,7 +138,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 balance_xaf: 0,
                 currency: 'XAF',
                 avatar_url: avatarUrl,
-                phone_number: '+237680209047',
+                phone_number: user.user_metadata?.phone || '',
                 role: 'client',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()

@@ -51,7 +51,7 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: `${firstName} ${lastName}`.trim() || username || 'Member',
-            phone: phone || '+237680209047'
+            phone: phone || undefined
           }
         }
       })
@@ -62,7 +62,7 @@ export default function SignupPage() {
           id: data.user.id,
           email: data.user.email || email,
           full_name: `${firstName} ${lastName}`.trim() || username || 'Premium Partner',
-          phone_number: phone || '+237 680209047',
+          phone_number: phone || '',
           balance_xaf: 0
         })
       }
