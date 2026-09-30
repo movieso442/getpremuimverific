@@ -12,7 +12,9 @@ export type PayunitStatusResponse = {
 }
 
 export function getPayunitConfig() {
-  const mode = process.env.PAYUNIT_MODE === 'sandbox' ? 'sandbox' : 'live'
+  // Payunit's API calls the sandbox header value "test". Keep accepting the
+  // older "sandbox" spelling in environment files, but never send it upstream.
+  const mode = ['test', 'sandbox'].includes((process.env.PAYUNIT_MODE || '').toLowerCase()) ? 'test' : 'live'
   const appId = process.env.PAYUNIT_APP_ID
   const apiUser = process.env.PAYUNIT_API_USER
   const apiPassword = process.env.PAYUNIT_API_PASSWORD
@@ -26,7 +28,7 @@ export function getPayunitConfig() {
     appUrl,
     mode,
     apiKey,
-    baseUrl: mode === 'live' ? 'https://gateway.payunit.net' : 'https://sandbox.payunit.net',
+    baseUrl: 'https://gateway.payunit.net',
     headers: {
       'x-api-key': apiKey,
       mode,
@@ -46,7 +48,9 @@ export async function getPayunitPaymentStatus(transactionId: string, config: Non
 }
 
 export function paymentErrorMessage(payload: PayunitStatusResponse) {
-  return typeof payload.message === 'string' && payload.message.trim()
-    ? payload.message.trim()
-    : 'Payunit could not initialize the payment. Please try again shortly.'
+  const providerMessage = typeof payload.message === 'string' ? payload.message.trim() : ''
+  if (/live operating environment.*sandbox/i.test(providerMessage)) {
+    return 'Payments are not live yet. Payunit must activate this application in Live mode before we can accept real payments.'
+  }
+  return providerMessage || 'Payunit could not initialize the payment. Please try again shortly.'
 }

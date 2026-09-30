@@ -98,7 +98,7 @@ export default function WhatsAppBotPage() {
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
             <CheckCircle2 className="w-4 h-4" />
-            <span>Webhook Listener Active</span>
+            <span>Webhook endpoint ready — Meta activation required</span>
           </span>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function WhatsAppBotPage() {
               <div className="font-mono text-[11px] space-y-1 text-gray-800 bg-white p-3 rounded-lg border border-emerald-200">
                 <div>WHATSAPP_PHONE_NUMBER_ID=your_id</div>
                 <div>WHATSAPP_ACCESS_TOKEN=your_token</div>
-                <div>WHATSAPP_VERIFY_TOKEN=pv_wa_secure_token_2026</div>
+                <div>WHATSAPP_VERIFY_TOKEN=your_private_verify_token</div>
               </div>
             </div>
 
