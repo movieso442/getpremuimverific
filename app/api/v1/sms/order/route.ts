@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { fetchFiveSimQuote } from '@/lib/providers/fivesim'
+import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 
 const FIVE_SIM_BASE_URL = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
 const COUNTRY_SLUGS: Record<string, string> = {
@@ -19,6 +20,21 @@ type FiveSimOrder = { id?: number; phone?: string; status?: string; expires?: st
 
 function fiveSimHeaders(token: string) {
   return { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+}
+
+export async function GET() {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Sign in to view your SMS inbox.' }, { status: 401 })
+  const admin = createAdminClient()
+  const { data: profile, error: profileError } = await admin.from('profiles')
+    .select('id').eq('user_id', user.id).single()
+  if (profileError || !profile) return NextResponse.json({ error: 'Your profile is unavailable.' }, { status: 409 })
+  const { data: orders, error } = await admin.from('sms_orders')
+    .select('id, provider_order_id, service_name, country_name, phone_number, sms_code, status, expires_at, created_at')
+    .eq('profile_id', profile.id).order('created_at', { ascending: false }).limit(50)
+  if (error) return NextResponse.json({ error: 'Your SMS inbox could not be loaded.' }, { status: 503 })
+  return NextResponse.json({ orders }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 export async function POST(request: Request) {
@@ -42,8 +58,11 @@ export async function POST(request: Request) {
       if (!id) return NextResponse.json({ error: '5SIM order ID is required.' }, { status: 400 })
       const providerOrderId = String(id)
       const { data: localOrder } = await admin.from('sms_orders')
-        .select('id, status').eq('profile_id', profile.id).eq('provider_order_id', providerOrderId).maybeSingle()
+        .select('id, status, sms_code').eq('profile_id', profile.id).eq('provider_order_id', providerOrderId).maybeSingle()
       if (!localOrder) return NextResponse.json({ error: 'SMS order not found.' }, { status: 404 })
+      if (localOrder.sms_code) return NextResponse.json({ status: 'RECEIVED', code: localOrder.sms_code })
+      if (localOrder.status === 'canceled' || localOrder.status === 'expired')
+        return NextResponse.json({ status: localOrder.status.toUpperCase() })
 
       const providerRes = await fetch(`${FIVE_SIM_BASE_URL}/user/check/${encodeURIComponent(providerOrderId)}`, {
         headers: fiveSimHeaders(token), signal: AbortSignal.timeout(15_000),
@@ -53,7 +72,8 @@ export async function POST(request: Request) {
 
       const code = providerOrder.sms?.find((sms) => sms.code)?.code
       if (code) {
-        await admin.from('sms_orders').update({ sms_code: code, status: 'received' }).eq('id', localOrder.id)
+        const { error: saveError } = await admin.from('sms_orders').update({ sms_code: code, status: 'received' }).eq('id', localOrder.id)
+        if (saveError) return NextResponse.json({ error: 'Could not save your code. Please retry.' }, { status: 503 })
         // Mark the activation complete at 5SIM after we safely record the code.
         await fetch(`${FIVE_SIM_BASE_URL}/user/finish/${encodeURIComponent(providerOrderId)}`, {
           headers: fiveSimHeaders(token), signal: AbortSignal.timeout(15_000),
@@ -106,6 +126,7 @@ export async function POST(request: Request) {
       reference: `SMS-${order.id}`, status: 'completed', description: `5SIM ${catalogService.name} activation via ${quote.operator}`,
     })
     if (transactionError) throw transactionError
+    scheduleAdminNotifications(admin)
 
     return NextResponse.json({ id: String(providerOrder.id), order, phone: providerOrder.phone, status: 'WAITING_SMS' }, { status: 201 })
   } catch (error: unknown) {

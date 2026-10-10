@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
+import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
+import { getPlatformSettings, getSmmPriceOverrides, smmRetailRateXaf } from '@/lib/platform/settings'
 import { fetchJapService } from '@/lib/providers/jap'
 
 export async function POST(request: Request) {
@@ -23,9 +24,12 @@ export async function POST(request: Request) {
     if (!service || Number(quantity) < service.min || Number(quantity) > service.max) {
       return NextResponse.json({ error: 'This live service is unavailable or the quantity is outside its current limits.' }, { status: 400 })
     }
-    const settings = await getPlatformSettings(admin)
-    const providerCostXaf = service.rateUsd * (Number(quantity) / 1000) * 600
-    const chargeXaf = retailPrice(providerCostXaf, settings.smm_markup_multiplier)
+    const [settings, priceOverrides] = await Promise.all([
+      getPlatformSettings(admin),
+      getSmmPriceOverrides(admin, [service.serviceId]),
+    ])
+    const retailRateXaf = smmRetailRateXaf(service.rateUsd, settings.smm_markup_multiplier, priceOverrides.get(service.serviceId))
+    const chargeXaf = Math.ceil((retailRateXaf * Number(quantity)) / 1000)
     if (Number(profile.balance_xaf) < chargeXaf)
       return NextResponse.json({ error: 'Insufficient wallet balance.', required_xaf: chargeXaf }, { status: 402 })
 
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
       reference: `SMM-${order.id}`, status: 'completed', description: `Live provider order ${providerData.order}`
     })
     if (transactionError) throw transactionError
+    scheduleAdminNotifications(admin)
 
     return NextResponse.json({ order, provider_order_id: String(providerData.order), charge_xaf: chargeXaf }, { status: 201 })
   } catch (e: any) {

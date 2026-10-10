@@ -41,8 +41,8 @@ export default function TermsOfServicePage() {
             <span>2. Account & Wallet Balance Rules</span>
           </h2>
           <ul className="list-disc pl-5 space-y-1 text-gray-600">
-            <li><strong>Account Security:</strong> You are responsible for safeguarding your login credentials and developer API keys. Any action taken using your API key is attributed to your account.</li>
-            <li><strong>Wallet Deposits:</strong> Deposits made via Payunit (MTN MoMo, Orange Money, Visa/Mastercard, PayPal), Stripe, or USDT Crypto are converted into wallet balance (XAF/USD) for purchasing platform services.</li>
+            <li><strong>Account Security:</strong> You are responsible for safeguarding your login credentials and for activity performed through your account.</li>
+            <li><strong>Wallet Deposits:</strong> Wallet deposits are initiated through Payunit&apos;s hosted checkout. A balance is credited only after our server verifies the exact Payunit amount and transaction reference.</li>
             <li><strong>Non-Transferable Balance:</strong> Wallet funds are non-transferable between separate accounts.</li>
           </ul>
         </section>
@@ -54,7 +54,7 @@ export default function TermsOfServicePage() {
             <span>3. Service SLA & Delivery Policies</span>
           </h2>
           <ul className="list-disc pl-5 space-y-1 text-gray-600">
-            <li><strong>SMS Virtual Verification:</strong> Virtual phone numbers are allocated for single-use SMS verification or rental periods. If an SMS verification code does not arrive within the 20-minute window, the order is automatically canceled and funds are fully returned to your wallet.</li>
+            <li><strong>SMS Virtual Verification:</strong> Virtual phone numbers are allocated for single-use SMS verification. Availability, delivery time, and any provider cancellation are shown on the order; no long-term rental is currently sold.</li>
             <li><strong>SMM Panel Orders:</strong> Delivery times for social media growth services (followers, views, likes) depend on provider node speeds. Instant speed estimates are non-binding guarantees.</li>
             <li><strong>Acceptable Use:</strong> You agree not to use virtual numbers or services for illegal activities, harassment, spamming, or fraudulent account generation.</li>
           </ul>
@@ -64,10 +64,10 @@ export default function TermsOfServicePage() {
         <section className="space-y-3">
           <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#ff5722]" />
-            <span>4. API Usage & Rate Limits</span>
+            <span>4. Platform Availability</span>
           </h2>
           <p>
-            Developer API access (`/api/v1/sms/order`, `/api/v1/smm/order`) is provided for automated integration. Excessive API polling or abuse exceeding 60 requests per minute may result in temporary API key suspension.
+            Customer-facing developer API keys, outbound webhooks, account-store products, and long-term number rentals are not currently offered. They will be announced only after their secure fulfillment and audit controls are live.
           </p>
         </section>
 

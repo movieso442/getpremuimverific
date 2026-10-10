@@ -25,14 +25,10 @@ import {
 import liveServices from '@/lib/liveServices.json'
 import { useAppState } from '@/lib/store'
 import confetti from 'canvas-confetti'
-import { retailPrice } from '@/lib/platform/settings'
-import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 export default function DashboardPage() {
   const { profile } = useAppState()
-  const platformSettings = usePlatformSettings()
-
-  const allServices = liveServices as any[]
+  const [allServices, setAllServices] = useState<any[]>(liveServices as any[])
   const allCategories = Array.from(new Set(allServices.map((s) => s.category)))
 
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null)
@@ -46,6 +42,18 @@ export default function DashboardPage() {
   const [quantity, setQuantity] = useState<number>(1000)
   const [favoriteServiceIds, setFavoriteServiceIds] = useState<number[]>([10110, 8751, 7102])
   const [showFilterGrid, setShowFilterGrid] = useState(true)
+
+  // Cached data is only a visual fallback. The live public catalogue carries
+  // the administrator's per-service retail price; checkout verifies it again.
+  useEffect(() => {
+    void fetch('/api/v1/smm/services', { cache: 'no-store' })
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((result) => {
+        if (Array.isArray(result?.services) && result.services.length) {
+          setAllServices(result.services)
+        }
+      }).catch(() => undefined)
+  }, [])
 
   const networks = [
     { name: 'Instagram', icon: CameraIcon, match: 'Instagram' },
@@ -128,11 +136,8 @@ export default function DashboardPage() {
   const currentService = allServices.find((s) => s.id === Number(selectedServiceId)) || filteredServices[0] || allServices[0]
 
   // Calculated charge
-  const rateUsd = currentService?.rate_usd || 1.0
-  const chargeUsd = currentService?.min === 1 && currentService?.max === 1
-    ? rateUsd
-    : (rateUsd * (quantity / 1000))
-  const chargeXaf = retailPrice(chargeUsd * 600, platformSettings.smm_markup_multiplier)
+  const retailRateXaf = Number(currentService?.retail_rate_xaf || 0)
+  const chargeXaf = Math.ceil((retailRateXaf * quantity) / 1000)
 
   const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
   const router = useRouter()
@@ -434,8 +439,7 @@ export default function DashboardPage() {
                 <div>
                   <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Charge</div>
                   <div className="text-2xl font-black text-[#ff5722]">
-                    ${chargeUsd.toFixed(4)}{' '}
-                    <span className="text-xs font-bold text-gray-500">({chargeXaf.toLocaleString()} XAF)</span>
+                    {chargeXaf.toLocaleString()} XAF
                   </div>
                 </div>
 
@@ -488,7 +492,7 @@ export default function DashboardPage() {
                     <div key={id} className="p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs">
                       <div>
                         <div className="font-bold text-gray-900">#{srv.id} - {srv.name}</div>
-                        <div className="text-[10px] text-gray-500">Rate: ${srv.rate_usd}</div>
+                        <div className="text-[10px] text-gray-500">From {Number(srv.retail_rate_xaf || 0).toLocaleString()} XAF / 1,000</div>
                       </div>
                       <button
                         onClick={() => {

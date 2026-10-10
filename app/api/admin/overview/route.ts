@@ -12,15 +12,16 @@ export async function GET() {
     const access = await requireAdmin()
     if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
 
-    const [profilesResult, transactionsResult, smmResult, smsResult, accountsResult, entriesResult, claimsResult, settings] = await Promise.all([
+    const [profilesResult, transactionsResult, smmResult, smsResult, accountsResult, entriesResult, claimsResult, settings, auditEventsResult] = await Promise.all([
       access.admin.from('profiles').select('id, email, full_name, phone_number, balance_xaf, role, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('wallet_transactions').select('id, profile_id, amount, type, payment_method, reference, status, description, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('smm_orders').select('id, profile_id, service_name, category, quantity, charge_xaf, start_count, remains, status, api_order_id, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('sms_orders').select('id, profile_id, service_name, country_name, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('account_orders').select('id, profile_id, item_title, category, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('financial_entries').select('id, kind, amount_xaf, description, reference, created_at').order('created_at', { ascending: false }).limit(250),
-      access.admin.from('manual_payment_claims').select('id, profile_id, amount_xaf, payment_method, payer_phone, transfer_reference, status, created_at').order('created_at', { ascending: false }).limit(200),
+      access.admin.from('manual_payment_claims').select('*').order('created_at', { ascending: false }).limit(200),
       getPlatformSettings(access.admin),
+      access.admin.from('audit_events').select('event_type, session_id, path, created_at').order('created_at', { ascending: false }).limit(1000),
     ])
 
     if (profilesResult.error || transactionsResult.error || smmResult.error || smsResult.error || accountsResult.error) {
@@ -32,7 +33,10 @@ export async function GET() {
     const customerSales = transactions.filter((row) => ['smm_order', 'sms_purchase', 'account_purchase'].includes(row.type) && completed(row))
     const refunds = transactions.filter((row) => row.type === 'refund' && completed(row))
     const expenses = entriesResult.error ? [] : (entriesResult.data || [])
+    const auditEvents = auditEventsResult.error ? [] : (auditEventsResult.data || [])
     const totalExpenses = expenses.reduce((total, item) => total + Number(item.amount_xaf || 0), 0)
+    const last24Hours = Date.now() - 24 * 60 * 60 * 1000
+    const checkoutStarts = auditEvents.filter((event) => event.event_type === 'checkout_started')
 
     const dayKey = (date: string) => date.slice(0, 10)
     const analyticsMap = new Map<string, { date: string; deposits_xaf: number; sales_xaf: number; orders: number }>()
@@ -55,7 +59,7 @@ export async function GET() {
 
     return NextResponse.json({
       generated_at: new Date().toISOString(),
-      schema_notice: entriesResult.error || claimsResult.error ? 'Run the latest Supabase SQL upgrades to enable all administrator accounting and manual-payment features.' : null,
+      schema_notice: entriesResult.error || claimsResult.error || auditEventsResult.error ? 'Run the latest Supabase SQL upgrades to enable all administrator accounting, pricing, payment-review, and visitor-analytics features.' : null,
       metrics: {
         cash_received_xaf: sum(completedDeposits),
         service_sales_xaf: sum(customerSales),
@@ -65,6 +69,10 @@ export async function GET() {
         wallet_liability_xaf: (profilesResult.data || []).reduce((total, profile) => total + Number(profile.balance_xaf || 0), 0),
         pending_payments_xaf: sum(transactions.filter((row) => row.type === 'deposit' && row.status === 'pending')),
         pending_payments_count: transactions.filter((row) => row.type === 'deposit' && row.status === 'pending').length,
+        page_views_24h: auditEvents.filter((event) => event.event_type === 'page_view' && new Date(event.created_at).getTime() >= last24Hours).length,
+        unique_visitors_24h: new Set(auditEvents.filter((event) => event.event_type === 'page_view' && new Date(event.created_at).getTime() >= last24Hours).map((event) => event.session_id).filter(Boolean)).size,
+        checkout_starts: checkoutStarts.length,
+        checkout_not_completed: Math.max(0, checkoutStarts.length - completedDeposits.length),
         active_smm_orders: (smmResult.data || []).filter((row) => ['pending', 'processing', 'in_progress'].includes(row.status)).length,
         customers: (profilesResult.data || []).length,
         completed_orders: (smmResult.data || []).filter(completed).length + (smsResult.data || []).filter((row) => row.status === 'received').length + (accountsResult.data || []).filter(completed).length,
@@ -72,6 +80,7 @@ export async function GET() {
       },
       settings,
       analytics: Array.from(analyticsMap.values()),
+      audit_events: auditEvents,
       profiles: profilesResult.data || [],
       transactions,
       smm_orders: smmResult.data || [],

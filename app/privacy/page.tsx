@@ -34,7 +34,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul className="list-disc pl-5 space-y-1 text-gray-600">
             <li><strong>Account Information:</strong> Email address, full name, phone number, and authentication tokens when creating an account or logging in via Google OAuth.</li>
-            <li><strong>Payment Data:</strong> Financial transactions processed through our secure payment aggregators (Payunit, Stripe, Coinbase Commerce, Mobile Money). We do not store raw credit card numbers or Mobile Money PINs on our servers.</li>
+            <li><strong>Payment Data:</strong> Financial transactions are processed through Payunit&apos;s hosted checkout. We do not store raw card details or Mobile Money PINs on our servers.</li>
             <li><strong>Service Data:</strong> API requests, SMS verification logs, virtual phone number allocations, and SMM order details submitted via our platform or automated WhatsApp Assistant.</li>
           </ul>
         </section>
@@ -61,7 +61,7 @@ export default function PrivacyPolicyPage() {
             <span>3. Payment Gateway Security & Third Parties</span>
           </h2>
           <p>
-            We partner with PCI-DSS compliant payment gateways, including <strong>Payunit</strong> (MTN MoMo, Orange Money, Credit Cards, PayPal), <strong>Stripe</strong>, and <strong>Coinbase Commerce</strong>. Your payment data is transmitted directly to payment providers via encrypted SSL/TLS endpoints. We never sell, rent, or lease user personal data to third-party marketers.
+            We use <strong>Payunit</strong> for the payment methods it presents at hosted checkout. Your payment data is transmitted directly to the payment provider via encrypted SSL/TLS endpoints. We never sell, rent, or lease user personal data to third-party marketers.
           </p>
         </section>
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { getPayunitConfig, getPayunitPaymentStatus, PayunitStatusResponse } from '@/lib/payments/payunit'
 
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
     if (transaction.status === 'pending') {
       const { error: updateError } = await admin.from('wallet_transactions').update({ status: 'completed' }).eq('id', transaction.id).eq('status', 'pending')
       if (updateError) throw updateError
+      scheduleAdminNotifications(admin)
     }
     return NextResponse.json({ received: true, credited: true })
   } catch (error: unknown) {

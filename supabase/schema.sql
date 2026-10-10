@@ -186,7 +186,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF (TG_OP = 'INSERT' AND NEW.status = 'completed')
      OR (TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM 'completed' AND NEW.status = 'completed') THEN
-    IF NEW.type = 'deposit' THEN
+    IF NEW.type IN ('deposit', 'refund') THEN
     UPDATE public.profiles SET balance_xaf = balance_xaf + NEW.amount WHERE id = NEW.profile_id;
     ELSIF NEW.type IN ('sms_purchase', 'smm_order', 'account_purchase') THEN
     UPDATE public.profiles SET balance_xaf = GREATEST(0, balance_xaf - NEW.amount) WHERE id = NEW.profile_id;

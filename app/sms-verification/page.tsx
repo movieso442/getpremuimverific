@@ -9,6 +9,11 @@ import { useAppState } from '@/lib/store'
 import { retailPrice } from '@/lib/platform/settings'
 import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
+type SmsInboxOrder = {
+  id: string; provider_order_id: string | null; service_name: string; country_name: string;
+  phone_number: string; sms_code: string | null; status: string; created_at: string;
+}
+
 export default function SmsVerificationPage() {
   const router = useRouter()
   const { profile } = useAppState()
@@ -22,6 +27,8 @@ export default function SmsVerificationPage() {
   const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
   const [requestError, setRequestError] = useState<string | null>(null)
   const [isRequesting, setIsRequesting] = useState(false)
+  const [inboxOrders, setInboxOrders] = useState<SmsInboxOrder[]>([])
+  const [inboxError, setInboxError] = useState<string | null>(null)
   const priceXaf = retailPrice(selectedService.price, platformSettings.sms_markup_multiplier)
 
   const handleGetNumber = async () => {
@@ -67,24 +74,49 @@ export default function SmsVerificationPage() {
   }
 
   useEffect(() => {
-    if (!providerOrderId || activeNumber?.status !== 'RECEIVING') return
-
+    if (!profile.id) return
+    let disposed = false
+    let inFlight = false
     const poll = async () => {
-      const response = await fetch('/api/v1/sms/order', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'getStatus', id: providerOrderId })
-      })
-      if (!response.ok) return
-      const result = await response.json()
-      if (result.status === 'RECEIVED' && result.code) {
-        setActiveNumber((current) => current ? { ...current, code: result.code, status: 'RECEIVED' } : current)
+      if (inFlight) return
+      inFlight = true
+      try {
+        const loadInbox = async (): Promise<SmsInboxOrder[]> => {
+          const response = await fetch('/api/v1/sms/order', { cache: 'no-store' })
+          if (!response.ok) throw new Error('Could not refresh your SMS inbox. Retrying shortly.')
+          const result = await response.json()
+          return result.orders
+        }
+        let orders = await loadInbox()
+        const pending = orders.filter(order => order.status === 'waiting_sms' && order.provider_order_id).slice(0, 5)
+        const checks = await Promise.allSettled(pending.map(async order => {
+          const response = await fetch('/api/v1/sms/order', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getStatus', id: order.provider_order_id })
+          })
+          if (!response.ok) throw new Error('Number status temporarily unavailable.')
+        }))
+        if (pending.length) orders = await loadInbox()
+        if (disposed) return
+        setInboxOrders(orders)
+        setInboxError(checks.some(check => check.status === 'rejected') ? 'Some numbers could not be checked. We will retry shortly.' : null)
+        const currentOrder = providerOrderId ? orders.find(order => order.provider_order_id === providerOrderId) : orders[0]
+        if (currentOrder) setActiveNumber({
+          number: currentOrder.phone_number,
+          code: currentOrder.sms_code || (currentOrder.status === 'waiting_sms' ? 'Waiting for SMS...' : currentOrder.status),
+          status: currentOrder.sms_code ? 'RECEIVED' : currentOrder.status === 'waiting_sms' ? 'RECEIVING' : currentOrder.status.toUpperCase(),
+        })
+      } catch {
+        if (!disposed) setInboxError('Could not refresh your SMS inbox. Retrying shortly.')
+      } finally {
+        inFlight = false
       }
     }
 
     void poll()
     const timer = window.setInterval(() => void poll(), 8_000)
-    return () => window.clearInterval(timer)
-  }, [providerOrderId, activeNumber?.status])
+    return () => { disposed = true; window.clearInterval(timer) }
+  }, [profile.id, providerOrderId])
 
   const handleCopy = () => {
     if (activeNumber) {
@@ -180,7 +212,7 @@ export default function SmsVerificationPage() {
       </div>
 
       {/* Number Status & Code Box */}
-      {activeNumber && (
+      {profile.id && activeNumber && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 space-y-4 shadow-2xs">
           <h3 className="text-sm font-bold text-gray-900">Active Virtual Number Session</h3>
 
@@ -212,6 +244,30 @@ export default function SmsVerificationPage() {
             )}
           </div>
         </div>
+      )}
+
+      {profile.id && (
+        <section className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+          <h2 className="text-lg font-bold text-gray-900">Your SMS inbox</h2>
+          <p className="text-sm text-gray-500">Your recent numbers and codes stay here after you refresh. Waiting numbers are checked every eight seconds while this page is open.</p>
+          {inboxError && <p role="status" className="text-sm text-amber-700">{inboxError}</p>}
+          {!inboxOrders.length && <p className="text-sm text-gray-500">Your reserved numbers will appear here.</p>}
+          <div className="space-y-3" aria-live="polite">
+            {inboxOrders.map(order => (
+              <article key={order.id} className="rounded-xl border border-gray-200 p-4 flex flex-wrap justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{order.service_name} · {order.country_name}</p>
+                  <p className="font-mono text-sm">{order.phone_number}</p>
+                  <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 capitalize">{order.status.replaceAll('_', ' ')}</p>
+                  <p className="font-mono font-bold text-green-700">{order.sms_code || (order.status === 'waiting_sms' ? 'Waiting for SMS…' : 'No code received')}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
 
     </div>

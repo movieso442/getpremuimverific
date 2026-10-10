@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, CreditCard, Loader2, ShieldCheck, Smartphone } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useAppState } from '@/lib/store'
+import { recordAnalytics } from '@/components/AnalyticsTracker'
+import CryptoDepositPanel from '@/components/CryptoDepositPanel'
 
 type Notice = { type: 'success' | 'error' | 'info'; text: string }
 
@@ -48,13 +50,14 @@ function AddFundsContent() {
   }, [paymentReference])
 
   const startCheckout = async () => {
-    if (!Number.isFinite(amount) || amount < 500) {
-      setNotice({ type: 'error', text: 'Enter a deposit of at least 500 XAF.' })
+    if (!Number.isFinite(amount) || amount < 3000) {
+      setNotice({ type: 'error', text: 'Enter a deposit of at least 3,000 XAF (about US$5).' })
       return
     }
 
     setLoading(true)
     setNotice(null)
+    recordAnalytics('checkout_started', '/add-funds', { amount_xaf: amount })
     try {
       const response = await fetch('/api/payments/payunit', {
         method: 'POST',
@@ -63,11 +66,14 @@ function AddFundsContent() {
       })
       const result = await response.json()
       if (response.ok && result.payment_url) {
+        recordAnalytics('checkout_redirected', '/add-funds', { amount_xaf: amount, reference: result.reference })
         window.location.assign(result.payment_url)
         return
       }
+      recordAnalytics('checkout_start_failed', '/add-funds', { amount_xaf: amount })
       setNotice({ type: 'error', text: result.error || 'Payunit could not start the payment. Your wallet was not credited.' })
     } catch {
+      recordAnalytics('checkout_start_failed', '/add-funds', { amount_xaf: amount })
       setNotice({ type: 'error', text: 'Could not connect to the payment service. Please try again.' })
     } finally {
       setLoading(false)
@@ -102,11 +108,12 @@ function AddFundsContent() {
           <div>
             <label className="block text-sm font-bold text-gray-800 mb-2">Deposit amount (XAF)</label>
             <div className="grid grid-cols-4 gap-2 mb-3">
-              {[2000, 5000, 10000, 25000].map((value) => (
+              {[3000, 5000, 10000, 25000].map((value) => (
                 <button key={value} type="button" onClick={() => setAmount(value)} className={`py-2 rounded-lg border text-sm font-bold ${amount === value ? 'border-[#ff5722] bg-orange-50 text-[#e64a19]' : 'border-gray-200 text-gray-600 hover:border-orange-300'}`}>{value.toLocaleString()}</button>
               ))}
             </div>
-            <div className="relative"><input aria-label="Deposit amount in XAF" type="number" min="500" step="500" value={amount} onChange={(event) => setAmount(Number(event.target.value))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-lg font-bold outline-none focus:border-[#ff5722]" /><span className="absolute right-4 top-4 text-sm font-bold text-gray-400">XAF</span></div>
+            <p className="mb-2 text-xs text-gray-500">Minimum: 3,000 XAF (about US$5).</p>
+            <div className="relative"><input aria-label="Deposit amount in XAF" type="number" min="3000" step="500" value={amount} onChange={(event) => setAmount(Number(event.target.value))} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-lg font-bold outline-none focus:border-[#ff5722]" /><span className="absolute right-4 top-4 text-sm font-bold text-gray-400">XAF</span></div>
           </div>
 
           <div>
@@ -125,6 +132,8 @@ function AddFundsContent() {
           </button>
         </div>
       </section>
+
+      <CryptoDepositPanel key={profile.id} profileId={profile.id} />
 
       <p className="text-center text-xs text-gray-500">Wallet: {Number(profile.balance_xaf || 0).toLocaleString()} XAF · MTN MoMo, Orange Money, card, and other channels shown by Payunit at checkout.</p>
     </div>

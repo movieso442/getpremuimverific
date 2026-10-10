@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
     })
     if (error?.code === '23505') return NextResponse.json({ error: 'This payment has already been submitted for review.' }, { status: 409 })
     if (error) throw error
+    scheduleAdminNotifications(admin)
     return NextResponse.json({ success: true, message: 'Payment submitted for verification. Your wallet will be credited only after our team confirms the transfer.' }, { status: 201 })
   } catch (error) {
     console.error('[Manual payment claim failed]', error)

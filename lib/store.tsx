@@ -52,6 +52,22 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const supabase = createClient()
 
+  // Refresh real wallet credits, including administrator-approved deposits.
+  // Never infer a balance from a customer's claim or optimistic UI state.
+  useEffect(() => {
+    if (!profile.id || !profile.user_id) return
+    let disposed = false
+    const refreshBalance = async () => {
+      const { data, error } = await createClient().from('profiles')
+        .select('balance_xaf').eq('id', profile.id).eq('user_id', profile.user_id).maybeSingle()
+      if (!disposed && !error && data) setProfileState(current => ({ ...current, balance_xaf: Number(data.balance_xaf) }))
+    }
+    const timer = window.setInterval(() => { void refreshBalance().catch(() => undefined) }, 15000)
+    const onFocus = () => { void refreshBalance().catch(() => undefined) }
+    window.addEventListener('focus', onFocus)
+    return () => { disposed = true; window.clearInterval(timer); window.removeEventListener('focus', onFocus) }
+  }, [profile.id, profile.user_id])
+
   const setProfile = (newProfileData: Partial<Profile>) => {
     const updated = { ...profile, ...newProfileData }
     setProfileState(updated)

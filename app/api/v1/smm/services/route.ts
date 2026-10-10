@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import liveServices from '@/lib/liveServices.json'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
+import { getPlatformSettings, getSmmPriceOverrides, smmRetailRateXaf } from '@/lib/platform/settings'
 
 export async function GET(request: Request) {
   try {
@@ -41,10 +41,13 @@ export async function GET(request: Request) {
     // Extract unique category names
     const categories = Array.from(new Set(services.map((s) => s.category)))
 
-    const settings = await getPlatformSettings(admin)
+    const [settings, priceOverrides] = await Promise.all([
+      getPlatformSettings(admin),
+      getSmmPriceOverrides(admin, services.map((service) => Number(service.service_id || service.id))),
+    ])
     const pricedServices = services.map((service) => ({
       ...service,
-      retail_rate_xaf: retailPrice(Number(service.rate_usd) * 600, settings.smm_markup_multiplier),
+      retail_rate_xaf: smmRetailRateXaf(Number(service.rate_usd), settings.smm_markup_multiplier, priceOverrides.get(Number(service.service_id || service.id))),
     }))
 
     return NextResponse.json({

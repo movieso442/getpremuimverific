@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const MINIMUM_TOPUP_XAF = 500
+const MINIMUM_TOPUP_XAF = 3000
 
 function appUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || 'https://premiumverific.com').replace(/\/$/, '')

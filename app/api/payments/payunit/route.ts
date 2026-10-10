@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { convertCurrency, SupportedCurrency } from '@/lib/currency'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { getPayunitConfig, paymentErrorMessage, PayunitStatusResponse } from '@/lib/payments/payunit'
 
 export const dynamic = 'force-dynamic'
+const MINIMUM_TOPUP_XAF = 3000
 
 export async function POST(request: Request) {
   try {
@@ -22,6 +24,7 @@ export async function POST(request: Request) {
 
     const inputCurrency = currency.toUpperCase() as SupportedCurrency
     const xafAmount = inputCurrency === 'USD' ? Math.round(convertCurrency(amount, 'USD', 'XAF')) : Math.round(amount)
+    if (xafAmount < MINIMUM_TOPUP_XAF) return NextResponse.json({ error: 'The minimum wallet deposit is 3,000 XAF (about US$5).' }, { status: 400 })
     const payunit = getPayunitConfig()
     if (!payunit)
       return NextResponse.json({ error: 'Payunit is not fully configured. No wallet credit was created.' }, { status: 503 })
@@ -32,6 +35,7 @@ export async function POST(request: Request) {
       status: 'pending', description: 'Payunit wallet top-up awaiting payment confirmation',
     })
     if (pendingError) throw pendingError
+    scheduleAdminNotifications(admin)
 
     const paymentResponse = await fetch(`${payunit.baseUrl}/api/gateway/initialize`, {
       method: 'POST', headers: payunit.headers,
@@ -84,6 +88,7 @@ export async function GET(request: Request) {
     if (isCompleted && transaction.status === 'pending') {
       const { error } = await admin.from('wallet_transactions').update({ status: 'completed' }).eq('id', transaction.id).eq('status', 'pending')
       if (error) throw error
+      scheduleAdminNotifications(admin)
     }
     return NextResponse.json({ status: isCompleted ? 'completed' : transaction.status, credited: isCompleted })
   } catch (error: unknown) {

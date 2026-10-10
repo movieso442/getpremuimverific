@@ -2,6 +2,10 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { ADMIN_OWNER_EMAIL } from '@/lib/admin/owner'
+import { createClient } from '@/lib/supabase/client'
+import AdminNotificationPanel from '@/components/AdminNotificationPanel'
+import { CRYPTO_METHODS, isCryptoMethod } from '@/lib/payments/manual-crypto'
 import { AlertTriangle, Banknote, ClipboardList, Loader2, RefreshCw, ShieldCheck, Users } from 'lucide-react'
 
 type Overview = {
@@ -14,7 +18,7 @@ type Overview = {
   sms_orders: Array<{ id: string; profile_id: string; service_name: string; price_xaf: number; status: string; created_at: string }>
   account_orders: Array<{ id: string; profile_id: string; item_title: string; price_xaf: number; status: string; created_at: string }>
   expenses: Array<{ id: string; kind: string; amount_xaf: number; description: string; reference?: string; created_at: string }>
-  manual_claims: Array<{ id: string; profile_id: string; amount_xaf: number; payment_method: string; payer_phone: string | null; transfer_reference: string; status: string; created_at: string }>
+  manual_claims: Array<{ id: string; profile_id: string; amount_xaf: number; payment_method: string; payer_phone: string | null; transfer_reference: string; status: string; created_at: string; crypto_amount?: string; receiving_address?: string; approved_amount_xaf?: number }>
   settings: { support_email: string; support_phone: string; whatsapp_number: string; smm_markup_multiplier: number; sms_markup_multiplier: number }
   analytics: Array<{ date: string; deposits_xaf: number; sales_xaf: number; orders: number }>
 }
@@ -39,6 +43,7 @@ export default function AdminPage() {
     try {
       const response = await fetch('/api/admin/overview', { cache: 'no-store' })
       const result = await response.json()
+      if (response.status === 401 || response.status === 403) { setData(null); setSettings(null) }
       if (!response.ok) throw new Error(result.error || 'Access denied')
       setData(result)
       setSettings(result.settings)
@@ -50,7 +55,7 @@ export default function AdminPage() {
     }
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => { void Promise.resolve().then(load) }, [])
 
   const profileById = useMemo(() => new Map(data?.profiles.map((profile) => [profile.id, profile]) || []), [data])
   const matchingTransactions = useMemo(() => (data?.transactions || []).filter((transaction) => {
@@ -75,14 +80,10 @@ export default function AdminPage() {
     }
   }
 
-  const changeRole = async (profileId: string, role: 'admin' | 'client') => {
-    const response = await fetch('/api/admin/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: profileId, role }) })
-    if (!response.ok) {
-      const result = await response.json()
-      setError(result.error || 'Could not update the user role.')
-      return
-    }
-    await load()
+  const signOut = async () => {
+    const { error } = await createClient().auth.signOut({ scope: 'local' })
+    if (error) { setError('Could not sign out. Please retry.'); return }
+    window.location.replace('/admin/login')
   }
 
   const saveSettings = async (event: FormEvent) => {
@@ -102,9 +103,18 @@ export default function AdminPage() {
   }
 
   const reviewManualPayment = async (claimId: string, action: 'confirm' | 'reject') => {
+    const claim = data?.manual_claims.find(row => row.id === claimId)
+    let approvedAmount: number | undefined
+    if (action === 'confirm' && claim) {
+      if (isCryptoMethod(claim.payment_method)) {
+        approvedAmount = Number(claim.amount_xaf)
+        if (!Number.isInteger(approvedAmount) || approvedAmount < 3000 || approvedAmount > 10000000) { setError('Enter a valid verified XAF credit.'); return }
+      }
+      if (!window.confirm(`Verify receipt, customer ownership and that the received payment matches the agreed ${xaf(approvedAmount ?? claim.amount_xaf)}. Approve this exact wallet credit? If the amount does not match, cancel and contact the customer.`)) return
+    }
     setReviewingClaim(claimId)
     try {
-      const response = await fetch('/api/admin/manual-payments', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ claim_id: claimId, action }) })
+      const response = await fetch('/api/admin/manual-payments', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ claim_id: claimId, action, approved_amount_xaf: approvedAmount }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Could not review this payment.')
       await load()
@@ -131,8 +141,7 @@ export default function AdminPage() {
 
   if (loading) return <div className="min-h-screen grid place-items-center bg-slate-950 text-white"><Loader2 className="w-7 h-7 animate-spin" /></div>
   if (error && !data) {
-    const needsSignIn = error === 'Sign in is required.'
-    return <div className="min-h-screen grid place-items-center bg-slate-950 p-6"><div className="max-w-md rounded-2xl bg-white p-7 text-center"><ShieldCheck className="mx-auto text-orange-600 w-10 h-10 mb-3" /><h1 className="font-extrabold text-xl">Administrator portal</h1><p className="text-sm text-gray-600 mt-2">{error}</p><p className="text-xs text-gray-500 mt-4">Sign in with a profile whose role is <code>admin</code>.</p>{needsSignIn && <Link href="/login?next=/admin" className="inline-flex mt-5 rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 text-sm font-bold text-white">Sign in to administrator portal</Link>}</div></div>
+    return <div className="min-h-screen grid place-items-center bg-slate-950 p-6"><div className="max-w-md rounded-2xl bg-white p-7 text-center"><ShieldCheck className="mx-auto text-orange-600 w-10 h-10 mb-3" /><h1 className="font-extrabold text-xl">Administrator portal</h1><p className="text-sm text-gray-600 mt-2">{error}</p><p className="text-xs text-gray-500 mt-4">Owner access only: {ADMIN_OWNER_EMAIL}</p><Link href="/admin/login" className="inline-flex mt-5 rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 text-sm font-bold text-white">Owner sign-in / switch account</Link></div></div>
   }
   if (!data) return null
 
@@ -148,10 +157,11 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div><p className="text-orange-400 text-xs font-bold uppercase tracking-[0.2em]">Premium Verify</p><h1 className="text-3xl font-black mt-1">Administrator portal</h1><p className="text-slate-400 text-sm mt-1">Live platform financial, customer, payment, and fulfillment monitoring.</p></div>
-          <button onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 font-bold text-sm"><RefreshCw className="w-4 h-4" />Refresh live data</button>
+          <div className="flex flex-wrap gap-2"><Link href="/admin/pricing" className="inline-flex items-center justify-center rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 font-bold text-sm">Service prices</Link><button onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 font-bold text-sm"><RefreshCw className="w-4 h-4" />Refresh live data</button><button onClick={() => void signOut()} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-bold">Sign out</button></div>
         </header>
 
         {error && <div className="rounded-xl border border-red-400/30 bg-red-500/10 text-red-100 p-4 text-sm">{error}</div>}
+        <AdminNotificationPanel />
         {data.schema_notice && <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-100 p-4 text-sm flex gap-3"><AlertTriangle className="w-5 h-5 shrink-0" />{data.schema_notice}</div>}
 
         <section className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -169,7 +179,13 @@ export default function AdminPage() {
           <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5"><Users className="text-violet-400 w-5 h-5" /><p className="text-2xl font-black mt-3">{data.metrics.customers}</p><p className="text-sm text-slate-400">Registered customer profiles</p></div>
         </section>
 
-        <section className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800"><h2 className="font-extrabold">Manual mobile-money review</h2><p className="text-xs text-slate-400 mt-1">Confirm only after matching the amount and reference in your MTN/Orange account. Confirmation creates one completed wallet deposit; claims do not credit a wallet by themselves.</p></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Customer</th><th className="p-3">Method</th><th className="p-3">Amount</th><th className="p-3">Payer / reference</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{data.manual_claims.map((claim) => <tr key={claim.id} className="border-t border-slate-800"><td className="p-3">{profileById.get(claim.profile_id)?.full_name || profileById.get(claim.profile_id)?.email || 'Unknown'}</td><td className="p-3">{claim.payment_method === 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}</td><td className="p-3 font-bold">{xaf(claim.amount_xaf)}</td><td className="p-3 text-xs"><p>{claim.payer_phone || 'No payer phone'}</p><p className="font-mono text-slate-400">{claim.transfer_reference}</p></td><td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${badge(claim.status)}`}>{claim.status}</span></td><td className="p-3">{claim.status === 'pending' ? <div className="flex gap-2"><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'confirm')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold">Confirm</button><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'reject')} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold">Reject</button></div> : <span className="text-xs text-slate-500">Reviewed</span>}</td></tr>)}</tbody></table>{data.manual_claims.length === 0 && <p className="p-5 text-sm text-slate-400">No manual payments awaiting review.</p>}</div></section>
+        <section className="grid sm:grid-cols-3 gap-4">
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5"><p className="text-2xl font-black">{data.metrics.page_views_24h || 0}</p><p className="text-sm text-slate-400">Page views in the last 24 hours</p></div>
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5"><p className="text-2xl font-black">{data.metrics.unique_visitors_24h || 0}</p><p className="text-sm text-slate-400">Unique visitors in the last 24 hours</p></div>
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5"><p className="text-2xl font-black">{data.metrics.checkout_starts || 0}</p><p className="text-sm text-slate-400">Checkout starts · {data.metrics.checkout_not_completed || 0} not yet completed</p></div>
+        </section>
+
+        <section className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800"><h2 className="font-extrabold">Manual payment review</h2><p className="text-xs text-slate-400 mt-1">For crypto, verify the credited Binance deposit, asset, network, destination and customer ownership. For Mobile Money, match the MTN/Orange transfer. Confirmation creates one completed wallet deposit; claims do not credit a wallet by themselves.</p></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Customer</th><th className="p-3">Method</th><th className="p-3">Amount</th><th className="p-3">Payer / reference</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{data.manual_claims.map((claim) => <tr key={claim.id} className="border-t border-slate-800"><td className="p-3">{profileById.get(claim.profile_id)?.full_name || profileById.get(claim.profile_id)?.email || 'Unknown'}</td><td className="p-3">{isCryptoMethod(claim.payment_method) ? CRYPTO_METHODS[claim.payment_method].label : claim.payment_method === 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}</td><td className="p-3 font-bold">{xaf(claim.approved_amount_xaf ?? claim.amount_xaf)}{claim.crypto_amount && <p className="text-xs text-slate-400">{claim.crypto_amount} {isCryptoMethod(claim.payment_method) ? CRYPTO_METHODS[claim.payment_method].asset : ''} claimed</p>}</td><td className="p-3 text-xs"><p>{claim.payer_phone || 'No payer phone'}</p><p className="font-mono text-slate-400 break-all">{claim.transfer_reference}</p>{isCryptoMethod(claim.payment_method) && <><p className="break-all">To: {claim.receiving_address}</p><a target="_blank" rel="noopener noreferrer" className="text-orange-400 underline" href={`${CRYPTO_METHODS[claim.payment_method].explorer}${encodeURIComponent(claim.transfer_reference)}`}>Inspect blockchain transfer</a></>}</td><td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${badge(claim.status)}`}>{claim.status}</span></td><td className="p-3">{claim.status === 'pending' ? <div className="flex gap-2"><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'confirm')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold">Approve</button><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'reject')} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold">Reject</button></div> : <span className="text-xs text-slate-500">Reviewed</span>}</td></tr>)}</tbody></table>{data.manual_claims.length === 0 && <p className="p-5 text-sm text-slate-400">No manual payments awaiting review.</p>}</div></section>
 
         <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div><h2 className="font-extrabold">Live provider catalogue</h2><p className="text-xs text-slate-400 mt-1">Pull the current JAP services, limits, and supplier rates into Supabase. Customer prices use your SMM multiplier, and checkout verifies JAP again immediately before charging.</p></div>
@@ -184,7 +200,7 @@ export default function AdminPage() {
 
         <section className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800"><h2 className="font-extrabold">Fulfilment monitor</h2><p className="text-xs text-slate-400 mt-1">Monitor provider delivery across social-media and temporary-number orders.</p></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Type</th><th className="p-3">Customer</th><th className="p-3">Service</th><th className="p-3">Value</th><th className="p-3">Progress</th><th className="p-3">Status</th><th className="p-3">Created</th></tr></thead><tbody>{[...data.smm_orders.map((order) => ({ ...order, type: 'SMM', value: order.charge_xaf, progress: order.remains ? `${order.remains} remaining` : 'Complete' })), ...data.sms_orders.map((order) => ({ ...order, type: 'SMS', value: order.price_xaf, progress: order.status === 'received' ? 'Code received' : 'Awaiting SMS' })), ...data.account_orders.map((order) => ({ ...order, type: 'Account', service_name: order.item_title, value: order.price_xaf, progress: 'Delivery order' }))].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 100).map((order) => <tr key={`${order.type}-${order.id}`} className="border-t border-slate-800"><td className="p-3 font-bold text-sky-300">{order.type}</td><td className="p-3">{profileById.get(order.profile_id)?.email || 'Unknown'}</td><td className="p-3 max-w-80 truncate">{order.service_name}</td><td className="p-3 font-bold">{xaf(order.value)}</td><td className="p-3 text-xs text-slate-400">{order.progress}</td><td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${badge(order.status)}`}>{order.status}</span></td><td className="p-3 text-xs text-slate-400">{when(order.created_at)}</td></tr>)}</tbody></table></div></section>
 
-        <section className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800"><h2 className="font-extrabold">Customers & administrator access</h2><p className="text-xs text-slate-400 mt-1">Promote trusted staff only. Access is enforced server-side on every administrator API request.</p></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Customer</th><th className="p-3">Phone</th><th className="p-3">Wallet</th><th className="p-3">Joined</th><th className="p-3">Role</th></tr></thead><tbody>{data.profiles.map((profile) => <tr key={profile.id} className="border-t border-slate-800"><td className="p-3"><p className="font-semibold">{profile.full_name || 'Unnamed customer'}</p><p className="text-xs text-slate-400">{profile.email}</p></td><td className="p-3 text-slate-300">{profile.phone_number || '—'}</td><td className="p-3 font-bold">{xaf(profile.balance_xaf)}</td><td className="p-3 text-xs text-slate-400">{when(profile.created_at)}</td><td className="p-3"><select aria-label={`Role for ${profile.email}`} value={profile.role} onChange={(event) => void changeRole(profile.id, event.target.value as 'admin' | 'client')} className="rounded-lg bg-slate-800 border border-slate-700 p-2 text-xs"><option value="client">Client</option><option value="admin">Admin</option></select></td></tr>)}</tbody></table></div></section>
+        <section className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800"><h2 className="font-extrabold">Customers</h2><p className="text-xs text-slate-400 mt-1">Administrator access is reserved for the verified owner account.</p></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Customer</th><th className="p-3">Phone</th><th className="p-3">Wallet</th><th className="p-3">Joined</th><th className="p-3">Account</th></tr></thead><tbody>{data.profiles.map((profile) => <tr key={profile.id} className="border-t border-slate-800"><td className="p-3"><p className="font-semibold">{profile.full_name || 'Unnamed customer'}</p><p className="text-xs text-slate-400">{profile.email}</p></td><td className="p-3 text-slate-300">{profile.phone_number || '—'}</td><td className="p-3 font-bold">{xaf(profile.balance_xaf)}</td><td className="p-3 text-xs text-slate-400">{when(profile.created_at)}</td><td className="p-3 text-xs">{profile.email.toLowerCase() === ADMIN_OWNER_EMAIL ? 'Owner' : 'Customer'}</td></tr>)}</tbody></table></div></section>
       </div>
     </main>
   )

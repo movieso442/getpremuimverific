@@ -276,7 +276,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
 
     return (
       `💳 <b>Wallet Topup (Payunit)</b>\n\n` +
-      `Reply with the amount in XAF you wish to deposit (Minimum: 500 XAF).\n\n` +
+      `Reply with the amount in XAF you wish to deposit (Minimum: 3,000 XAF / about US$5).\n\n` +
       `<i>Example:</i> <code>5000</code> or <code>10000</code>`
     )
   }
@@ -284,7 +284,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   // If in PAY step and user enters a number
   if (session.step === 'PAY' && !isNaN(Number(text))) {
     const amount = Number(text)
-    if (amount >= 500) {
+    if (amount >= 3000) {
       userSessions[chatId] = { step: 'MAIN' }
       const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
       if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
@@ -433,6 +433,11 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   }
 
   // 5. SMM PANEL FLOW (2, /smm, smm, growth, social media)
+  // Keep fulfilment and wallet records together: legacy bot package IDs are
+  // disabled until this flow shares the audited web-order transaction.
+  if (lowerText === '2' || lowerText === '/smm' || lowerText === 'smm' || lowerText.includes('growth') || lowerText.includes('social media') || /^s\d+\b/i.test(text)) {
+    return `For social-media growth, use the live catalogue: ${getAppUrl()}/dashboard\n\nIt shows current availability and your exact price before charging your wallet.`
+  }
   if (lowerText === '2' || lowerText === '/smm' || lowerText === 'smm' || lowerText.includes('growth') || lowerText.includes('social media')) {
     userSessions[chatId] = { step: 'SMM_PLATFORM' }
     return (

@@ -49,7 +49,7 @@ export default function AIAssistantPage() {
       } else if (lower.includes('facebook') || lower.includes('rescue') || lower.includes('hack') || lower.includes('recover')) {
         aiReply = 'For Facebook Account Rescue & Recovery:\nOur technical team assists in restoring hacked, locked, or 2FA-blocked Facebook profiles and pages. Visit the "Accounts" section and select "Facebook Hacking & Rescue Recovery Service" to submit your recovery request.'
       } else if (lower.includes('deposit') || lower.includes('momo') || lower.includes('orange') || lower.includes('pay') || lower.includes('money')) {
-        aiReply = 'You can top up your wallet instantly using MTN Mobile Money, Orange Money, Visa/Mastercard, or USDT Crypto. Click the "+" button beside your balance in the sidebar!'
+        aiReply = 'You can top up your wallet securely through Payunit. Click the "+" button beside your balance to see the available methods at checkout.'
       }
 
       const aiMsg: Message = {

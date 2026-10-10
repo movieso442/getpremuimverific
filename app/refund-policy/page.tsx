@@ -49,7 +49,7 @@ export default function RefundPolicyPage() {
             <span>2. Wallet Balance & Cashout Policy</span>
           </h2>
           <p>
-            Deposits made into your Premium Verify account wallet via <strong>Payunit</strong> (MTN MoMo, Orange Money, Credit Cards, PayPal), <strong>Stripe</strong>, or <strong>USDT Crypto</strong> are meant for service fulfillment on our platform.
+            Deposits made into your Premium Verify account wallet through <strong>Payunit</strong> are meant for service fulfillment on our platform.
           </p>
           <ul className="list-disc pl-5 space-y-1 text-gray-600">
             <li>Unused wallet balances can be withdrawn or refunded back to your original Mobile Money or Bank account upon request, subject to standard gateway processing fees (1.5%).</li>

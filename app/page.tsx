@@ -52,7 +52,7 @@ export default function LandingPage() {
     },
     {
       q: 'How do I top up my wallet balance?',
-      a: 'You can deposit funds instantly using Mobile Money (MTN MoMo, Orange Money), Visa or Mastercard credit cards, or USDT Crypto via Payunit.'
+      a: 'You can add funds through Payunit&apos;s hosted checkout using the payment methods it shows for your location. Your wallet is credited only after verified confirmation.'
     }
   ]
 

@@ -21,6 +21,37 @@ export function retailPrice(providerCostXaf: number, multiplier = 3) {
   return Math.ceil((Number(providerCostXaf) * Math.max(1, multiplier)) / 5) * 5
 }
 
+export type SmmPriceOverride = {
+  service_id: number
+  retail_rate_xaf: number
+  is_active: boolean
+}
+
+/**
+ * Per-service prices are optional. If an administrator has not overridden a
+ * service, the platform-wide multiplier remains the safe default.
+ */
+export async function getSmmPriceOverrides(admin: SupabaseClient, serviceIds?: number[]) {
+  let query = admin.from('smm_service_prices').select('service_id, retail_rate_xaf, is_active')
+  if (serviceIds?.length) query = query.in('service_id', serviceIds)
+  const { data, error } = await query
+  // Older installations may not have run the pricing upgrade yet. A catalogue
+  // must still be viewable; checkout falls back to the global margin rule.
+  if (error) return new Map<number, SmmPriceOverride>()
+  return new Map((data || []).map((row) => [Number(row.service_id), {
+    service_id: Number(row.service_id),
+    retail_rate_xaf: Number(row.retail_rate_xaf),
+    is_active: Boolean(row.is_active),
+  }]))
+}
+
+export function smmRetailRateXaf(providerRateUsd: number, multiplier: number, override?: SmmPriceOverride) {
+  if (override?.is_active && Number.isFinite(override.retail_rate_xaf) && override.retail_rate_xaf > 0) {
+    return Math.ceil(override.retail_rate_xaf / 5) * 5
+  }
+  return retailPrice(Number(providerRateUsd) * 600, multiplier)
+}
+
 export async function getPlatformSettings(admin: SupabaseClient): Promise<PlatformSettings> {
   const { data, error } = await admin.from('platform_settings')
     .select('support_email, support_phone, whatsapp_number, smm_markup_multiplier, sms_markup_multiplier')

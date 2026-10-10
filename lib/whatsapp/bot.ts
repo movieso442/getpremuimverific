@@ -295,7 +295,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
 
     return (
       `💳 *Wallet Topup (Payunit)*\n\n` +
-      `Reply with the amount in XAF you wish to deposit (Minimum: 500 XAF).\n\n` +
+      `Reply with the amount in XAF you wish to deposit (Minimum: 3,000 XAF / about US$5).\n\n` +
       `*Example:* \`5000\` or \`10000\``
     )
   }
@@ -303,7 +303,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   // If in PAY step and user enters a number
   if (session.step === 'PAY' && !isNaN(Number(text))) {
     const amount = Number(text)
-    if (amount >= 500) {
+    if (amount >= 3000) {
       userSessions[userPhone] = { step: 'MAIN' }
       const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
       if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
@@ -455,6 +455,12 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   }
 
   // 5. SMM PANEL FLOW (2, /smm, smm, growth, social media)
+  // Social orders must use the authenticated web checkout until this bot flow
+  // shares the same atomic order-and-ledger transaction. Do not let legacy
+  // hard-coded package IDs create provider work without an auditable receipt.
+  if (lowerText === '2' || lowerText === '/smm' || lowerText === 'smm' || lowerText.includes('growth') || lowerText.includes('social media') || /^s\d+\b/i.test(text)) {
+    return `For social-media growth, open our live catalogue: ${getAppUrl()}/dashboard\n\nYou will see current availability and your exact price before your wallet is charged.`
+  }
   if (lowerText === '2' || lowerText === '/smm' || lowerText === 'smm' || lowerText.includes('growth') || lowerText.includes('social media')) {
     userSessions[userPhone] = { step: 'SMM_PLATFORM' }
     return (

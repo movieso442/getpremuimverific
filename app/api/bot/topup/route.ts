@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { getPayunitConfig, paymentErrorMessage, PayunitStatusResponse } from '@/lib/payments/payunit'
 
 export const dynamic = 'force-dynamic'
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     amount_xaf: Number(link.amount_xaf),
     expires_at: link.expires_at,
-    status: transaction?.status || (manualClaim?.status === 'pending' ? 'manual_pending' : manualClaim?.status || 'ready'),
+    status: transaction?.status || (manualClaim?.status === 'confirmed' ? 'completed' : manualClaim?.status === 'pending' ? 'manual_pending' : manualClaim?.status || 'ready'),
   })
 }
 
@@ -73,6 +74,7 @@ export async function POST(request: Request) {
       description: 'Bot wallet top-up awaiting Payunit confirmation',
     })
     if (pendingError) throw pendingError
+    scheduleAdminNotifications(admin)
 
     const { error: linkError } = await admin.from('bot_payment_links')
       .update({ payment_reference: transactionId }).eq('id', link.id).is('payment_reference', null)

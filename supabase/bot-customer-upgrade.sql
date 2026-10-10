@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.bot_payment_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   token TEXT UNIQUE NOT NULL,
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  amount_xaf NUMERIC(12, 2) NOT NULL CHECK (amount_xaf >= 500),
+  amount_xaf NUMERIC(12, 2) NOT NULL CHECK (amount_xaf >= 3000),
   payment_reference TEXT UNIQUE,
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.manual_payment_claims (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   bot_payment_link_id UUID UNIQUE NOT NULL REFERENCES public.bot_payment_links(id) ON DELETE CASCADE,
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  amount_xaf NUMERIC(12, 2) NOT NULL CHECK (amount_xaf >= 500),
+  amount_xaf NUMERIC(12, 2) NOT NULL CHECK (amount_xaf >= 3000),
   payment_method TEXT NOT NULL CHECK (payment_method IN ('mtn_momo', 'orange_money')),
   payer_phone TEXT,
   transfer_reference TEXT NOT NULL,
@@ -54,3 +54,10 @@ CREATE INDEX IF NOT EXISTS manual_payment_claims_status_idx
 ALTER TABLE public.manual_payment_claims ENABLE ROW LEVEL SECURITY;
 -- No browser policy: claims are submitted and reviewed only by trusted server
 -- routes. A customer cannot mark their own payment as confirmed.
+
+-- Existing deployments created the original 500 XAF constraints. Raise both
+-- limits so every wallet entry point enforces the same US$5 minimum.
+ALTER TABLE public.bot_payment_links DROP CONSTRAINT IF EXISTS bot_payment_links_amount_xaf_check;
+ALTER TABLE public.bot_payment_links ADD CONSTRAINT bot_payment_links_amount_xaf_check CHECK (amount_xaf >= 3000);
+ALTER TABLE public.manual_payment_claims DROP CONSTRAINT IF EXISTS manual_payment_claims_amount_xaf_check;
+ALTER TABLE public.manual_payment_claims ADD CONSTRAINT manual_payment_claims_amount_xaf_check CHECK (amount_xaf >= 3000);
