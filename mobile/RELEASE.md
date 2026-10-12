@@ -1,0 +1,49 @@
+# Release and website downloads
+
+The signed Android APK has been built, downloaded, signature-verified and smoke-tested at the native login screen in an isolated emulator. It is available for testing, not yet approved for public paid launch. See [INSPECTION.md](./INSPECTION.md) for verified checks and blockers. Exported JavaScript bundles in dist are NOT installable apps. Website APK download variables remain unset until release acceptance checks pass; iPhone customers use the website.
+
+Android build submitted on 12 October 2026: [EAS build 1846930c](https://expo.dev/accounts/student-admin/projects/getpremuimverific/builds/1846930c-5f97-4f3f-a95f-4b69f6a6a547), version 0.1.0 / versionCode 2, release keystore generated and managed by EAS. Check its current result rather than assuming submission means success. Back up the signing credentials securely using `npx eas-cli credentials --platform android`; never commit/export them into the public download directory.
+
+iOS Simulator build submitted: [EAS build c7f7b99c](https://expo.dev/accounts/student-admin/projects/getpremuimverific/builds/c7f7b99c-23a9-4d5c-8370-4024c8e34ccc). The ios-simulator profile needs no paid Apple membership, but its artifact is for Apple's simulator on macOS, NOT a real iPhone, TestFlight or the App Store. Run npm run build:ios-simulator to repeat it. Real iPhone distribution still needs enrollment/signing. Complete the encryption declaration in App Store Connect before TestFlight; this build does not automatically answer that declaration.
+
+## Accounts and signing
+
+1. Run all Expo/EAS commands from this repository's `mobile` directory (`cd mobile` from the website root). Expo is installed there, not in the Next.js website. Sign in with `npx eas-cli login` if your session expires.
+2. This app is linked to @student-admin/getpremuimverific, project c0d05158-6d75-4762-bdbc-1e48ff1c3cc3. Do not initialize another project from the website root. Check the link with `npx eas-cli project:info`.
+3. Configure public build variables from .env.example in that project's EAS production environment. Only the public website API URL, Supabase project URL and anon key belong in the binary. Never include provider, payment, Resend or Supabase service-role secrets.
+4. Android: `npm run build:apk` uses android-download to produce an APK, not an AAB. Keep a recoverable backup of the signing key; future updates must use the same key. Expo is the configured cloud-build path, not a fundamental requirement: a locally signed Gradle build is also possible with an Android SDK/JDK and your own release signing configuration. Never publish Expo's default debug-keystore build as a release.
+5. iPhone: enroll in Apple Developer, configure signing and an App Store Connect application, then `npm run build:iphone`. Upload the signed build to TestFlight using EAS Submit or Apple's tooling. Complete Apple's beta review as needed, then create a public tester link. A raw IPA is not a public iPhone download strategy; ad-hoc builds allow only provisioned devices.
+
+App icons/splash assets, privacy disclosures and store/payment-rule review are still release tasks. No paid account purchase, store submission or live charge is part of this setup. Android cloud build setup uses the owner's linked Expo project.
+
+## Configuration verified on 12 October 2026
+
+- EAS owner/project verified, SDK 57 dependency compatibility checked, all 21 Expo Doctor checks passed, mobile TypeScript passed.
+- Missing expo-font peer dependency installed and duplicate expo-constants copies deduplicated.
+- Production EAS environment contains only the three public connection variables listed in .env.example; its build profiles explicitly select production.
+- The archive includes mobile source/manifest and no .env/signing files or website source. Root package manifests/Git metadata are retained by EAS's monorepo archive machinery.
+- The missing mobile routes were deployed to production with the owner's approval. Both the configured Vercel API deployment and premiumverific.com now return 200 for /api/mobile/sms/catalog and 401 for signed-out /api/mobile/account.
+
+## Test before publishing
+
+- Deploy accompanying API changes. Ensure the build API URL points at that deployment, not an older deployment.
+- Add premiumverify://auth/callback to Supabase Auth redirect URLs. Test password login, confirmation and Google OAuth on real devices.
+- Test number quote → buy → OTP inbox → copy, expiry, poor network, sign-out, restart and large text/Reduce Motion.
+- Test social order limits/pricing and history; prevent duplicates after interruptions. Existing provider-allocation/wallet-debit atomicity remains a launch blocker.
+- Test real MTN and Orange payments, including rejection, timeout, app background/restart and exactly-once wallet credit. Never retry an uncertain charge without checking its status.
+- Resolve or assess remaining dependency audit findings. Do not force-downgrade Expo to clear the report.
+
+## Publish on the website
+
+Upload the verified, release-signed APK to HTTPS static/object storage. Record its SHA-256 with `Get-FileHash -Algorithm SHA256 -LiteralPath <apk-path>` and verify the published bytes match. Configure these SERVER environment variables on the website and redeploy:
+
+```dotenv
+APP_ANDROID_APK_URL=https://your-download-host/premium-verify-0.1.0.apk
+APP_ANDROID_APK_SHA256=<64-character-sha256-of-published-apk>
+APP_MOBILE_VERSION=0.1.0
+APP_IOS_INSTALL_URL=https://testflight.apple.com/join/<your-public-tester-code>
+```
+
+After App Store release, APP_IOS_INSTALL_URL can instead be the official apps.apple.com listing. The download page requires HTTPS + APK filename + version + checksum for Android and an official Apple distribution URL for iPhone. These checks validate configuration, not signatures or binary safety: release verification must happen before setting them.
+
+Homepage, public footer and panel sidebar link to /downloads. With missing/invalid metadata the page keeps website access available and offers no pretend download.

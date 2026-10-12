@@ -365,6 +365,13 @@ export default function LandingPage() {
       </section>
 
       {/* CTA FOOTER BANNER */}
+      <section className="mx-auto max-w-6xl px-5 py-16">
+        <div className="flex flex-col items-start justify-between gap-6 rounded-3xl border border-orange-100 bg-orange-50 p-8 sm:flex-row sm:items-center">
+          <div><p className="text-xs font-bold uppercase tracking-widest text-orange-700">Premium Verify mobile</p><h2 className="mt-3 text-3xl font-black text-slate-950">Your panel. Now in your pocket.</h2><p className="mt-3 max-w-xl text-slate-600">Explore the Android and iPhone apps for numbers, your code inbox and your wallet.</p></div>
+          <Link href="/downloads" className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-orange-700 px-6 py-4 font-bold text-white">App downloads <ArrowRight className="h-5 w-5" /></Link>
+        </div>
+      </section>
+
       <section className="bg-gradient-to-r from-[#ff5722] to-[#ea580c] py-20 text-white text-center">
         <div className="max-w-4xl mx-auto px-6 space-y-6">
           <h2 className="text-4xl md:text-5xl font-black">Ready to Grow Your Digital Accounts?</h2>

@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Premium Verify",
+    "slug": "getpremuimverific",
+    "owner": "student-admin",
+    "scheme": "premiumverify",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.premiumverify.app"
+    },
+    "android": {
+      "package": "com.premiumverify.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c0d05158-6d75-4762-bdbc-1e48ff1c3cc3"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-font"
+    ]
+  }
+}

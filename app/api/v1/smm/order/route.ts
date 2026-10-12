@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { customerUser } from '@/lib/supabase/customer'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPlatformSettings, getSmmPriceOverrides, smmRetailRateXaf } from '@/lib/platform/settings'
 import { fetchJapService } from '@/lib/providers/jap'
@@ -11,8 +11,7 @@ export async function POST(request: Request) {
     if (!link || !Number.isInteger(Number(quantity)))
       return NextResponse.json({ error: 'The selected service, link, or quantity is not valid.' }, { status: 400 })
 
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await customerUser(request)
     if (!user) return NextResponse.json({ error: 'Sign in before placing an order.' }, { status: 401 })
 
     const admin = createAdminClient()

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
@@ -46,6 +47,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Choose an asset/network, enter its valid transaction hash, positive crypto amount and requested credit of at least 3,000 XAF.' }, { status: 400 })
     }
     if (access.link?.payment_reference) return NextResponse.json({ error: 'This link already has a payment attempt. Request a new link from the bot.' }, { status: 409 })
+    if (access.link) {
+      const { data: reserved, error: reservationError } = await access.admin.from('bot_payment_links')
+        .update({ payment_reference: 'PVC' + randomUUID().replace(/-/g, '') }).eq('id', access.link.id).is('payment_reference', null).select('id').maybeSingle()
+      if (reservationError) throw reservationError
+      if (!reserved) return NextResponse.json({ error: 'This link already has a payment attempt. Request a fresh link from the bot.' }, { status: 409 })
+    }
     const { error } = await access.admin.from('manual_payment_claims').insert({
       profile_id: access.profile.id, payment_method, transfer_reference: transfer_reference.trim().toLowerCase(),
       crypto_amount, amount_xaf: access.link ? Number(access.link.amount_xaf) : amount_xaf, receiving_address: CRYPTO_METHODS[payment_method].address,

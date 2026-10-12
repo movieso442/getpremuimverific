@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { SMS_SERVICES } from '@/lib/mockData'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { customerUser } from '@/lib/supabase/customer'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { fetchFiveSimQuote } from '@/lib/providers/fivesim'
@@ -22,9 +22,8 @@ function fiveSimHeaders(token: string) {
   return { Authorization: `Bearer ${token}`, Accept: 'application/json' }
 }
 
-export async function GET() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export async function GET(request: Request) {
+  const user = await customerUser(request)
   if (!user) return NextResponse.json({ error: 'Sign in to view your SMS inbox.' }, { status: 401 })
   const admin = createAdminClient()
   const { data: profile, error: profileError } = await admin.from('profiles')
@@ -46,8 +45,7 @@ export async function POST(request: Request) {
     const token = process.env.SMS_PROVIDER_API_KEY
     if (!token) return NextResponse.json({ error: '5SIM is not configured. No funds were charged.' }, { status: 503 })
 
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await customerUser(request)
     if (!user) return NextResponse.json({ error: 'Sign in before requesting a number.' }, { status: 401 })
 
     const admin = createAdminClient()
@@ -103,6 +101,8 @@ export async function POST(request: Request) {
     const settings = await getPlatformSettings(admin)
     const providerCostXaf = quote.costUsd * 600
     const priceXaf = retailPrice(providerCostXaf, settings.sms_markup_multiplier)
+    if (action === 'quote') return NextResponse.json({ price_xaf: priceXaf, available: quote.available }, { headers: { 'Cache-Control': 'private, no-store' } })
+    if (action !== 'getNumber') return NextResponse.json({ error: 'Unknown SMS action.' }, { status: 400 })
     if (Number(profile.balance_xaf) < priceXaf)
       return NextResponse.json({ error: 'Insufficient wallet balance.', required_xaf: priceXaf }, { status: 402 })
 

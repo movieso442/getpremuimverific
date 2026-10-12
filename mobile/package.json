@@ -1,0 +1,38 @@
+{
+  "name": "premium-verify-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit",
+    "bundle": "expo export --platform android --platform ios",
+    "build:apk": "npx eas-cli build --platform android --profile android-download",
+    "build:iphone": "npx eas-cli build --platform ios --profile ios-testflight",
+    "build:ios-simulator": "npx eas-cli build --platform ios --profile ios-simulator"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@supabase/supabase-js": "^2.116.0",
+    "expo": "~57.0.27",
+    "expo-clipboard": "~57.0.2",
+    "expo-constants": "~57.0.21",
+    "expo-crypto": "~57.0.3",
+    "expo-font": "~57.0.4",
+    "expo-haptics": "~57.0.3",
+    "expo-linking": "~57.0.12",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "~57.0.3",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-url-polyfill": "4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "@types/react": "~19.2.2"
+  }
+}

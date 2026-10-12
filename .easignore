@@ -1,0 +1,43 @@
+# This repository also contains a website and server credentials. EAS uploads
+# Exclude website source, secrets and local signing data. EAS retains Git
+# metadata plus the root package manifests for its monorepo build machinery.
+**/node_modules/
+**/.expo/
+**/dist/
+/mobile/artifacts/
+**/.next/
+**/.vercel/
+**/.git/
+/app/
+/components/
+/lib/
+/db/
+/supabase/
+/public/
+/scripts/
+/drizzle/
+/github/
+/.github/
+/AGENTS.md
+/CLAUDE.md
+/README.md
+/drizzle.config.ts
+/eslint.config.mjs
+/next-env.d.ts
+/next.config.ts
+/postcss.config.mjs
+/proxy.ts
+/tailwind.config.js
+/tsconfig.json
+/tsconfig.tsbuildinfo
+/vercel.json
+/android/
+/ios/
+**/.env*
+**/credentials.json
+**/*.jks
+**/*.keystore
+**/*.pem
+**/*.p12
+**/.signing/
+**/npm-debug.log*

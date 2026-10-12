@@ -40,6 +40,7 @@ export function getPayunitConfig() {
 
 export async function getPayunitPaymentStatus(transactionId: string, config: NonNullable<ReturnType<typeof getPayunitConfig>>) {
   const response = await fetch(`${config.baseUrl}/api/gateway/paymentstatus/${encodeURIComponent(transactionId)}`, {
+    cache: 'no-store',
     headers: config.headers,
     signal: AbortSignal.timeout(20_000),
   })

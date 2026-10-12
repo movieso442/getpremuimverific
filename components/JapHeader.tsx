@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react'
 import {
-  Search,
   Settings,
   Sun,
   Moon,
@@ -35,19 +34,21 @@ export const JapHeader: React.FC<JapHeaderProps> = ({ onToggleSidebar, onOpenDep
   return (
     <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-3 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
       {/* Left items: Menu button & Badges */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex min-w-0 items-center gap-2 md:gap-3">
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
             className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition md:hidden"
             title="Toggle Menu"
+            aria-label="Open navigation"
+            aria-controls="mobile-navigation"
           >
             <Menu className="w-5 h-5" />
           </button>
         )}
 
         {/* Welcome Badge */}
-        <div className="bg-[#f0f7ff] text-[#2563eb] text-xs font-semibold px-4 py-2 rounded-full flex items-center gap-1.5 shadow-2xs">
+        <div className="bg-[#f0f7ff] text-[#2563eb] text-xs font-semibold px-4 py-2 rounded-full hidden md:flex items-center gap-1.5 shadow-2xs">
           <span>Welcome:</span>
           <span className="font-bold text-[#1d4ed8]">
             {displayName}
@@ -55,14 +56,14 @@ export const JapHeader: React.FC<JapHeaderProps> = ({ onToggleSidebar, onOpenDep
         </div>
 
         {/* Total Orders Badge */}
-        <div className="bg-[#f0f7ff] text-[#2563eb] text-xs font-semibold px-4 py-2 rounded-full flex items-center gap-1.5 shadow-2xs">
+        <div className="bg-[#f0f7ff] text-[#2563eb] text-xs font-semibold px-4 py-2 rounded-full hidden md:flex items-center gap-1.5 shadow-2xs">
           <span>Total Orders:</span>
           <span className="font-bold text-[#1d4ed8]">{totalOrdersCount}</span>
         </div>
 
         {/* Current Balance Badge */}
         <div className="bg-[#f0f7ff] text-[#2563eb] text-xs font-semibold px-4 py-2 rounded-full flex items-center gap-2 shadow-2xs">
-          <span>Current Balance:</span>
+          <span className="hidden sm:inline">Current Balance:</span>
           <span className="font-extrabold text-[#1d4ed8]">
             {currency === 'USD' ? `$${balanceUsd}` : `${profile.balance_xaf.toLocaleString()} XAF`}
           </span>
@@ -90,7 +91,7 @@ export const JapHeader: React.FC<JapHeaderProps> = ({ onToggleSidebar, onOpenDep
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-1 text-gray-500">
+        <div className="flex items-center gap-0 md:gap-1 text-gray-500">
           <Link
             href="/profile"
             className="p-2 rounded-full hover:bg-gray-100 hover:text-gray-900 transition"

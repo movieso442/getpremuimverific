@@ -1,39 +1,24 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
-import { getPayunitConfig, getPayunitPaymentStatus, PayunitStatusResponse } from '@/lib/payments/payunit'
+import { getPayunitConfig, type PayunitStatusResponse } from '@/lib/payments/payunit'
+import { reconcilePayunit } from '@/lib/payments/payunit-direct'
 
 export const dynamic = 'force-dynamic'
-
 export async function POST(request: Request) {
   try {
     const payload = await request.json() as PayunitStatusResponse
-    const transactionId = payload.data?.transaction_id
-    if (!transactionId) return NextResponse.json({ error: 'Missing Payunit transaction ID.' }, { status: 400 })
-
-    const payunit = getPayunitConfig()
-    if (!payunit) return NextResponse.json({ error: 'Payunit verification is not configured.' }, { status: 503 })
-    const { response: statusResponse, payload: verified } = await getPayunitPaymentStatus(transactionId, payunit)
-    if (!statusResponse.ok || verified.status !== 'SUCCESS' || verified.data?.transaction_status !== 'SUCCESS')
-      return NextResponse.json({ received: true, credited: false })
-    if (verified.data.transaction_currency !== 'XAF' || !Number.isFinite(Number(verified.data.transaction_amount)))
-      return NextResponse.json({ error: 'Invalid verified payment currency or amount.' }, { status: 400 })
-
+    const reference = payload.data?.transaction_id
+    if (typeof reference !== 'string' || reference.length > 100 || !reference) return NextResponse.json({ error: 'Missing payment reference.' }, { status: 400 })
+    if (!getPayunitConfig()) return NextResponse.json({ error: 'Payment verification is unavailable.' }, { status: 503 })
     const admin = createAdminClient()
-    const { data: transaction, error: transactionError } = await admin.from('wallet_transactions')
-      .select('id, amount, status').eq('reference', transactionId).maybeSingle()
-    if (transactionError || !transaction) return NextResponse.json({ error: 'Unknown payment reference.' }, { status: 404 })
-    if (Number(transaction.amount) !== Number(verified.data.transaction_amount))
-      return NextResponse.json({ error: 'Verified payment amount does not match the expected amount.' }, { status: 400 })
-
-    if (transaction.status === 'pending') {
-      const { error: updateError } = await admin.from('wallet_transactions').update({ status: 'completed' }).eq('id', transaction.id).eq('status', 'pending')
-      if (updateError) throw updateError
-      scheduleAdminNotifications(admin)
-    }
-    return NextResponse.json({ received: true, credited: true })
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Payunit webhook processing failed'
-    return NextResponse.json({ error: message }, { status: 400 })
-  }
+    const { data: transaction, error } = await admin.from('wallet_transactions').select('id,amount,status,reference').eq('reference', reference).eq('type', 'deposit').maybeSingle()
+    if (error) throw error
+    if (!transaction) return NextResponse.json({ error: 'Unknown payment reference.' }, { status: 404 })
+    // Webhook bodies are untrusted. Only the authenticated provider status
+    // query can complete a pending ledger entry and trigger a wallet credit.
+    const status = await reconcilePayunit(admin, transaction)
+    if (status === 'completed' || status === 'failed') scheduleAdminNotifications(admin)
+    return NextResponse.json({ received: true, credited: status === 'completed' })
+  } catch { return NextResponse.json({ error: 'Payment verification could not complete. Retry this notification.' }, { status: 503 }) }
 }

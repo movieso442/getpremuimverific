@@ -1,0 +1,10 @@
+# The website deployment does not need native mobile source or signing data.
+/mobile/**
+node_modules/
+.next/
+.git/
+.env*
+**/*.keystore
+**/*.jks
+**/*.p12
+**/.signing/

@@ -28,9 +28,10 @@ import { AuthModal } from '@/components/AuthModal'
 
 interface SidebarProps {
   onOpenDeposit: () => void
+  mobile?: boolean
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onOpenDeposit }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onOpenDeposit, mobile = false }) => {
   const pathname = usePathname()
   const { profile } = useAppState()
   const [isAuthOpen, setIsAuthOpen] = useState(false)
@@ -58,13 +59,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenDeposit }) => {
   ]
 
   const extraLinks = [
+    { label: 'Get the Mobile App', href: '/downloads', icon: Smartphone },
     { label: 'AI Growth Assistant', href: '/ai-assistant', icon: Bot },
     { label: 'Developer API', href: '/developer', icon: Code2 },
   ]
 
   return (
     <>
-      <aside className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col justify-between p-4 sticky top-0 h-screen overflow-y-auto shrink-0 z-30 shadow-2xs">
+      <aside className={`${mobile ? 'w-full min-h-dvh' : 'w-64 sticky top-0 h-screen'} bg-white border-r border-gray-200 flex flex-col justify-between p-4 overflow-y-auto shrink-0 z-30 shadow-2xs`}>
         <div>
           
           {/* Brand Header: JAP style Thumbs Up Logo with Premium Verify */}

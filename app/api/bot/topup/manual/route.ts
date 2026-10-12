@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 
@@ -25,6 +26,10 @@ export async function POST(request: Request) {
     if (!method || !reference || reference.length < 3 || reference.length > 120) return NextResponse.json({ error: 'Choose MTN or Orange and enter the payment reference from the confirmation message.' }, { status: 400 })
 
     const admin = createAdminClient()
+    const { data: reserved, error: reservationError } = await admin.from('bot_payment_links')
+      .update({ payment_reference: 'PVM' + randomUUID().replace(/-/g, '') }).eq('id', link.id).is('payment_reference', null).select('id').maybeSingle()
+    if (reservationError) throw reservationError
+    if (!reserved) return NextResponse.json({ error: 'This link already has a payment attempt. Request a fresh link from the bot.' }, { status: 409 })
     const { error } = await admin.from('manual_payment_claims').insert({
       bot_payment_link_id: link.id,
       profile_id: link.profile_id,

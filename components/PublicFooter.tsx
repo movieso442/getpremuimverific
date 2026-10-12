@@ -36,6 +36,7 @@ export const PublicFooter: React.FC = () => {
               <li><Link href="/services" className="hover:text-[#ff5722] transition">SMM Panel Growth</Link></li>
               <li><Link href="/whatsapp" className="hover:text-[#ff5722] transition">WhatsApp Assistant Bot</Link></li>
               <li><Link href="/developer" className="hover:text-[#ff5722] transition">Developer API Docs</Link></li>
+              <li><Link href="/downloads" className="hover:text-[#ff5722] transition">Download our App</Link></li>
             </ul>
           </div>
 
