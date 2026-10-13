@@ -39,8 +39,15 @@ export default function AdminSignIn() {
         if (error) throw error
         return
       }
-      const { error: authError } = await supabase.auth.signInWithPassword({ email: ADMIN_OWNER_EMAIL, password })
-      if (authError) throw authError
+      const login = await fetch('/api/admin/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ADMIN_OWNER_EMAIL, password }),
+      })
+      if (!login.ok) {
+        const result = await login.json()
+        throw new Error(result.error || 'Could not sign in.')
+      }
+      setPassword('')
       const response = await fetch('/api/admin/session', { cache: 'no-store' })
       if (!response.ok) {
         const result = await response.json()

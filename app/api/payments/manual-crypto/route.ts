@@ -30,14 +30,25 @@ export async function GET(request: Request) {
     .order('created_at', { ascending: false }).limit(20)
   if (access.link) query = query.eq('bot_payment_link_id', access.link.id)
   const { data, error } = await query
-  if (error) return NextResponse.json({ error: 'Crypto deposits are not configured yet.' }, { status: 503 })
   const { data: pendingClaim, error: claimError } = await access.admin.from('manual_payment_claims')
     .select('id,payment_method,crypto_amount,amount_xaf,approved_amount_xaf,status')
     .eq('profile_id', access.profile.id).eq('status', 'pending').order('created_at').limit(1).maybeSingle()
   const { data: pendingMobile, error: paymentError } = await access.admin.from('wallet_transactions')
     .select('reference,amount,payment_method').eq('profile_id', access.profile.id).eq('type', 'deposit').eq('status', 'pending').order('created_at').limit(1).maybeSingle()
   if (claimError || paymentError) return NextResponse.json({ error: 'Unable to check existing payments. Contact support before sending again.' }, { status: 503 })
-  return NextResponse.json({ claims: data, pending_claim: pendingClaim, pending_mobile: pendingMobile, fixed_credit_xaf: access.link ? Number(access.link.amount_xaf) : null }, { headers: { 'Cache-Control': 'private, no-store' } })
+  // Crypto history must not prevent checking/resuming mobile-money payments.
+  // Check the mobile fee column independently and keep missing-schema methods
+  // unavailable: taking money before the atomic payment migration is unsafe.
+  const { error: mobileSetupError } = await access.admin.from('wallet_transactions').select('service_fee_xaf').limit(0)
+  return NextResponse.json({
+    claims: data || [], pending_claim: pendingClaim, pending_mobile: pendingMobile,
+    crypto_available: !error, mobile_available: !mobileSetupError,
+    availability_notice: error && mobileSetupError
+      ? 'Payments are temporarily unavailable while we complete wallet setup. Please contact support before sending money.'
+      : error ? 'Crypto top-ups are temporarily unavailable. You can use an available mobile-money method.'
+      : mobileSetupError ? 'Mobile-money top-ups are temporarily unavailable. Contact support for help.' : null,
+    fixed_credit_xaf: access.link ? Number(access.link.amount_xaf) : null,
+  }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 export async function POST(request: Request) {

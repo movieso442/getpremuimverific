@@ -11,8 +11,8 @@ function AddFunds() {
   const requested = Number(params.get('amount') || params.get('required'))
   const [amount, setAmount] = useState(5000)
   useEffect(() => {
-    if (Number.isFinite(requested) && requested >= 3000 && requested <= 10000000) {
-      void Promise.resolve().then(() => setAmount(Math.round(requested)))
+    if (Number.isFinite(requested) && requested > 0 && requested <= 10000000) {
+      void Promise.resolve().then(() => setAmount(Math.max(3000, Math.round(requested))))
     }
   }, [requested])
   return <div className="mx-auto max-w-2xl space-y-6">

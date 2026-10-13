@@ -6,6 +6,22 @@ Account requests do not imply stocked products or charge a wallet. Facebook supp
 
 ## Deployment gates
 
+### Vercel admin password
+
+Set `ADMIN_LOGIN_PASSWORD` in Vercel Project Settings → Environment Variables
+for Production, then redeploy. Use a new strong secret, not the password shared
+in chat. This is a server-only additional login check, never a browser variable.
+It must match the password on the existing Supabase Auth owner account
+`mohammednurdine6@gmail.com`; adding the variable does not change that password.
+The server first authenticates the real confirmed owner through Supabase and
+then applies the env check before writing session cookies. Incorrect or missing
+owner identity cannot be replaced with a manufactured owner. If the variable is
+blank, existing Supabase owner-password login works as before. Google owner
+login is separate and unchanged. Existing sessions are not revoked simply by
+changing this variable; sign out/revoke sessions separately when rotating access.
+
+### Platform release
+
 1. Run `supabase/topup-fees-upgrade.sql` after the combined platform SQL, then deploy this backend. Do not deploy fee-enabled checkout before the migration.
 2. Admin email/password is now the primary sign-in method. Set a fresh password for the existing `mohammednurdine6@gmail.com` Supabase Auth identity; do not create a second owner identity or hardcode a password in the app. No live password change was performed. For optional Google sign-in, Supabase Authentication → URL Configuration → Redirect URLs must include `https://admin.premiumverific.com/auth/callback`. The old longer callback remains internally compatible. An omitted/disallowed OAuth redirect can fall back to the customer Site URL. This external configuration has not been verified remotely.
 3. Admin root rewrites internally to `/admin` without moving the visible URL to the customer site. Signed-out visitors see the owner email/password form directly, not a preview. On the admin hostname successful login returns to `/`. All financial/customer APIs still require verified owner access. A public live administrator dashboard is not enabled.
