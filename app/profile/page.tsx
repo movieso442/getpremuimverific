@@ -1,14 +1,20 @@
 'use client'
 
 import React, { useState } from 'react'
-import { User, Mail, Phone, Lock, Save, ShieldCheck, DollarSign } from 'lucide-react'
+import { Save, ShieldCheck } from 'lucide-react'
 import { useAppState } from '@/lib/store'
 
 export default function ProfilePage() {
+  const { profile } = useAppState()
+  if (!profile.id) return <p className="text-lg">Sign in to edit your own profile.</p>
+  return <ProfileForm key={profile.id} />
+}
+
+function ProfileForm() {
   const { profile, setProfile } = useAppState()
-  const [fullName, setFullName] = useState(profile.full_name || 'Premium Verify Partner')
+  const [fullName, setFullName] = useState(profile.full_name || '')
   const [phone, setPhone] = useState(profile.phone_number || '')
-  const [currency, setCurrency] = useState(profile.currency || 'XAF')
+  const [currency, setCurrency] = useState(profile.currency || 'AUTO')
   const [savedSuccess, setSavedSuccess] = useState(false)
   const [error, setError] = useState('')
 
@@ -93,9 +99,11 @@ export default function ProfilePage() {
             <input
               type="text"
               value={phone}
+              placeholder="Your own phone number, including country code"
               onChange={(e) => setPhone(e.target.value)}
               className="w-full bg-white border border-gray-300 focus:border-[#ff6b00] rounded-xl py-3 px-4 text-gray-900 text-sm outline-none"
             />
+            {['237680209047', '237677034736'].includes(phone.replace(/\D/g, '')) && <p className="mt-2 text-base text-amber-800">This matches a platform contact number. Please enter or confirm your own personal contact before saving.</p>}
           </div>
 
           <div>
@@ -108,6 +116,12 @@ export default function ProfilePage() {
               className="w-full bg-white border border-gray-300 focus:border-[#ff6b00] rounded-xl py-3 px-4 text-gray-900 text-sm outline-none"
             >
               <option value="XAF">XAF (FCFA)</option>
+              <option value="AUTO">Automatic (your country)</option>
+              <option value="NGN">NGN (Nigerian naira)</option>
+              <option value="GHS">GHS (Ghanaian cedi)</option>
+              <option value="GBP">GBP (British pound)</option>
+              <option value="KES">KES (Kenyan shilling)</option>
+              <option value="XOF">XOF (West African CFA franc)</option>
               <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
             </select>

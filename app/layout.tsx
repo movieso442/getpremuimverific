@@ -33,13 +33,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <title>Premium Verify - Best & Cheapest SMM Panel & SMS Virtual Verification</title>
+        <title>Premium Verific - Best & Cheapest SMM Panel & SMS Virtual Verification</title>
         <meta
           name="description"
-          content="Premium Verify (premiumverific.com): High retention YouTube monetization, organic Instagram followers, TikTok views, Facebook page boost & rescue, virtual phone numbers across 197 countries. Contact: +237 680209047 / hello@premiumverific.com."
+          content="Premium Verific (premiumverific.com): High retention YouTube monetization, organic Instagram followers, TikTok views, Facebook page boost & rescue, virtual phone numbers across 197 countries. Contact: +237 680209047 / hello@premiumverific.com."
         />
-        <meta name="keywords" content="Premium Verify, SMM Panel, SMS Verification, Virtual Phone Number, YouTube Monetization, Facebook Rescue, TikTok Followers" />
-        <meta property="og:title" content="Premium Verify - Best & Cheapest SMM Panel & SMS Verification" />
+        <meta name="keywords" content="Premium Verific, SMM Panel, SMS Verification, Virtual Phone Number, YouTube Monetization, Facebook Rescue, TikTok Followers" />
+        <meta property="og:title" content="Premium Verific - Best & Cheapest SMM Panel & SMS Verification" />
         <meta property="og:description" content="Boost your social media presence with automated instant delivery SMM Panel services and get virtual phone numbers across 197 countries." />
         <meta property="og:url" content="https://premiumverific.com" />
         <link rel="icon" href="/favicon.ico" />
@@ -85,7 +85,7 @@ export default function RootLayout({
           )}
 
           {/* Floating WhatsApp Widget */}
-          {!isAdminPage && <WhatsAppButton />}
+          {!isAdminPage && !isSidebarOpenMobile && <WhatsAppButton />}
 
         </AppStateProvider>}
       </body>

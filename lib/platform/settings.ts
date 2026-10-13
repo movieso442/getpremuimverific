@@ -10,8 +10,8 @@ export type PlatformSettings = {
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   support_email: 'hello@premiumverific.com',
-  support_phone: '+237 680209047',
-  whatsapp_number: '237680209047',
+  support_phone: '+237 677034736',
+  whatsapp_number: '237677034736',
   smm_markup_multiplier: 3,
   sms_markup_multiplier: 3,
 }

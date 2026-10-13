@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     if (!error && isVerifiedOwner(data.user)) {
       // Relative locations retain the browser's admin hostname even when
       // a reverse proxy gives the server an internal request origin.
-      return new NextResponse(null, { status: 303, headers: { Location: '/admin', 'Cache-Control': 'no-store' } })
+      return new NextResponse(null, { status: 303, headers: { Location: url.hostname === 'admin.premiumverific.com' ? '/' : '/admin', 'Cache-Control': 'no-store' } })
     }
     await supabase.auth.signOut({ scope: 'local' })
   }

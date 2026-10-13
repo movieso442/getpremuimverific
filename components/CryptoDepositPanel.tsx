@@ -1,17 +1,25 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { CRYPTO_METHODS, CryptoMethod } from '@/lib/payments/manual-crypto'
+import { useEffect, useRef, useState } from 'react'
+import { Copy, Loader2 } from 'lucide-react'
+import { CRYPTO_METHODS, type CryptoMethod, validCryptoAmount } from '@/lib/payments/manual-crypto'
+import { topupQuote } from '@/lib/payments/topup-fees'
+import { normalizeCryptoReference } from '@/lib/payments/crypto-reference'
+
 type Claim = { id: string; payment_method: CryptoMethod; crypto_amount: string; amount_xaf: number; approved_amount_xaf: number | null; status: string }
-export default function CryptoDepositPanel({ profileId, token }: { profileId: string; token?: string }) {
+export default function CryptoDepositPanel({ profileId, token, selectedMethod = 'usdt_trc20', walletAmount = 3000, onStarted }: {
+  profileId: string; token?: string; selectedMethod?: CryptoMethod; walletAmount?: number; onStarted?: () => void
+}) {
+  const option = CRYPTO_METHODS[selectedMethod]
   const endpoint = `/api/payments/manual-crypto${token ? `?token=${encodeURIComponent(token)}` : ''}`
-  const [method, setMethod] = useState<CryptoMethod>('usdt_trc20')
   const [cryptoAmount, setCryptoAmount] = useState('')
-  const [requestedCredit, setRequestedCredit] = useState('3000')
-  const [hash, setHash] = useState('')
+  const [reference, setReference] = useState('')
   const [claims, setClaims] = useState<Claim[]>([])
   const [ready, setReady] = useState(false)
+  const [paid, setPaid] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const locked = useRef(false)
+  const quote = walletAmount >= 3000 ? topupQuote(walletAmount) : { creditXaf: walletAmount, feeXaf: 0, totalXaf: walletAmount }
   useEffect(() => {
     if (!profileId) return
     let disposed = false
@@ -21,49 +29,53 @@ export default function CryptoDepositPanel({ profileId, token }: { profileId: st
         const result = await response.json()
         if (disposed) return
         setReady(response.ok)
-        if (response.ok) setClaims(result.claims)
-        else setNotice(result.error || 'Crypto deposits unavailable. Do not send funds yet.')
-      } catch { if (!disposed) { setReady(false); setNotice('Could not load deposits. Do not send funds yet.') } }
+        if (response.ok) setClaims(result.pending_claim && !result.claims.some((claim: Claim) => claim.id === result.pending_claim.id) ? [result.pending_claim, ...result.claims] : result.claims)
+        else setNotice(result.error || 'Payment unavailable. Please contact support before sending money.')
+      } catch { if (!disposed) { setReady(false); setNotice('Unable to load payment. Please try again.') } }
     }
     void refresh()
-    const timer = window.setInterval(() => void refresh(), 15000)
+    const timer = window.setInterval(() => void refresh(), 10000)
     return () => { disposed = true; window.clearInterval(timer) }
   }, [profileId, endpoint])
-  const submit = async () => {
+  const pending = claims.find(claim => claim.status === 'pending')
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (locked.current || pending) return
+    const hash = normalizeCryptoReference(selectedMethod, reference)
+    if (!hash || !validCryptoAmount(selectedMethod, cryptoAmount)) {
+      setNotice('Paste the transaction ID or explorer link from your payment receipt and the crypto amount sent.'); return
+    }
+    locked.current = true
     setBusy(true)
+    onStarted?.()
     try {
-      const response = await fetch('/api/payments/manual-crypto', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, payment_method: method, crypto_amount: cryptoAmount, amount_xaf: Number(requestedCredit), transfer_reference: hash }),
-      })
+      const response = await fetch('/api/payments/manual-crypto', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, payment_method: selectedMethod, crypto_amount: cryptoAmount, amount_xaf: walletAmount, transfer_reference: hash, accepted_fee_percent: 2 }) })
       const result = await response.json()
-      setNotice(result.message || result.error)
+      setNotice(response.ok ? 'Payment details received. We’ll update your wallet once the transfer arrives and is checked.' : result.error)
       if (response.ok) {
-        setHash('')
         const history = await fetch(endpoint, { cache: 'no-store' })
         if (history.ok) setClaims((await history.json()).claims)
       }
-    } catch { setNotice('Could not submit transfer. Please retry.') }
-    finally { setBusy(false) }
+    } catch { setNotice('Connection interrupted. Check your payment status before trying again.') }
+    finally { setBusy(false); locked.current = false }
   }
-  return <section className="bg-white text-gray-900 rounded-2xl border border-gray-200 p-6 space-y-4">
-    <h2 className="text-xl font-bold">Pay with crypto</h2>
-    <p className="text-sm text-gray-600">Contact support to agree the crypto amount and XAF credit before transferring. Our team reviews deposits. Minimum credit: 3,000 XAF. Network fees are separate.</p>
-    <a href="https://wa.me/237677034736?text=I%20want%20to%20agree%20a%20crypto%20deposit%20amount%20and%20XAF%20credit" target="_blank" rel="noopener noreferrer" className="inline-block text-orange-600 font-bold text-sm">Agree a crypto deposit with support</a>
-    {!profileId && <a href="/login?next=/add-funds" className="text-orange-600 font-bold">Sign in to deposit crypto</a>}
-    {notice && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{notice}</p>}
-    {profileId && ready && <>
-      <label className="block text-sm font-bold">Asset and network<select value={method} onChange={event => { setMethod(event.target.value as CryptoMethod); setCryptoAmount(''); setHash('') }} className="block w-full border rounded-xl p-3 mt-2">{Object.entries(CRYPTO_METHODS).map(([key, option]) => <option key={key} value={key}>{option.label}</option>)}</select></label>
-      <p className="text-sm font-semibold text-red-700">Send only {CRYPTO_METHODS[method].asset} using {CRYPTO_METHODS[method].label}. Other assets or networks may result in lost funds.</p>
-      <div className="rounded-xl border bg-gray-50 p-4 space-y-2"><p className="text-sm font-semibold">Receiving address</p><code className="block break-all text-sm">{CRYPTO_METHODS[method].address}</code><button type="button" className="text-orange-600 text-sm font-bold" onClick={async () => { try { await navigator.clipboard.writeText(CRYPTO_METHODS[method].address); setNotice('Address copied. Check the selected network before sending.') } catch { setNotice('Please copy the address manually.') } }}>Copy address</button></div>
-      <label className="block text-sm font-bold">{CRYPTO_METHODS[method].asset} amount sent<input type="text" inputMode="decimal" value={cryptoAmount} onChange={event => setCryptoAmount(event.target.value)} placeholder={method === 'usdt_trc20' ? 'e.g. 5.00' : 'e.g. 0.002'} className="block w-full border rounded-xl p-3 mt-1" /></label>
-      <label className="block text-sm font-bold">Agreed wallet credit (XAF)<input type="number" min="3000" max="10000000" step="1" value={requestedCredit} onChange={event => setRequestedCredit(event.target.value)} className="block w-full border rounded-xl p-3 mt-1" /></label>
-      <label className="block text-sm font-bold">Blockchain transaction hash<input type="text" value={hash} onChange={event => setHash(event.target.value)} placeholder={CRYPTO_METHODS[method].evm ? '0x…' : '64 hexadecimal characters (no 0x prefix)'} className="block w-full border rounded-xl p-3 mt-1" /></label>
-      <p className="text-xs text-gray-500">Submitting a hash is not proof of payment. We verify the received deposit, ownership and XAF value before crediting your wallet.</p>
-      <button type="button" onClick={() => void submit()} disabled={busy} className="w-full bg-orange-600 text-white font-bold rounded-xl p-3 disabled:opacity-50">{busy ? 'Submitting…' : 'Submit transfer for review'}</button>
-      <h3 className="font-bold">Your crypto deposits</h3>
-      {!claims.length && <p className="text-sm text-gray-500">No deposits submitted yet.</p>}
-      {claims.map(claim => <div key={claim.id} className="border rounded-xl p-3 text-sm"><p>{CRYPTO_METHODS[claim.payment_method].label} · {claim.crypto_amount} {CRYPTO_METHODS[claim.payment_method].asset}</p><p className="capitalize">{claim.status} · {claim.status === 'confirmed' ? `Credited: ${claim.approved_amount_xaf} XAF` : `Requested: ${claim.amount_xaf} XAF`}</p></div>)}
-    </>}
-  </section>
+  return <div className="space-y-4 text-gray-900">
+    {notice && <p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-blue-900">{notice}</p>}
+    {!profileId ? <a href="/login?next=/add-funds" className="block rounded-xl bg-orange-600 p-4 text-center font-bold text-white">Sign in to continue</a> : !ready ? <p className="text-sm text-gray-500">Loading payment details…</p> : pending ?
+      <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><h3 className="font-bold">Payment being checked</h3><p className="mt-2 text-sm">{CRYPTO_METHODS[pending.payment_method].label} · {pending.crypto_amount} {CRYPTO_METHODS[pending.payment_method].asset}</p><p className="mt-2 text-sm">Wallet credit requested: {Number(pending.amount_xaf).toLocaleString()} XAF. Please don’t send another transfer for this top-up.</p></div> : !paid ? <>
+      <div className="rounded-2xl bg-gray-50 p-4 text-sm"><p>Wallet credit <strong>{quote.creditXaf.toLocaleString()} XAF</strong></p><p className="mt-1">2% fee <strong>{quote.feeXaf.toLocaleString()} XAF</strong></p><p className="mt-2 font-bold">Transfer value: {quote.totalXaf.toLocaleString()} XAF, plus network fees</p></div>
+      <a href={`https://wa.me/237677034736?text=${encodeURIComponent(`Hello, please confirm the ${option.label} amount for ${quote.creditXaf} XAF wallet credit plus ${quote.feeXaf} XAF fee.`)}`} target="_blank" rel="noopener noreferrer" className="block text-sm font-semibold text-emerald-700">Confirm the exact {option.asset} amount with support before sending ↗</a>
+      <div className="rounded-2xl border border-gray-200 p-4"><p className="text-xs font-bold uppercase tracking-wide text-gray-500">{option.label} receiving address</p><code className="mt-3 block break-all text-sm leading-6">{option.address}</code><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(option.address); setNotice('Address copied.') } catch { setNotice('Please copy the address above.') } }} className="mt-3 flex items-center gap-2 text-sm font-bold text-orange-700"><Copy size={16} />Copy address</button></div>
+      <p className="text-xs text-gray-600">Send only {option.asset} on this network. Pay the network fee separately so the full agreed amount arrives.</p>
+      <button type="button" onClick={() => { setPaid(true); onStarted?.() }} className="w-full rounded-xl bg-orange-600 p-4 font-bold text-white">I’ve paid</button>
+    </> : <form onSubmit={submit} className="space-y-4">
+      <h3 className="font-bold">Find your payment</h3>
+      <p className="text-sm text-gray-600">Open the transfer in your wallet or exchange and copy its transaction ID or explorer link.</p>
+      <label className="block text-sm font-semibold">Payment reference<input required value={reference} onChange={event => setReference(event.target.value)} autoComplete="off" placeholder="Paste transaction ID or link" className="mt-2 w-full rounded-xl border border-gray-300 p-3" /></label>
+      <label className="block text-sm font-semibold">Amount sent ({option.asset})<input required type="text" inputMode="decimal" value={cryptoAmount} onChange={event => setCryptoAmount(event.target.value)} placeholder="As shown on your payment receipt" className="mt-2 w-full rounded-xl border border-gray-300 p-3" /></label>
+      <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 p-4 font-bold text-white disabled:opacity-50">{busy && <Loader2 size={18} className="animate-spin" />}Find my payment</button>
+    </form>}
+    {claims.filter(claim => claim.status !== 'pending').length > 0 && <details className="rounded-xl border border-gray-200 p-4"><summary className="cursor-pointer text-sm font-bold">Previous payments</summary>{claims.filter(claim => claim.status !== 'pending').map(claim => <p key={claim.id} className="mt-3 text-sm">{CRYPTO_METHODS[claim.payment_method].asset} · {claim.status === 'confirmed' ? `${Number(claim.approved_amount_xaf).toLocaleString()} XAF credited` : 'Not confirmed — contact support'}</p>)}</details>}
+  </div>
 }

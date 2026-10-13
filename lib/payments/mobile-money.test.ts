@@ -84,6 +84,12 @@ test('wallet reconciliation requires matching reference, amount, currency and fi
     assert.equal(await reconcilePayunit(database, transaction), 'completed')
     assert.deepEqual(updates, ['completed'])
     updates = []
+    assert.equal(await reconcilePayunit(database, { ...transaction, service_fee_xaf: 60 }), 'pending')
+    assert.deepEqual(updates, [])
+    globalThis.fetch = async () => Response.json({ status: 'SUCCESS', data: { ...exact, transaction_amount: 3060 } })
+    assert.equal(await reconcilePayunit(database, { ...transaction, service_fee_xaf: 60 }), 'completed')
+    assert.deepEqual(updates, ['completed'])
+    updates = []
     assert.equal(await reconcilePayunit(database, { ...transaction, status: 'completed' }), 'completed')
     assert.deepEqual(updates, [])
     globalThis.fetch = async () => Response.json({ status: 'SUCCESS', data: { ...exact, transaction_status: 'CANCELLED' } })

@@ -40,7 +40,7 @@ function Application() {
     const stop = manageRefresh()
     return () => { mounted = false; data.subscription.unsubscribe(); stop() }
   }, [])
-  if (!configured) return <View style={s.card}><Text style={s.title}>Premium Verify</Text><Text style={s.text}>Set the public API URL and Supabase project variables in mobile/.env to connect this app. Never add server/provider secrets.</Text></View>
+  if (!configured) return <View style={s.card}><Text style={s.title}>Premium Verific</Text><Text style={s.text}>Set the public API URL and Supabase project variables in mobile/.env to connect this app. Never add server/provider secrets.</Text></View>
   if (loading) return <Text style={s.text}>Restoring your account...</Text>
   return session ? <Panel key={session.user.id} userId={session.user.id} /> : <Login />
 }
@@ -76,7 +76,7 @@ function Login() {
     } catch (error) { setNotice(messageOf(error)) } finally { setBusy(false) }
   }
   return <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-    <Text style={s.brand}>PREMIUM VERIFY</Text><Text style={s.title}>Your numbers. Your panel.</Text>
+    <Text style={s.brand}>PREMIUM VERIFIC</Text><Text style={s.title}>Your numbers. Your panel.</Text>
     <Text style={s.text}>Sign in with your existing website account. Your wallet and OTP inbox stay together.</Text>
     <View style={s.card}><Text style={s.label}>Email</Text><TextInput style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
       <Text style={s.label}>Password</Text><TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" />
@@ -161,7 +161,7 @@ function Panel({ userId }: { userId: string }) {
   }
   return <View style={s.fill}>
     <View style={s.header}>
-      <View style={{ flex: 1, minWidth: 0 }}><Text style={s.brand}>PREMIUM VERIFY</Text><Text numberOfLines={1} style={s.greeting}>{account?.profile.full_name ? 'Hi, ' + account.profile.full_name.split(' ')[0] : 'Welcome back'}</Text></View>
+      <View style={{ flex: 1, minWidth: 0 }}><Text style={s.brand}>PREMIUM VERIFIC</Text><Text numberOfLines={1} style={s.greeting}>{account?.profile.full_name ? 'Hi, ' + account.profile.full_name.split(' ')[0] : 'Welcome back'}</Text></View>
       <Pressable accessibilityRole="button" accessibilityLabel="Open wallet" onPress={() => navigate('Wallet')} style={s.walletBadge}><Icon name="wallet-outline" color="#1d4ed8" size={18} /><Text style={s.balance}>{account ? money(account.profile.balance_xaf) : 'Loading...'}</Text></Pressable>
     </View>
     <ScrollView ref={scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}>
@@ -294,13 +294,13 @@ function Wallet({ userId, onCredit }: { userId: string; onCredit: () => void }) 
       // Persist before sending so a closed app can recover the same reference.
       await SecureStore.setItemAsync(storageKey, JSON.stringify({ key: requestKey.current, reference: expectedRef }))
       setReference(expectedRef); setStatus('pending')
-      const result = await api<{ reference: string; status: string }>('/api/payments/payunit', { amount: Number(amount), currency: 'XAF', phone_number: phone, payment_method: method, idempotency_key: requestKey.current })
+      const result = await api<{ reference: string; status: string }>('/api/payments/payunit', { amount: Number(amount), currency: 'XAF', phone_number: phone, payment_method: method, idempotency_key: requestKey.current, accepted_fee_percent: 2 })
       setReference(result.reference); setStatus(result.status)
       setNotice('Check your phone for approval. We verify the payment before adding funds.')
     } catch (error) { setNotice(messageOf(error) + ' Check your payment history before starting another request.') } finally { setBusy(false); locked.current = false }
   }
   const reset = () => Alert.alert('Start another payment?', 'Only continue after checking your wallet and operator account. A previous pending transfer may still complete.', [{ text: 'Cancel', style: 'cancel' }, { text: 'I checked — continue', onPress: () => { void SecureStore.deleteItemAsync(storageKey).then(() => { requestKey.current = ''; setReference(''); setStatus('ready'); setNotice('') }).catch(error => setNotice(messageOf(error))) } }])
-  return <><StepLabel title="A little fuel for your next move" detail="Top up once. Get numbers and place orders from one wallet." /><Text style={s.text}>Minimum 3,000 XAF. Approve on your phone; we never ask for your PIN.</Text><View style={s.card}><Text style={s.label}>Amount (XAF)</Text><TextInput editable={!busy && status !== 'pending'} style={s.input} keyboardType="number-pad" value={amount} onChangeText={setAmount} /><Choices items={[3000,5000,10000,25000].map(value => ({code:String(value),name:money(value)}))} selected={amount} onSelect={value => { if (!busy && status !== 'pending') setAmount(value) }} /><Choices items={[{code:'mtn_momo',name:'MTN MoMo'},{code:'orange_money',name:'Orange Money'}]} selected={method} onSelect={value => { if (!busy && status !== 'pending') setMethod(value) }} /><Text style={s.label}>Your mobile-money number</Text><TextInput editable={!busy && status !== 'pending'} style={s.input} keyboardType="phone-pad" placeholder="+237 6XX XXX XXX" value={phone} onChangeText={setPhone} /><Button title={busy ? 'Please wait...' : status === 'pending' ? 'Waiting for confirmation' : status === 'completed' ? 'Wallet credited' : 'Send payment request'} disabled={busy || status === 'pending' || status === 'completed' || status === 'failed'} onPress={() => void pay()} />{!!notice && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text>}{!!reference && <><Text selectable style={s.text}>Reference: {reference}</Text><Button title="Start a new payment (check previous first)" disabled={busy} onPress={reset} /></>}</View></>
+  return <><StepLabel title="A little fuel for your next move" detail="Top up once. Get numbers and place orders from one wallet." /><Text style={s.text}>Minimum 3,000 XAF wallet credit. A 2% service fee is added on top; operator fees are separate. Approve on your phone; we never ask for your PIN.</Text><View style={s.card}><Text style={s.label}>Amount (XAF)</Text><TextInput editable={!busy && status !== 'pending'} style={s.input} keyboardType="number-pad" value={amount} onChangeText={setAmount} /><Choices items={[3000,5000,10000,25000].map(value => ({code:String(value),name:money(value)}))} selected={amount} onSelect={value => { if (!busy && status !== 'pending') setAmount(value) }} /><Choices items={[{code:'mtn_momo',name:'MTN MoMo'},{code:'orange_money',name:'Orange Money'}]} selected={method} onSelect={value => { if (!busy && status !== 'pending') setMethod(value) }} /><Text style={s.text}>Wallet credit: {money(Number(amount))}. Fee: {money(Math.ceil(Number(amount) * 0.02))}. Total payment: {money(Number(amount) + Math.ceil(Number(amount) * 0.02))}.</Text><Button secondary title="No convenient method? WhatsApp support" onPress={() => void Linking.openURL('https://wa.me/237677034736')} /><Text style={s.label}>Your mobile-money number</Text><TextInput editable={!busy && status !== 'pending'} style={s.input} keyboardType="phone-pad" placeholder="+237 6XX XXX XXX" value={phone} onChangeText={setPhone} /><Button title={busy ? 'Please wait...' : status === 'pending' ? 'Waiting for confirmation' : status === 'completed' ? 'Wallet credited' : 'Send payment request'} disabled={busy || status === 'pending' || status === 'completed' || status === 'failed'} onPress={() => void pay()} />{!!notice && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text>}{!!reference && <><Text selectable style={s.text}>Reference: {reference}</Text><Button title="Start a new payment (check previous first)" disabled={busy} onPress={reset} /></>}</View></>
 }
 const s = StyleSheet.create({
   safe: {flex:1,backgroundColor:'#f5f7fb'}, fill:{flex:1}, content:{padding:20,gap:16,paddingBottom:32},

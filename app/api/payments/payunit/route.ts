@@ -6,11 +6,13 @@ import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { getPayunitConfig } from '@/lib/payments/payunit'
 import { cameroonPhone, depositXaf, mobileMoneyMethod } from '@/lib/payments/mobile-money'
 import { reconcilePayunit, requestMobileMoney } from '@/lib/payments/payunit-direct'
+import { topupQuote } from '@/lib/payments/topup-fees'
 
 export const dynamic = 'force-dynamic'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+    if (body.accepted_fee_percent !== 2) return NextResponse.json({ error: 'Review the 2% top-up fee on our website or update your Android app before paying.' }, { status: 409 })
     const amount = depositXaf(body.amount, body.currency || 'XAF')
     const phone = cameroonPhone(body.phone_number)
     if (!amount || !phone || !mobileMoneyMethod(body.payment_method)) return NextResponse.json({ error: 'Choose MTN or Orange, enter a Cameroon mobile number, and an amount between 3,000 and 10,000,000 XAF.' }, { status: 400 })
@@ -22,17 +24,14 @@ export async function POST(request: Request) {
     const config = getPayunitConfig()
     if (!config) return NextResponse.json({ error: 'Payments are temporarily unavailable.' }, { status: 503 })
     if (body.idempotency_key && (typeof body.idempotency_key !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.idempotency_key))) return NextResponse.json({ error: 'Invalid payment request ID.' }, { status: 400 })
+    const quote = topupQuote(amount)
     const reference = `PV${(body.idempotency_key || randomUUID()).replace(/-/g, '')}`
-    const { error: insertError } = await admin.from('wallet_transactions').insert({ profile_id: profile.id, amount, type: 'deposit', payment_method: body.payment_method,
-      reference, status: 'pending', description: 'Mobile-money wallet top-up awaiting verified payment' })
-    if (insertError) {
-      if (insertError.code !== '23505') throw insertError
-      const { data: existing } = await admin.from('wallet_transactions').select('amount, status, payment_method').eq('profile_id', profile.id).eq('reference', reference).single()
-      if (!existing || Number(existing.amount) !== amount || existing.payment_method !== body.payment_method) return NextResponse.json({ error: 'This payment request ID has already been used.' }, { status: 409 })
-      return NextResponse.json({ reference, status: existing.status, credited: existing.status === 'completed' })
-    }
+    const { data: reserved, error: insertError } = await admin.rpc('start_wallet_topup', { p_profile: profile.id, p_reference: reference, p_credit: amount, p_method: body.payment_method, p_link: null })
+    if (insertError?.code === 'P0001') return NextResponse.json({ error: 'An existing payment is being checked. Check your wallet or contact support before paying again.' }, { status: 409 })
+    if (insertError || !reserved) throw insertError || new Error('Payment reservation unavailable')
+    if (!reserved.created) return NextResponse.json({ reference: reserved.reference, status: reserved.status, credited: reserved.status === 'completed' })
     scheduleAdminNotifications(admin)
-    const result = await requestMobileMoney(config, { amount, phone, method: body.payment_method, reference, returnPath: `/add-funds?ref=${reference}` })
+    const result = await requestMobileMoney(config, { amount: quote.totalXaf, phone, method: body.payment_method, reference, returnPath: `/add-funds?ref=${reference}` })
     if (!result.accepted && !result.uncertain) {
       await admin.from('wallet_transactions').update({ status: 'failed' }).eq('reference', reference).eq('status', 'pending')
       scheduleAdminNotifications(admin)
@@ -52,10 +51,10 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ error: 'Sign in is required.' }, { status: 401 })
     const admin = createAdminClient()
     const { data: profile } = await admin.from('profiles').select('id').eq('user_id', user.id).maybeSingle()
-    const { data: transaction } = await admin.from('wallet_transactions').select('id, amount, status, reference').eq('profile_id', profile?.id || '').eq('reference', reference).maybeSingle()
+    const { data: transaction } = await admin.from('wallet_transactions').select('id, amount, status, reference, service_fee_xaf').eq('profile_id', profile?.id || '').eq('reference', reference).maybeSingle()
     if (!transaction) return NextResponse.json({ error: 'Payment reference was not found.' }, { status: 404 })
     const status = await reconcilePayunit(admin, transaction)
     if (status === 'completed') scheduleAdminNotifications(admin)
-    return NextResponse.json({ status, amount_xaf: Number(transaction.amount), credited: status === 'completed' }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ status, amount_xaf: Number(transaction.amount), service_fee_xaf: Number(transaction.service_fee_xaf), credited: status === 'completed' }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return NextResponse.json({ error: 'Could not confirm this payment yet.' }, { status: 502 }) }
 }

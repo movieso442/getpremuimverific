@@ -99,7 +99,7 @@ export default function SignupPage() {
           <div className="lg:col-span-6 bg-white rounded-3xl border border-gray-200 p-8 md:p-10 shadow-sm space-y-6">
             <div>
               <h1 className="text-2xl md:text-3xl font-black text-gray-900">Sign Up</h1>
-              <p className="text-xs text-gray-500 mt-1">Please enter your details to create your Premium Verify account.</p>
+              <p className="text-xs text-gray-500 mt-1">Please enter your details to create your Premium Verific account.</p>
             </div>
 
             {errorMsg && (
@@ -241,7 +241,7 @@ export default function SignupPage() {
                 </div>
                 <div className="space-y-1 text-xs">
                   <p className="text-gray-800 font-medium leading-relaxed">
-                    &quot;My business scaled up its operations faster than ever before using Premium Verify.&quot;
+                    &quot;My business scaled up its operations faster than ever before using Premium Verific.&quot;
                   </p>
                   <span className="font-bold text-gray-400 text-[10px] uppercase">John K. — Verified Client</span>
                 </div>
@@ -253,7 +253,7 @@ export default function SignupPage() {
                 </div>
                 <div className="space-y-1 text-xs">
                   <p className="text-gray-800 font-medium leading-relaxed">
-                    &quot;I have been using Premium Verify for a year now, I am very happy with their panel and instant virtual SMS numbers across 197 countries. Simply the best!&quot;
+                    &quot;I have been using Premium Verific for a year now, I am very happy with their panel and instant virtual SMS numbers across 197 countries. Simply the best!&quot;
                   </p>
                   <span className="font-bold text-gray-400 text-[10px] uppercase">Michael D. — Agency Reseller</span>
                 </div>
@@ -265,7 +265,7 @@ export default function SignupPage() {
                 </div>
                 <div className="space-y-1 text-xs">
                   <p className="text-gray-800 font-medium leading-relaxed">
-                    &quot;I recently started using Premium Verify SMM reseller panel & UK phone activation. They have a great selection of packages available with automatic instant execution!&quot;
+                    &quot;I recently started using Premium Verific SMM reseller panel & UK phone activation. They have a great selection of packages available with automatic instant execution!&quot;
                   </p>
                   <span className="font-bold text-gray-400 text-[10px] uppercase">Thomas W. — Partner</span>
                 </div>

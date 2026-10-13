@@ -16,7 +16,7 @@ export default function RefundPolicyPage() {
         </div>
         <h1 className="text-2xl md:text-3xl font-black text-gray-900">Refund & Cancellation Policy</h1>
         <p className="text-xs text-gray-500">
-          Last updated: September 18, 2026 • Premium Verify Official Policy (premiumverific.com)
+          Last updated: September 18, 2026 • Premium Verific Official Policy (premiumverific.com)
         </p>
       </div>
 
@@ -30,7 +30,7 @@ export default function RefundPolicyPage() {
             <span>1. Automatic Refund Guarantee (SMS & SMM Orders)</span>
           </h2>
           <p>
-            At <strong>Premium Verify</strong>, customer satisfaction and fair pricing are our top priorities. We implement automated instant refund mechanisms across our service categories:
+            At <strong>Premium Verific</strong>, customer satisfaction and fair pricing are our top priorities. We implement automated instant refund mechanisms across our service categories:
           </p>
           <ul className="list-disc pl-5 space-y-2 text-gray-600">
             <li>
@@ -49,7 +49,7 @@ export default function RefundPolicyPage() {
             <span>2. Wallet Balance & Cashout Policy</span>
           </h2>
           <p>
-            Deposits made into your Premium Verify account wallet through <strong>Payunit</strong> are meant for service fulfillment on our platform.
+            Deposits made into your Premium Verific account wallet through <strong>Payunit</strong> are meant for service fulfillment on our platform.
           </p>
           <ul className="list-disc pl-5 space-y-1 text-gray-600">
             <li>Unused wallet balances can be withdrawn or refunded back to your original Mobile Money or Bank account upon request, subject to standard gateway processing fees (1.5%).</li>

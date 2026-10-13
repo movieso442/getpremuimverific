@@ -49,7 +49,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               PV
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Premium Verify</h3>
+              <h3 className="text-lg font-bold text-gray-900">Premium Verific</h3>
               <p className="text-[11px] text-gray-500">Sign in to manage your orders & wallet</p>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ThumbsUp, Shield, MessageCircle } from 'lucide-react'
+import { ThumbsUp, MessageCircle } from 'lucide-react'
 import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 export const PublicFooter: React.FC = () => {
@@ -20,7 +20,7 @@ export const PublicFooter: React.FC = () => {
               </div>
               <div>
                 <span className="text-xl font-black text-gray-900">PV</span>
-                <span className="text-xs font-bold text-gray-600 block uppercase">Premium Verify</span>
+                <span className="text-xs font-bold text-gray-600 block uppercase">Premium Verific</span>
               </div>
             </div>
             <p className="text-xs text-gray-500 leading-relaxed">
@@ -35,7 +35,6 @@ export const PublicFooter: React.FC = () => {
               <li><Link href="/services" className="hover:text-[#ff5722] transition">SMS Virtual Numbers</Link></li>
               <li><Link href="/services" className="hover:text-[#ff5722] transition">SMM Panel Growth</Link></li>
               <li><Link href="/whatsapp" className="hover:text-[#ff5722] transition">WhatsApp Assistant Bot</Link></li>
-              <li><Link href="/developer" className="hover:text-[#ff5722] transition">Developer API Docs</Link></li>
               <li><Link href="/downloads" className="hover:text-[#ff5722] transition">Download our App</Link></li>
             </ul>
           </div>
@@ -71,7 +70,7 @@ export const PublicFooter: React.FC = () => {
         </div>
 
         <div className="border-t border-gray-100 mt-10 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-gray-400 gap-4">
-          <div>© {new Date().getFullYear()} Premium Verify. All Rights Reserved.</div>
+          <div>© {new Date().getFullYear()} Premium Verific. All Rights Reserved.</div>
           <div className="flex items-center gap-6 font-medium">
             <Link href="/privacy" className="hover:text-gray-600">Privacy</Link>
             <Link href="/terms" className="hover:text-gray-600">Terms</Link>

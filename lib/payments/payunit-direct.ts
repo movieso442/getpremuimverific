@@ -9,7 +9,7 @@ export async function requestMobileMoney(config: Config, input: { amount: number
   const common = { currency: 'XAF', transaction_id: input.reference, return_url: `${config.appUrl}${input.returnPath}`, notify_url: `${config.appUrl}/api/payments/webhooks/payunit` }
   try {
     const init = await fetch(`${config.baseUrl}/api/gateway/initialize`, { method: 'POST', headers: config.headers, signal: AbortSignal.timeout(20_000),
-      body: JSON.stringify({ ...common, total_amount: input.amount, app_id: config.appId, payment_country: 'CM', description: 'Premium Verify wallet top-up' }) })
+      body: JSON.stringify({ ...common, total_amount: input.amount, app_id: config.appId, payment_country: 'CM', description: 'Premium Verific wallet top-up' }) })
     const initialized = await init.json().catch(() => ({}))
     if (!init.ok || initialized.status !== 'SUCCESS') return { accepted: false, error: 'The payment service could not start this payment. Please try again later.' }
     const response = await fetch(`${config.baseUrl}/api/gateway/makepayment`, { method: 'POST', headers: config.headers, signal: AbortSignal.timeout(20_000),
@@ -23,14 +23,14 @@ export async function requestMobileMoney(config: Config, input: { amount: number
   } catch { return { accepted: false, uncertain: true } }
 }
 
-export async function reconcilePayunit(admin: SupabaseClient, transaction: { id: string; reference: string; amount: number | string; status: string }) {
+export async function reconcilePayunit(admin: SupabaseClient, transaction: { id: string; reference: string; amount: number | string; status: string; service_fee_xaf?: number | string }) {
   if (transaction.status === 'completed') return 'completed'
   const config = getPayunitConfig()
   if (!config || transaction.status !== 'pending') return transaction.status
   const { response, payload } = await getPayunitPaymentStatus(transaction.reference, config)
   const verified = response.ok && payload.status === 'SUCCESS'
     && payload.data?.transaction_id === transaction.reference && payload.data.transaction_currency === 'XAF'
-    && Number(payload.data.transaction_amount) === Number(transaction.amount)
+    && Number(payload.data.transaction_amount) === Number(transaction.amount) + Number(transaction.service_fee_xaf ?? 0)
   if (!verified) return transaction.status
   const next = payload.data?.transaction_status === 'SUCCESS' ? 'completed'
     : ['FAILED', 'CANCELLED'].includes(payload.data?.transaction_status || '') ? 'failed' : null

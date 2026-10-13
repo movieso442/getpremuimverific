@@ -7,8 +7,9 @@ export function proxy(request: NextRequest) {
   const host = request.headers.get('host')?.split(':')[0].toLowerCase()
   if (host === 'admin.premiumverific.com') {
     const path = request.nextUrl.pathname
+    if (path === '/auth/callback') return NextResponse.rewrite(new URL(`/admin/auth/callback${request.nextUrl.search}`, request.url))
     if (path === '/' || path === '/login' || path === '/signup') {
-      return NextResponse.redirect(new URL('/admin/login', request.url))
+      return NextResponse.rewrite(new URL('/admin', request.url))
     }
   }
   return NextResponse.next()
@@ -16,4 +17,4 @@ export function proxy(request: NextRequest) {
 
 // Match browser pages on the subdomain (including /login) while leaving API
 // webhooks on their original host untouched.
-export const config = { matcher: ['/', '/login', '/signup'] }
+export const config = { matcher: ['/', '/login', '/signup', '/auth/callback'] }

@@ -8,6 +8,7 @@ import { fetchFiveSimCountries, fetchFiveSimProducts, fetchFiveSimQuote } from '
 import { getOrCreateWhatsAppCustomer } from '@/lib/bots/customers'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { createBotCheckoutLink } from '@/lib/bots/checkout'
+import { topupCommand } from '@/lib/bots/topup-command'
 import { checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
 
 export interface WhatsAppMessagePayload {
@@ -254,11 +255,11 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   if (isReset) {
     userSessions[userPhone] = { step: 'MAIN' }
     return (
-      `👋 *Welcome to Premium Verify WhatsApp Bot!*\n\n` +
+      `👋 *Welcome to Premium Verific WhatsApp Bot!*\n\n` +
       `How can I help you today? Please reply with a number:\n\n` +
       `1️⃣ *Virtual SMS Numbers* (WhatsApp, Telegram, Gmail, TikTok...)\n` +
       `2️⃣ *Social Media Growth* (Followers, Likes, Views, Members...)\n` +
-      `3️⃣ *Top up Wallet Balance* (MTN MoMo, Orange Money, Card, PayPal)\n` +
+      `3️⃣ *Top up Wallet Balance* (MTN MoMo, Orange Money, supported crypto)\n` +
       `4️⃣ *Check Wallet Balance*\n\n` +
       `💡 _Reply with 1, 2, 3, or 4 to select, or type "menu" anytime to restart._`
     )
@@ -268,7 +269,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   if ((lowerText === '4' && session.step !== 'SMS_CATALOG') || lowerText === '/balance' || lowerText === 'balance' || lowerText === 'solde') {
     const usd = (currentBalance / 600).toFixed(2)
     return (
-      `💼 *Premium Verify Wallet Status*\n\n` +
+      `💼 *Premium Verific Wallet Status*\n\n` +
       `👤 *User:* ${payload.name || userPhone}\n` +
       `💵 *Balance:* ${currentBalance.toLocaleString()} XAF (~$${usd} USD)\n` +
       `⚡ *Status:* Active Member\n\n` +
@@ -277,24 +278,23 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   }
 
   // 3. TOP UP WALLET (3, /pay, pay, deposit, topup)
-  if ((lowerText === '3' && session.step !== 'SMS_CATALOG') || lowerText.startsWith('pay ') || lowerText.startsWith('/pay ') || lowerText.startsWith('topup ') || lowerText === 'deposit') {
+  if ((lowerText === '3' && session.step !== 'SMS_CATALOG') || topupCommand(text)) {
     userSessions[userPhone] = { step: 'PAY' }
-    const parts = text.split(' ').filter(Boolean)
-    const amount = Number(parts[1])
+    const amount = topupCommand(text)?.amount
 
     if (amount && amount > 0) {
       const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
       if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
       return (
-        `💳 *Payunit Payment Link Generated!*\n\n` +
+        `💳 *Your secure top-up link*\n\n` +
         `💰 *Deposit Amount:* ${amount.toLocaleString()} XAF\n` +
-        `📱 *Channels:* MTN MoMo, Orange Money, Credit Cards, PayPal\n\n` +
+        `📱 *Channels:* MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237677034736\n\n` +
         `👉 *Click here to complete payment:* ${checkoutUrl}`
       )
     }
 
     return (
-      `💳 *Wallet Topup (Payunit)*\n\n` +
+      `💳 *Add funds*\n\n` +
       `Reply with the amount in XAF you wish to deposit (Minimum: 3,000 XAF / about US$5).\n\n` +
       `*Example:* \`5000\` or \`10000\``
     )
@@ -308,9 +308,9 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
       const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
       if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
       return (
-        `💳 *Payunit Payment Link Generated!*\n\n` +
+        `💳 *Your secure top-up link*\n\n` +
         `💰 *Deposit Amount:* ${amount.toLocaleString()} XAF\n` +
-        `📱 *Channels:* MTN MoMo, Orange Money, Credit Cards, PayPal\n\n` +
+        `📱 *Channels:* MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237677034736\n\n` +
         `👉 *Click here to complete payment:* ${checkoutUrl}`
       )
     }
@@ -616,7 +616,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   // simple intent-based welcome instead of echoing the customer's text back.
   if (session.step === 'MAIN') {
     const name = userProfile?.full_name?.split(/\s+/)[0] || payload.name?.split(/\s+/)[0] || 'there'
-    return `Hi ${name}! Welcome to Premium Verify. I can help you get a temporary number, boost social media, top up, or check your balance.\n\nJust say “get a number”, “boost followers”, “top up”, or “help”.`
+    return `Hi ${name}! Welcome to Premium Verific. I can help you get a temporary number, boost social media, top up, or check your balance.\n\nJust say “get a number”, “boost followers”, “top up”, or “help”.`
   }
 
   // DEFAULT FALLBACK RESPONSE

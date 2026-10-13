@@ -46,7 +46,7 @@ export interface AccountProductItem {
 }
 
 export const PLATFORM_INFO = {
-  name: 'Premium Verify',
+  name: 'Premium Verific',
   domain: 'premiumverific.com',
   phone: '237680209047',
   email: 'hello@premiumverific.com',

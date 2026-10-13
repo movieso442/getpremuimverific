@@ -6,6 +6,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { getOrCreateTelegramCustomer } from '@/lib/bots/customers'
 import { createBotCheckoutLink } from '@/lib/bots/checkout'
+import { topupCommand } from '@/lib/bots/topup-command'
 import { fetchFiveSimCountries, fetchFiveSimProducts, fetchFiveSimQuote } from '@/lib/providers/fivesim'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
@@ -200,7 +201,7 @@ async function placeSmmOrder(serviceId: number, link: string, quantity: number) 
 
 export async function processTelegramMessage(payload: TelegramMessagePayload): Promise<string> {
   const text = (payload.text || '').trim()
-  const lowerText = text.toLowerCase()
+  const lowerText = text.normalize('NFKC').toLowerCase().trim().replace(/\s+/g, ' ')
   const chatId = String(payload.chatId)
   const appUrl = getAppUrl()
 
@@ -235,11 +236,11 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   if (isReset) {
     userSessions[chatId] = { step: 'MAIN' }
     return (
-      `👋 <b>Welcome to Premium Verify Assistant!</b> (@getpremuimverific_bot)\n\n` +
+      `👋 <b>Welcome to Premium Verific Assistant!</b> (@getpremuimverific_bot)\n\n` +
       `How can I help you today? Please reply with a number:\n\n` +
       `1️⃣ <b>Virtual SMS Numbers</b> (WhatsApp, Telegram, Gmail, TikTok...)\n` +
       `2️⃣ <b>Social Media Growth</b> (Followers, Likes, Views, Members...)\n` +
-      `3️⃣ <b>Top up Wallet Balance</b> (MTN MoMo, Orange Money, Card, PayPal)\n` +
+      `3️⃣ <b>Top up Wallet Balance</b> (MTN MoMo, Orange Money, supported crypto)\n` +
       `4️⃣ <b>Check Wallet Balance</b>\n\n` +
       `💡 <i>Reply with 1, 2, 3, or 4 to select, or type "menu" anytime to restart.</i>`
     )
@@ -249,7 +250,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   if ((lowerText === '4' && session.step !== 'SMS_CATALOG') || lowerText === '/balance' || lowerText === 'balance' || lowerText === 'solde') {
     const usd = (currentBalance / 600).toFixed(2)
     return (
-      `💼 <b>Premium Verify Wallet Status</b>\n\n` +
+      `💼 <b>Premium Verific Wallet Status</b>\n\n` +
       `👤 <b>User:</b> ${payload.fromName || 'Partner'}\n` +
       `💵 <b>Balance:</b> ${currentBalance.toLocaleString()} XAF (~$${usd} USD)\n` +
       `⚡ <b>Status:</b> Active Member\n\n` +
@@ -258,24 +259,23 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   }
 
   // 3. TOP UP WALLET (3, /pay, pay, deposit, topup)
-  if ((lowerText === '3' && session.step !== 'SMS_CATALOG') || lowerText.startsWith('pay ') || lowerText.startsWith('/pay ') || lowerText.startsWith('topup ') || lowerText === 'deposit') {
+  if ((lowerText === '3' && session.step !== 'SMS_CATALOG') || topupCommand(text)) {
     userSessions[chatId] = { step: 'PAY' }
-    const parts = text.split(' ').filter(Boolean)
-    const amount = Number(parts[1])
+    const amount = topupCommand(text)?.amount
 
     if (amount && amount > 0) {
       const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
       if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
       return (
-        `💳 <b>Payunit Payment Link Generated!</b>\n\n` +
+        `💳 <b>Your secure top-up link</b>\n\n` +
         `💰 <b>Deposit Amount:</b> ${amount.toLocaleString()} XAF\n` +
-        `📱 <b>Channels:</b> MTN MoMo, Orange Money, Credit Cards, PayPal\n\n` +
+        `📱 <b>Channels:</b> MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237677034736\n\n` +
         `👉 <a href="${checkoutUrl}">Click here to complete payment</a>`
       )
     }
 
     return (
-      `💳 <b>Wallet Topup (Payunit)</b>\n\n` +
+      `💳 <b>Add funds</b>\n\n` +
       `Reply with the amount in XAF you wish to deposit (Minimum: 3,000 XAF / about US$5).\n\n` +
       `<i>Example:</i> <code>5000</code> or <code>10000</code>`
     )
@@ -289,9 +289,9 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
       const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
       if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'
       return (
-        `💳 <b>Payunit Payment Link Generated!</b>\n\n` +
+        `💳 <b>Your secure top-up link</b>\n\n` +
         `💰 <b>Deposit Amount:</b> ${amount.toLocaleString()} XAF\n` +
-        `📱 <b>Channels:</b> MTN MoMo, Orange Money, Credit Cards, PayPal\n\n` +
+        `📱 <b>Channels:</b> MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237677034736\n\n` +
         `👉 <a href="${checkoutUrl}">Click here to complete payment</a>`
       )
     }
@@ -591,7 +591,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
 
   if (session.step === 'MAIN') {
     const name = userProfile?.full_name?.split(/\s+/)[0] || payload.fromName?.split(/\s+/)[0] || 'there'
-    return `Hi ${name}! <b>Welcome to Premium Verify.</b> I can help you get a temporary number, boost social media, top up, or check your balance.\n\nSay “get a number”, “boost followers”, “top up”, or “help”.`
+    return `Hi ${name}! <b>Welcome to Premium Verific.</b> I can help you get a temporary number, boost social media, top up, or check your balance.\n\nSay “get a number”, “boost followers”, “top up”, or “help”.`
   }
 
   // DEFAULT FALLBACK RESPONSE

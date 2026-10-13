@@ -5,6 +5,7 @@ import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { getPayunitConfig } from '@/lib/payments/payunit'
 import { cameroonPhone, mobileMoneyMethod, depositXaf } from '@/lib/payments/mobile-money'
 import { reconcilePayunit, requestMobileMoney } from '@/lib/payments/payunit-direct'
+import { topupQuote } from '@/lib/payments/topup-fees'
 
 export const dynamic = 'force-dynamic'
 type BotPaymentLink = { id: string; profile_id: string; amount_xaf: number | string; payment_reference: string | null; expires_at: string }
@@ -21,17 +22,18 @@ export async function GET(request: Request) {
     if (!link) return expired()
     const admin = createAdminClient()
     const { data: transaction } = link.payment_reference
-      ? await admin.from('wallet_transactions').select('id,reference,amount,status').eq('profile_id', link.profile_id).eq('reference', link.payment_reference).maybeSingle()
+      ? await admin.from('wallet_transactions').select('id,reference,amount,status,service_fee_xaf').eq('profile_id', link.profile_id).eq('reference', link.payment_reference).maybeSingle()
       : { data: null }
     const { data: claim } = await admin.from('manual_payment_claims').select('status').eq('bot_payment_link_id', link.id).maybeSingle()
     const status = transaction ? await reconcilePayunit(admin, transaction) : claim?.status === 'confirmed' ? 'completed' : claim?.status === 'pending' ? 'manual_pending' : claim?.status || 'ready'
     if (status === 'completed') scheduleAdminNotifications(admin)
-    return NextResponse.json({ amount_xaf: Number(link.amount_xaf), expires_at: link.expires_at, reference: link.payment_reference, status }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ amount_xaf: Number(link.amount_xaf), service_fee_xaf: transaction ? Number(transaction.service_fee_xaf) : topupQuote(Number(link.amount_xaf)).feeXaf, expires_at: link.expires_at, reference: link.payment_reference, status }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return NextResponse.json({ error: 'Could not check this payment yet.' }, { status: 502 }) }
 }
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+    if (body.accepted_fee_percent !== 2) return NextResponse.json({ error: 'Refresh checkout to review the 2% top-up fee before paying.' }, { status: 409 })
     const phone = cameroonPhone(body.phone_number)
     if (!phone || !mobileMoneyMethod(body.payment_method)) return NextResponse.json({ error: 'Choose MTN or Orange and enter your Cameroon mobile number.' }, { status: 400 })
     const link = await loadLink(body.token)
@@ -47,16 +49,14 @@ export async function POST(request: Request) {
       const { data: existing } = await admin.from('wallet_transactions').select('status').eq('profile_id', link.profile_id).eq('reference', link.payment_reference).maybeSingle()
       return NextResponse.json({ reference: link.payment_reference, status: existing?.status || 'pending', credited: existing?.status === 'completed' })
     }
+    const quote = topupQuote(amount)
     const reference = 'PVB' + randomUUID().replace(/-/g, '')
-    // Claim the one-use capability before contacting the operator. Concurrent
-    // requests must never send a second phone prompt for the same link.
-    const { data: reserved, error: reservationError } = await admin.from('bot_payment_links').update({ payment_reference: reference }).eq('id', link.id).is('payment_reference', null).select('id').maybeSingle()
-    if (reservationError) throw reservationError
-    if (!reserved) return NextResponse.json({ error: 'Payment is already starting. Refresh this page to check its status.' }, { status: 409 })
-    const { error } = await admin.from('wallet_transactions').insert({ profile_id: link.profile_id, amount, type: 'deposit', payment_method: body.payment_method, reference, status: 'pending', description: 'Bot mobile-money top-up awaiting verified payment' })
-    if (error) throw error
+    const { data: reserved, error: reservationError } = await admin.rpc('start_wallet_topup', { p_profile: link.profile_id, p_reference: reference, p_credit: amount, p_method: body.payment_method, p_link: link.id })
+    if (reservationError?.code === 'P0001') return NextResponse.json({ error: 'An existing payment is being checked. Contact support before paying again.' }, { status: 409 })
+    if (reservationError || !reserved) throw reservationError || new Error('Payment reservation unavailable')
+    if (!reserved.created) return NextResponse.json({ reference: reserved.reference, status: reserved.status, credited: reserved.status === 'completed' })
     scheduleAdminNotifications(admin)
-    const result = await requestMobileMoney(config, { amount, phone, method: body.payment_method, reference, returnPath: '/bot-topup?token=' + encodeURIComponent(body.token) })
+    const result = await requestMobileMoney(config, { amount: quote.totalXaf, phone, method: body.payment_method, reference, returnPath: '/bot-topup?token=' + encodeURIComponent(body.token) })
     if (!result.accepted && !result.uncertain) {
       await admin.from('wallet_transactions').update({ status: 'failed' }).eq('reference', reference).eq('status', 'pending')
       scheduleAdminNotifications(admin)

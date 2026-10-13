@@ -22,15 +22,14 @@ import {
 } from 'lucide-react'
 import { SMS_SERVICES, COUNTRIES, SMM_SERVICES, ACCOUNT_PRODUCTS, PLATFORM_INFO } from '@/lib/mockData'
 import { AuthModal } from '@/components/AuthModal'
+import OrderCalculator from '@/components/OrderCalculator'
 
 export default function LandingPage() {
   const [isAuthOpen, setIsAuthOpen] = useState(false)
-  const [authActionTitle, setAuthActionTitle] = useState('Sign In to Premium Verify')
+  const [authActionTitle, setAuthActionTitle] = useState('Sign In to Premium Verific')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   // Pricing preview state
-  const [calcPlatform, setCalcPlatform] = useState('Instagram')
-  const [calcQuantity, setCalcQuantity] = useState(1000)
 
   const handleCtaClick = (title: string) => {
     setAuthActionTitle(title)
@@ -273,58 +272,7 @@ export default function LandingPage() {
             <p className="text-base text-gray-600">Select platform and quantity to estimate price in XAF.</p>
           </div>
 
-          <div className="agoverify-card p-8 md:p-10 space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              
-              <div>
-                <label className="text-xs font-extrabold uppercase text-gray-600 tracking-wider mb-2 block">
-                  Select Social Platform
-                </label>
-                <select
-                  value={calcPlatform}
-                  onChange={(e) => setCalcPlatform(e.target.value)}
-                  className="w-full bg-white border border-gray-300 focus:border-[#ff5722] rounded-xl py-4 px-4 text-gray-900 text-base outline-none font-bold"
-                >
-                  <option value="Instagram">Instagram Followers (1,200 XAF / 1k)</option>
-                  <option value="YouTube">YouTube High Retention Views (1,800 XAF / 1k)</option>
-                  <option value="TikTok">TikTok FYP Viral Views (150 XAF / 1k)</option>
-                  <option value="Facebook">Facebook Page Boost (1,900 XAF / 1k)</option>
-                  <option value="Telegram">Telegram Channel Members (1,100 XAF / 1k)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-extrabold uppercase text-gray-600 tracking-wider mb-2 block">
-                  Quantity
-                </label>
-                <input
-                  type="number"
-                  step="500"
-                  min="500"
-                  value={calcQuantity}
-                  onChange={(e) => setCalcQuantity(Number(e.target.value))}
-                  className="w-full bg-white border border-gray-300 focus:border-[#ff5722] rounded-xl py-4 px-4 text-gray-900 text-base outline-none font-bold"
-                />
-              </div>
-
-            </div>
-
-            <div className="p-6 rounded-2xl bg-orange-50 border border-orange-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div>
-                <div className="text-xs font-bold text-gray-600 uppercase">Estimated Total Charge</div>
-                <div className="text-3xl font-black text-[#ea580c]">
-                  {(calcPlatform === 'TikTok' ? Math.ceil((150 * calcQuantity)/1000) : Math.ceil((1200 * calcQuantity)/1000)).toLocaleString()} XAF
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleCtaClick('Order SMM Package Now')}
-                className="px-8 py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-sm transition shadow-md"
-              >
-                Place Order Now
-              </button>
-            </div>
-          </div>
+          <OrderCalculator />
 
         </div>
       </section>
@@ -335,7 +283,7 @@ export default function LandingPage() {
           
           <div className="text-center space-y-3">
             <h2 className="text-3xl md:text-5xl font-black text-gray-900">Frequently Asked Questions</h2>
-            <p className="text-base text-gray-600">Everything you need to know about Premium Verify services.</p>
+            <p className="text-base text-gray-600">Everything you need to know about Premium Verific services.</p>
           </div>
 
           <div className="space-y-4">
@@ -367,7 +315,7 @@ export default function LandingPage() {
       {/* CTA FOOTER BANNER */}
       <section className="mx-auto max-w-6xl px-5 py-16">
         <div className="flex flex-col items-start justify-between gap-6 rounded-3xl border border-orange-100 bg-orange-50 p-8 sm:flex-row sm:items-center">
-          <div><p className="text-xs font-bold uppercase tracking-widest text-orange-700">Premium Verify mobile</p><h2 className="mt-3 text-3xl font-black text-slate-950">Your panel. Now in your pocket.</h2><p className="mt-3 max-w-xl text-slate-600">Explore the Android and iPhone apps for numbers, your code inbox and your wallet.</p></div>
+          <div><p className="text-xs font-bold uppercase tracking-widest text-orange-700">Premium Verific mobile</p><h2 className="mt-3 text-3xl font-black text-slate-950">Your panel. Now in your pocket.</h2><p className="mt-3 max-w-xl text-slate-600">Explore the Android and iPhone apps for numbers, your code inbox and your wallet.</p></div>
           <Link href="/downloads" className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-orange-700 px-6 py-4 font-bold text-white">App downloads <ArrowRight className="h-5 w-5" /></Link>
         </div>
       </section>
@@ -376,7 +324,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-6 space-y-6">
           <h2 className="text-4xl md:text-5xl font-black">Ready to Grow Your Digital Accounts?</h2>
           <p className="text-base md:text-lg text-white/90 max-w-xl mx-auto font-medium">
-            Join thousands of partners using Premium Verify for instant SMS activations and automated SMM panel growth.
+            Join thousands of partners using Premium Verific for instant SMS activations and automated SMM panel growth.
           </p>
 
           <div className="pt-4 flex flex-wrap items-center justify-center gap-4">

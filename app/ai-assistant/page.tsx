@@ -16,7 +16,7 @@ export default function AIAssistantPage() {
     {
       id: '1',
       sender: 'ai',
-      text: 'Welcome to Premium Verify AI Assistant! How can I help you today? Ask me about SMM panel services, YouTube monetization packages, Facebook rescue & recovery, or virtual SMS numbers!',
+      text: 'Welcome to Premium Verific AI Assistant! How can I help you today? Ask me about SMM panel services, YouTube monetization packages, Facebook rescue & recovery, or virtual SMS numbers!',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ])
@@ -39,7 +39,7 @@ export default function AIAssistantPage() {
     setIsThinking(true)
 
     setTimeout(() => {
-      let aiReply = 'I am your Premium Verify AI assistant. You can also reach our direct human support team on WhatsApp (+237 680209047) or email hello@premiumverific.com.'
+      let aiReply = 'I am your Premium Verific AI assistant. You can also reach our direct human support team on WhatsApp (+237 680209047) or email hello@premiumverific.com.'
 
       const lower = promptText.toLowerCase()
       if (lower.includes('number') || lower.includes('sms') || lower.includes('code') || lower.includes('whatsapp') || lower.includes('telegram')) {
@@ -134,7 +134,7 @@ export default function AIAssistantPage() {
           {isThinking && (
             <div className="flex gap-3 items-center text-xs text-[#ea580c]">
               <Bot className="w-4 h-4 animate-bounce" />
-              <span>Premium Verify AI is generating response...</span>
+              <span>Premium Verific AI is generating response...</span>
             </div>
           )}
         </div>

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useAppState } from '@/lib/store'
 import { retailPrice } from '@/lib/platform/settings'
 import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
+import LocalAmount from '@/components/LocalAmount'
 
 type SmsInboxOrder = {
   id: string; provider_order_id: string | null; service_name: string; country_name: string;
@@ -30,6 +31,7 @@ export default function SmsVerificationPage() {
   const [inboxOrders, setInboxOrders] = useState<SmsInboxOrder[]>([])
   const [inboxError, setInboxError] = useState<string | null>(null)
   const priceXaf = retailPrice(selectedService.price, platformSettings.sms_markup_multiplier)
+  useEffect(() => { router.prefetch('/add-funds') }, [router])
 
   const handleGetNumber = async () => {
     setShowInsufficientBanner(false)
@@ -42,9 +44,7 @@ export default function SmsVerificationPage() {
 
     if (profile.balance_xaf < priceXaf) {
       setShowInsufficientBanner(true)
-      setTimeout(() => {
-        router.push(`/add-funds?amount=${priceXaf}&reason=insufficient_balance`)
-      }, 1500)
+      router.push(`/add-funds?amount=${priceXaf}&reason=insufficient_balance`)
       return
     }
 
@@ -206,7 +206,7 @@ export default function SmsVerificationPage() {
           className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-xs uppercase shadow-md transition flex items-center justify-center gap-2"
         >
           <Smartphone className="w-4 h-4" />
-          <span>{isRequesting ? 'REQUESTING LIVE NUMBER...' : `GET VIRTUAL NUMBER (${priceXaf.toLocaleString()} XAF)`}</span>
+          <span>{isRequesting ? 'Requesting live number…' : <>Get virtual number · <LocalAmount amountXaf={priceXaf} /></>}</span>
         </button>
         {requestError && <p className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">{requestError}</p>}
       </div>

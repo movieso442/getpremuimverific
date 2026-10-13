@@ -28,7 +28,7 @@ import confetti from 'canvas-confetti'
 
 export default function DashboardPage() {
   const { profile } = useAppState()
-  const [allServices, setAllServices] = useState<any[]>(liveServices as any[])
+  const [allServices, setAllServices] = useState<Array<(typeof liveServices)[number] & { retail_rate_xaf?: number; avgTime?: string; usdRate?: number; rate?: number; startTime?: string; speed?: string; guaranteed?: string; description?: string }>>(liveServices)
   const allCategories = Array.from(new Set(allServices.map((s) => s.category)))
 
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null)
@@ -51,6 +51,14 @@ export default function DashboardPage() {
       .then((result) => {
         if (Array.isArray(result?.services) && result.services.length) {
           setAllServices(result.services)
+          const params = new URLSearchParams(window.location.search)
+          const requestedService = result.services.find((item: { id: number; service_id?: number }) => String(item.service_id || item.id) === params.get('service'))
+          if (requestedService) {
+            setSelectedCategory(requestedService.category)
+            setSelectedServiceId(Number(requestedService.id || requestedService.service_id))
+            const requestedQuantity = Number(params.get('quantity'))
+            setQuantity(Number.isInteger(requestedQuantity) && requestedQuantity >= requestedService.min && requestedQuantity <= requestedService.max ? requestedQuantity : requestedService.min)
+          }
         }
       }).catch(() => undefined)
   }, [])
@@ -143,16 +151,6 @@ export default function DashboardPage() {
   const router = useRouter()
 
   const [orderStatusMsg, setOrderStatusMsg] = useState<{ type: 'success' | 'error'; text: string; link?: string } | null>(null)
-
-  useEffect(() => {
-    const requestedService = Number(new URLSearchParams(window.location.search).get('service'))
-    const service = allServices.find((item) => item.id === requestedService)
-    if (service) {
-      setSelectedCategory(service.category)
-      setSelectedServiceId(service.id)
-      setQuantity(service.min)
-    }
-  }, [])
 
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -546,7 +544,7 @@ export default function DashboardPage() {
             
             {/* Service Title & Price */}
             <div className="text-xs font-extrabold text-gray-900 leading-relaxed font-mono">
-              {currentService?.id} - {currentService?.name} - {currentService?.usdRate !== undefined ? `$${currentService.usdRate}` : `$${(currentService.rate / 600).toFixed(4)}`}
+              {currentService?.id} - {currentService?.name} - {retailRateXaf.toLocaleString()} XAF per 1,000
             </div>
 
             {/* 4-Grid Specification Metrics (Exact match to Screenshots 1, 2, 4) */}
@@ -554,28 +552,28 @@ export default function DashboardPage() {
               <div>
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">START TIME</div>
                 <div className={`text-xs font-extrabold mt-0.5 ${currentService?.startTime === 'N/A' ? 'text-red-500' : 'text-[#ea580c]'}`}>
-                  {currentService?.startTime || '0-24 Hours'}
+                  {currentService?.startTime || 'See service description'}
                 </div>
               </div>
 
               <div>
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">SPEED</div>
                 <div className={`text-xs font-extrabold mt-0.5 ${currentService?.speed === 'N/A' ? 'text-red-500' : 'text-[#ea580c]'}`}>
-                  {currentService?.speed || 'Up to 50K/D'}
+                  {currentService?.speed || 'See service description'}
                 </div>
               </div>
 
               <div>
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GUARANTEED</div>
                 <div className={`text-xs font-extrabold mt-0.5 ${currentService?.guaranteed === 'N/A' ? 'text-red-500' : 'text-gray-800'}`}>
-                  {currentService?.guaranteed || '30 Days Refill'}
+                  {currentService?.guaranteed || (currentService?.refill ? 'Refill available — see terms' : 'No refill specified')}
                 </div>
               </div>
 
               <div>
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AVERAGE TIME</div>
                 <div className="text-xs font-extrabold text-[#ea580c] mt-0.5">
-                  {currentService?.avgTime || 'Instant'}
+                  {currentService?.avgTime || 'Not specified'}
                 </div>
               </div>
             </div>

@@ -17,7 +17,7 @@ export const PublicHeader: React.FC = () => {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-2xl font-black text-gray-900 tracking-tight">PV</span>
-              <span className="text-[10px] sm:text-xs font-bold text-gray-700 uppercase tracking-wider">Premium Verify</span>
+              <span className="text-[10px] sm:text-xs font-bold text-gray-700 uppercase tracking-wider">Premium Verific</span>
             </div>
             <div className="hidden sm:block text-[10px] font-extrabold text-[#ff5722] uppercase tracking-wider">WE LEAD. THEY FOLLOW</div>
           </div>

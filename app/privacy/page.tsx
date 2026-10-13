@@ -16,7 +16,7 @@ export default function PrivacyPolicyPage() {
         </div>
         <h1 className="text-2xl md:text-3xl font-black text-gray-900">Privacy Policy</h1>
         <p className="text-xs text-gray-500">
-          Last updated: September 18, 2026 • Premium Verify Official Policy (premiumverific.com)
+          Last updated: September 18, 2026 • Premium Verific Official Policy (premiumverific.com)
         </p>
       </div>
 
@@ -30,7 +30,7 @@ export default function PrivacyPolicyPage() {
             <span>1. Information We Collect</span>
           </h2>
           <p>
-            At <strong>Premium Verify</strong> (getpremuimverific.vercel.app / premiumverific.com), we prioritize the confidentiality and protection of our users&apos; personal data. We collect minimal information necessary to deliver our services efficiently:
+            At <strong>Premium Verific</strong> (getpremuimverific.vercel.app / premiumverific.com), we prioritize the confidentiality and protection of our users&apos; personal data. We collect minimal information necessary to deliver our services efficiently:
           </p>
           <ul className="list-disc pl-5 space-y-1 text-gray-600">
             <li><strong>Account Information:</strong> Email address, full name, phone number, and authentication tokens when creating an account or logging in via Google OAuth.</li>

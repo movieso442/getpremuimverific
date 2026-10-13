@@ -23,7 +23,7 @@ export function paymentEmail(event: Event, customer: string) {
   const title = manual && status === 'pending' ? 'Payment submitted — review required' : `Payment ${status}`
   const amount = payment.approved_amount_xaf ?? payment.amount_xaf ?? payment.amount
   return {
-    subject: `Premium Verify: ${title}`,
+    subject: `Premium Verific: ${title}`,
     text: [
       title, `Customer: ${customer}`, `Customer profile: ${event.profile_id}`,
       `Method: ${crypto?.label || method}`, `Wallet amount: ${amount} XAF`,

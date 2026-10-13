@@ -16,7 +16,7 @@ export default function TermsOfServicePage() {
         </div>
         <h1 className="text-2xl md:text-3xl font-black text-gray-900">Terms of Service</h1>
         <p className="text-xs text-gray-500">
-          Last updated: September 18, 2026 • Premium Verify Official Policy (premiumverific.com)
+          Last updated: September 18, 2026 • Premium Verific Official Policy (premiumverific.com)
         </p>
       </div>
 
@@ -30,7 +30,7 @@ export default function TermsOfServicePage() {
             <span>1. Acceptance of Terms</span>
           </h2>
           <p>
-            By creating an account, accessing, or placing orders on <strong>Premium Verify</strong> (premiumverific.com / getpremuimverific.vercel.app), or interacting with our automated WhatsApp Assistant, you agree to be bound by these Terms of Service. If you do not agree with any part of these terms, you must discontinue platform usage immediately.
+            By creating an account, accessing, or placing orders on <strong>Premium Verific</strong> (premiumverific.com / getpremuimverific.vercel.app), or interacting with our automated WhatsApp Assistant, you agree to be bound by these Terms of Service. If you do not agree with any part of these terms, you must discontinue platform usage immediately.
           </p>
         </section>
 
@@ -75,7 +75,7 @@ export default function TermsOfServicePage() {
         <section className="space-y-3 border-t border-gray-100 pt-6">
           <h2 className="text-sm font-bold text-gray-900">5. Modifications & Contact</h2>
           <p className="text-gray-600">
-            We reserve the right to modify these terms at any time. Continued use of Premium Verify constitutes acceptance of revised terms. For inquiries, contact:
+            We reserve the right to modify these terms at any time. Continued use of Premium Verific constitutes acceptance of revised terms. For inquiries, contact:
           </p>
           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 font-medium space-y-1 text-gray-800">
             <div>Email Support: <strong className="text-[#ea580c]">hello@premiumverific.com</strong></div>

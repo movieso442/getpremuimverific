@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { ADMIN_OWNER_EMAIL } from '@/lib/admin/owner'
 import { createClient } from '@/lib/supabase/client'
 import AdminNotificationPanel from '@/components/AdminNotificationPanel'
+import AdminSignIn from '@/components/AdminSignIn'
 import { CRYPTO_METHODS, isCryptoMethod } from '@/lib/payments/manual-crypto'
-import { AlertTriangle, Banknote, ClipboardList, Loader2, RefreshCw, ShieldCheck, Users } from 'lucide-react'
+import { AlertTriangle, Banknote, ClipboardList, Loader2, RefreshCw, Users } from 'lucide-react'
 
 type Overview = {
   generated_at: string
@@ -18,7 +19,7 @@ type Overview = {
   sms_orders: Array<{ id: string; profile_id: string; service_name: string; price_xaf: number; status: string; created_at: string }>
   account_orders: Array<{ id: string; profile_id: string; item_title: string; price_xaf: number; status: string; created_at: string }>
   expenses: Array<{ id: string; kind: string; amount_xaf: number; description: string; reference?: string; created_at: string }>
-  manual_claims: Array<{ id: string; profile_id: string; amount_xaf: number; payment_method: string; payer_phone: string | null; transfer_reference: string; status: string; created_at: string; crypto_amount?: string; receiving_address?: string; approved_amount_xaf?: number }>
+  manual_claims: Array<{ id: string; profile_id: string; amount_xaf: number; payment_method: string; payer_phone: string | null; transfer_reference: string; status: string; created_at: string; crypto_amount?: string; receiving_address?: string; approved_amount_xaf?: number; service_fee_xaf?: number }>
   settings: { support_email: string; support_phone: string; whatsapp_number: string; smm_markup_multiplier: number; sms_markup_multiplier: number }
   analytics: Array<{ date: string; deposits_xaf: number; sales_xaf: number; orders: number }>
 }
@@ -31,6 +32,7 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [needsSignIn, setNeedsSignIn] = useState(false)
   const [filter, setFilter] = useState('')
   const [saving, setSaving] = useState(false)
   const [syncingCatalog, setSyncingCatalog] = useState(false)
@@ -43,9 +45,10 @@ export default function AdminPage() {
     try {
       const response = await fetch('/api/admin/overview', { cache: 'no-store' })
       const result = await response.json()
-      if (response.status === 401 || response.status === 403) { setData(null); setSettings(null) }
+      if (response.status === 401 || response.status === 403) { setData(null); setSettings(null); setNeedsSignIn(true) }
       if (!response.ok) throw new Error(result.error || 'Access denied')
       setData(result)
+      setNeedsSignIn(false)
       setSettings(result.settings)
       setError('')
     } catch (reason) {
@@ -110,7 +113,7 @@ export default function AdminPage() {
         approvedAmount = Number(claim.amount_xaf)
         if (!Number.isInteger(approvedAmount) || approvedAmount < 3000 || approvedAmount > 10000000) { setError('Enter a valid verified XAF credit.'); return }
       }
-      if (!window.confirm(`Verify receipt, customer ownership and that the received payment matches the agreed ${xaf(approvedAmount ?? claim.amount_xaf)}. Approve this exact wallet credit? If the amount does not match, cancel and contact the customer.`)) return
+      if (!window.confirm(`Verify receipt, customer ownership and that the received payment matches the agreed ${xaf(approvedAmount ?? claim.amount_xaf)}. The top-up fee is ${xaf(claim.service_fee_xaf ?? 0)} extra; verify receipt of the agreed credit plus this fee. Approve this exact wallet credit? If the amount does not match, cancel and contact the customer.`)) return
     }
     setReviewingClaim(claimId)
     try {
@@ -141,7 +144,8 @@ export default function AdminPage() {
 
   if (loading) return <div className="min-h-screen grid place-items-center bg-slate-950 text-white"><Loader2 className="w-7 h-7 animate-spin" /></div>
   if (error && !data) {
-    return <div className="min-h-screen grid place-items-center bg-slate-950 p-6"><div className="max-w-md rounded-2xl bg-white p-7 text-center"><ShieldCheck className="mx-auto text-orange-600 w-10 h-10 mb-3" /><h1 className="font-extrabold text-xl">Administrator portal</h1><p className="text-sm text-gray-600 mt-2">{error}</p><p className="text-xs text-gray-500 mt-4">Owner access only: {ADMIN_OWNER_EMAIL}</p><Link href="/admin/login" className="inline-flex mt-5 rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 text-sm font-bold text-white">Owner sign-in / switch account</Link></div></div>
+    if (needsSignIn) return <AdminSignIn />
+    return <main className="min-h-dvh bg-slate-950 p-8 text-white"><h1 className="text-2xl font-bold">Could not load the dashboard</h1><p role="alert" className="mt-4">{error}</p><button onClick={() => void load()} className="mt-6 rounded-xl bg-orange-600 px-5 py-3 font-bold">Try again</button></main>
   }
   if (!data) return null
 
@@ -156,7 +160,7 @@ export default function AdminPage() {
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
-          <div><p className="text-orange-400 text-xs font-bold uppercase tracking-[0.2em]">Premium Verify</p><h1 className="text-3xl font-black mt-1">Administrator portal</h1><p className="text-slate-400 text-sm mt-1">Live platform financial, customer, payment, and fulfillment monitoring.</p></div>
+          <div><p className="text-orange-400 text-xs font-bold uppercase tracking-[0.2em]">Premium Verific</p><h1 className="text-3xl font-black mt-1">Administrator portal</h1><p className="text-slate-400 text-sm mt-1">Live platform financial, customer, payment, and fulfillment monitoring.</p></div>
           <div className="flex flex-wrap gap-2"><Link href="/admin/pricing" className="inline-flex items-center justify-center rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 font-bold text-sm">Service prices</Link><button onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 font-bold text-sm"><RefreshCw className="w-4 h-4" />Refresh live data</button><button onClick={() => void signOut()} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-bold">Sign out</button></div>
         </header>
 
@@ -185,7 +189,7 @@ export default function AdminPage() {
           <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5"><p className="text-2xl font-black">{data.metrics.checkout_starts || 0}</p><p className="text-sm text-slate-400">Checkout starts · {data.metrics.checkout_not_completed || 0} not yet completed</p></div>
         </section>
 
-        <section className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800"><h2 className="font-extrabold">Manual payment review</h2><p className="text-xs text-slate-400 mt-1">For crypto, verify the credited Binance deposit, asset, network, destination and customer ownership. For Mobile Money, match the MTN/Orange transfer. Confirmation creates one completed wallet deposit; claims do not credit a wallet by themselves.</p></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Customer</th><th className="p-3">Method</th><th className="p-3">Amount</th><th className="p-3">Payer / reference</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{data.manual_claims.map((claim) => <tr key={claim.id} className="border-t border-slate-800"><td className="p-3">{profileById.get(claim.profile_id)?.full_name || profileById.get(claim.profile_id)?.email || 'Unknown'}</td><td className="p-3">{isCryptoMethod(claim.payment_method) ? CRYPTO_METHODS[claim.payment_method].label : claim.payment_method === 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}</td><td className="p-3 font-bold">{xaf(claim.approved_amount_xaf ?? claim.amount_xaf)}{claim.crypto_amount && <p className="text-xs text-slate-400">{claim.crypto_amount} {isCryptoMethod(claim.payment_method) ? CRYPTO_METHODS[claim.payment_method].asset : ''} claimed</p>}</td><td className="p-3 text-xs"><p>{claim.payer_phone || 'No payer phone'}</p><p className="font-mono text-slate-400 break-all">{claim.transfer_reference}</p>{isCryptoMethod(claim.payment_method) && <><p className="break-all">To: {claim.receiving_address}</p><a target="_blank" rel="noopener noreferrer" className="text-orange-400 underline" href={`${CRYPTO_METHODS[claim.payment_method].explorer}${encodeURIComponent(claim.transfer_reference)}`}>Inspect blockchain transfer</a></>}</td><td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${badge(claim.status)}`}>{claim.status}</span></td><td className="p-3">{claim.status === 'pending' ? <div className="flex gap-2"><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'confirm')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold">Approve</button><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'reject')} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold">Reject</button></div> : <span className="text-xs text-slate-500">Reviewed</span>}</td></tr>)}</tbody></table>{data.manual_claims.length === 0 && <p className="p-5 text-sm text-slate-400">No manual payments awaiting review.</p>}</div></section>
+        <section className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800"><h2 className="font-extrabold">Manual payment review</h2><p className="text-xs text-slate-400 mt-1">For crypto, verify the credited Binance deposit, asset, network, destination and customer ownership. For Mobile Money, match the MTN/Orange transfer. Confirmation creates one completed wallet deposit; claims do not credit a wallet by themselves.</p></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Customer</th><th className="p-3">Method</th><th className="p-3">Amount</th><th className="p-3">Payer / reference</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{data.manual_claims.map((claim) => <tr key={claim.id} className="border-t border-slate-800"><td className="p-3">{profileById.get(claim.profile_id)?.full_name || profileById.get(claim.profile_id)?.email || 'Unknown'}</td><td className="p-3">{isCryptoMethod(claim.payment_method) ? CRYPTO_METHODS[claim.payment_method].label : claim.payment_method === 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}</td><td className="p-3 font-bold">{xaf(claim.approved_amount_xaf ?? claim.amount_xaf)}<p className="text-xs text-slate-400">Fee on top: {xaf(claim.service_fee_xaf ?? 0)}</p>{claim.crypto_amount && <p className="text-xs text-slate-400">{claim.crypto_amount} {isCryptoMethod(claim.payment_method) ? CRYPTO_METHODS[claim.payment_method].asset : ''} claimed</p>}</td><td className="p-3 text-xs"><p>{claim.payer_phone || 'No payer phone'}</p><p className="font-mono text-slate-400 break-all">{claim.transfer_reference}</p>{isCryptoMethod(claim.payment_method) && <><p className="break-all">To: {claim.receiving_address}</p><a target="_blank" rel="noopener noreferrer" className="text-orange-400 underline" href={`${CRYPTO_METHODS[claim.payment_method].explorer}${encodeURIComponent(claim.transfer_reference)}`}>Inspect blockchain transfer</a></>}</td><td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${badge(claim.status)}`}>{claim.status}</span></td><td className="p-3">{claim.status === 'pending' ? <div className="flex gap-2"><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'confirm')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold">Approve</button><button disabled={reviewingClaim === claim.id} onClick={() => void reviewManualPayment(claim.id, 'reject')} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold">Reject</button></div> : <span className="text-xs text-slate-500">Reviewed</span>}</td></tr>)}</tbody></table>{data.manual_claims.length === 0 && <p className="p-5 text-sm text-slate-400">No manual payments awaiting review.</p>}</div></section>
 
         <section className="rounded-2xl bg-slate-900 border border-slate-800 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div><h2 className="font-extrabold">Live provider catalogue</h2><p className="text-xs text-slate-400 mt-1">Pull the current JAP services, limits, and supplier rates into Supabase. Customer prices use your SMM multiplier, and checkout verifies JAP again immediately before charging.</p></div>

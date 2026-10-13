@@ -17,7 +17,7 @@ export const JapFooter: React.FC = () => {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-xl font-black text-[#1e293b] tracking-tight">PV</span>
-              <span className="text-xs font-bold text-gray-600 uppercase">Premium Verify</span>
+              <span className="text-xs font-bold text-gray-600 uppercase">Premium Verific</span>
             </div>
             <div className="text-[9px] font-extrabold text-[#ea580c] uppercase tracking-wider">WE LEAD. THEY FOLLOW</div>
           </div>
@@ -28,12 +28,12 @@ export const JapFooter: React.FC = () => {
           <Link href="/privacy" className="hover:text-[#ff5722] transition">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-[#ff5722] transition">Terms of Service</Link>
           <Link href="/refund-policy" className="hover:text-[#ff5722] transition">Refund Policy</Link>
-          <a href="https://wa.me/237680209047" target="_blank" rel="noreferrer" className="hover:text-[#ff5722] transition">Support WhatsApp</a>
+          <a href="https://wa.me/237677034736" target="_blank" rel="noreferrer" className="hover:text-[#ff5722] transition">Support WhatsApp</a>
         </div>
 
         {/* Copyright */}
         <div className="text-gray-400 font-medium text-[11px]">
-          © Copyright PV (Premium Verify). All Rights Reserved.
+          © Copyright PV (Premium Verific). All Rights Reserved.
         </div>
 
       </div>

@@ -45,7 +45,7 @@ export async function POST(request: Request) {
         // Customers add their own contact number later from Profile settings.
         phone_number: phone_number?.trim() || null,
         balance_xaf: 0,
-        currency: 'XAF',
+        currency: 'AUTO',
         role: 'client'
       })
       .select()
@@ -77,7 +77,7 @@ export async function PATCH(request: Request) {
     const updates = {
       full_name: typeof full_name === 'string' ? full_name.trim().slice(0, 120) || null : undefined,
       phone_number: typeof phone_number === 'string' ? phone_number.trim().slice(0, 32) || null : undefined,
-      currency: ['XAF', 'USD', 'EUR'].includes(currency) ? currency : undefined,
+      currency: ['AUTO', 'XAF', 'USD', 'NGN', 'GHS', 'EUR', 'GBP', 'KES', 'XOF'].includes(currency) ? currency : undefined,
       updated_at: new Date().toISOString(),
     }
     const admin = createAdminClient()

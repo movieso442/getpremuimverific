@@ -68,3 +68,14 @@
   color: #ea580c;
   border: 1px solid #ffedd5;
 }
+
+/* Readable UI labels, help text and controls, including on narrow phones. */
+body { font-size: 1rem; }
+.text-sm { font-size: 1rem; line-height: 1.6; }
+.text-xs, .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[12px\] { font-size: 0.875rem; line-height: 1.5; }
+input, select, textarea { font-size: max(1rem, 1em); }
+footer { font-size: 1rem; line-height: 1.65; }
+footer .text-xs, footer .text-sm { font-size: 1rem; line-height: 1.65; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

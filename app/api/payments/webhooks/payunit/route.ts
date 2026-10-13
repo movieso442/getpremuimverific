@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     if (typeof reference !== 'string' || reference.length > 100 || !reference) return NextResponse.json({ error: 'Missing payment reference.' }, { status: 400 })
     if (!getPayunitConfig()) return NextResponse.json({ error: 'Payment verification is unavailable.' }, { status: 503 })
     const admin = createAdminClient()
-    const { data: transaction, error } = await admin.from('wallet_transactions').select('id,amount,status,reference').eq('reference', reference).eq('type', 'deposit').maybeSingle()
+    const { data: transaction, error } = await admin.from('wallet_transactions').select('id,amount,status,reference,service_fee_xaf').eq('reference', reference).eq('type', 'deposit').maybeSingle()
     if (error) throw error
     if (!transaction) return NextResponse.json({ error: 'Unknown payment reference.' }, { status: 404 })
     // Webhook bodies are untrusted. Only the authenticated provider status

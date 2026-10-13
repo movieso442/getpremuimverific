@@ -26,8 +26,8 @@ export const HeaderBanners: React.FC = () => {
                 <MessageSquare className="w-5 h-5 fill-current" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-gray-900">Join Premium Verify Community</h4>
-                <p className="text-[11px] text-gray-500">Support: +237 680209047 • hello@premiumverific.com</p>
+                <h4 className="text-xs font-bold text-gray-900">Join Premium Verific Community</h4>
+                <p className="text-[11px] text-gray-500">Support: +237 677034736 • hello@premiumverific.com</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
