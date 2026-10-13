@@ -18,7 +18,8 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
 
 export function retailPrice(providerCostXaf: number, multiplier = 3) {
   // Always round up to the nearest 5 XAF so provider cost is never undercharged.
-  return Math.ceil((Number(providerCostXaf) * Math.max(1, multiplier)) / 5) * 5
+  const basePrice = Math.ceil((Number(providerCostXaf) * Math.max(1, multiplier)) / 5) * 5
+  return Math.ceil(basePrice * 102 / 100)
 }
 
 export type SmmPriceOverride = {
@@ -47,7 +48,7 @@ export async function getSmmPriceOverrides(admin: SupabaseClient, serviceIds?: n
 
 export function smmRetailRateXaf(providerRateUsd: number, multiplier: number, override?: SmmPriceOverride) {
   if (override?.is_active && Number.isFinite(override.retail_rate_xaf) && override.retail_rate_xaf > 0) {
-    return Math.ceil(override.retail_rate_xaf / 5) * 5
+    return Math.ceil((Math.ceil(override.retail_rate_xaf / 5) * 5) * 102 / 100)
   }
   return retailPrice(Number(providerRateUsd) * 600, multiplier)
 }

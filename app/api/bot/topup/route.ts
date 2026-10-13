@@ -27,13 +27,13 @@ export async function GET(request: Request) {
     const { data: claim } = await admin.from('manual_payment_claims').select('status').eq('bot_payment_link_id', link.id).maybeSingle()
     const status = transaction ? await reconcilePayunit(admin, transaction) : claim?.status === 'confirmed' ? 'completed' : claim?.status === 'pending' ? 'manual_pending' : claim?.status || 'ready'
     if (status === 'completed') scheduleAdminNotifications(admin)
-    return NextResponse.json({ amount_xaf: Number(link.amount_xaf), service_fee_xaf: transaction ? Number(transaction.service_fee_xaf) : topupQuote(Number(link.amount_xaf)).feeXaf, expires_at: link.expires_at, reference: link.payment_reference, status }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ amount_xaf: Number(link.amount_xaf), service_fee_xaf: transaction ? Number(transaction.service_fee_xaf) : (claim ? topupQuote(Number(link.amount_xaf)).feeXaf : 0), expires_at: link.expires_at, reference: link.payment_reference, status }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return NextResponse.json({ error: 'Could not check this payment yet.' }, { status: 502 }) }
 }
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    if (body.accepted_fee_percent !== 2) return NextResponse.json({ error: 'Refresh checkout to review the 2% top-up fee before paying.' }, { status: 409 })
+    if (body.accepted_fee_percent !== 0) return NextResponse.json({ error: 'Refresh checkout. MTN and Orange no longer have a platform top-up fee.' }, { status: 409 })
     const phone = cameroonPhone(body.phone_number)
     if (!phone || !mobileMoneyMethod(body.payment_method)) return NextResponse.json({ error: 'Choose MTN or Orange and enter your Cameroon mobile number.' }, { status: 400 })
     const link = await loadLink(body.token)
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       const { data: existing } = await admin.from('wallet_transactions').select('status').eq('profile_id', link.profile_id).eq('reference', link.payment_reference).maybeSingle()
       return NextResponse.json({ reference: link.payment_reference, status: existing?.status || 'pending', credited: existing?.status === 'completed' })
     }
-    const quote = topupQuote(amount)
+    const quote = topupQuote(amount, body.payment_method)
     const reference = 'PVB' + randomUUID().replace(/-/g, '')
     const { data: reserved, error: reservationError } = await admin.rpc('start_wallet_topup', { p_profile: link.profile_id, p_reference: reference, p_credit: amount, p_method: body.payment_method, p_link: link.id })
     if (reservationError?.code === 'P0001') return NextResponse.json({ error: 'An existing payment is being checked. Contact support before paying again.' }, { status: 409 })

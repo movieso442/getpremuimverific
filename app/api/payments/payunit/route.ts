@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    if (body.accepted_fee_percent !== 2) return NextResponse.json({ error: 'Review the 2% top-up fee on our website or update your Android app before paying.' }, { status: 409 })
+    if (body.accepted_fee_percent !== 0) return NextResponse.json({ error: 'Refresh checkout or update your Android app. MTN and Orange no longer have a platform top-up fee.' }, { status: 409 })
     const amount = depositXaf(body.amount, body.currency || 'XAF')
     const phone = cameroonPhone(body.phone_number)
     if (!amount || !phone || !mobileMoneyMethod(body.payment_method)) return NextResponse.json({ error: 'Choose MTN or Orange, enter a Cameroon mobile number, and an amount between 3,000 and 10,000,000 XAF.' }, { status: 400 })
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const config = getPayunitConfig()
     if (!config) return NextResponse.json({ error: 'Payments are temporarily unavailable.' }, { status: 503 })
     if (body.idempotency_key && (typeof body.idempotency_key !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.idempotency_key))) return NextResponse.json({ error: 'Invalid payment request ID.' }, { status: 400 })
-    const quote = topupQuote(amount)
+    const quote = topupQuote(amount, body.payment_method)
     const reference = `PV${(body.idempotency_key || randomUUID()).replace(/-/g, '')}`
     const { data: reserved, error: insertError } = await admin.rpc('start_wallet_topup', { p_profile: profile.id, p_reference: reference, p_credit: amount, p_method: body.payment_method, p_link: null })
     if (insertError?.code === 'P0001') return NextResponse.json({ error: 'An existing payment is being checked. Check your wallet or contact support before paying again.' }, { status: 409 })

@@ -25,6 +25,7 @@ try {
   for (const [i, id] of ids.entries()) await db.query('INSERT INTO profiles(id,role) VALUES($1,$2)', [id, i === 3 ? 'admin' : 'client'])
   const start = async (id, reference, link = null) => (await db.query('SELECT start_wallet_topup($1,$2,5000,$3,$4) AS result', [id, reference, 'mtn_momo', link])).rows[0].result
   assert.equal((await start(ids[0], 'PV-first')).created, true)
+  assert.equal(Number((await db.query("SELECT service_fee_xaf FROM wallet_transactions WHERE reference='PV-first'")).rows[0].service_fee_xaf), 0)
   assert.equal((await start(ids[0], 'PV-first')).created, false)
   assert.equal((await start(ids[0], 'PV-other-tab')).reference, 'PV-first')
   const submit = async (id, hash, link = null) => (await db.query('SELECT submit_crypto_payment($1,$2,$3,8.5,5000,$4,$5) AS id', [id, 'usdt_trc20', hash, 'test-receiving-address', link])).rows[0].id
@@ -47,5 +48,20 @@ try {
   assert.equal((await start(ids[2], 'PVB-retry', linkId)).reference, 'PVB-first')
   assert.equal(Number((await db.query('SELECT count(*) FROM wallet_transactions WHERE profile_id=$1', [ids[2]])).rows[0].count), 1)
   assert.equal((await db.query("SELECT has_function_privilege('authenticated','start_wallet_topup(uuid,text,numeric,text,uuid)','EXECUTE') AS allowed")).rows[0].allowed, false)
-  console.log('PASS SQL: schema applies, pending top-ups reused, cross-method blocking, crypto retry returns same claim, bot reservation atomic, 2% recorded, exactly-once approval/credit, browser RPC denied')
+  await db.exec(`CREATE SCHEMA storage;
+    CREATE TABLE storage.buckets(id TEXT PRIMARY KEY,name TEXT,public BOOLEAN,file_size_limit BIGINT,allowed_mime_types TEXT[]);
+    CREATE TABLE storage.objects(id UUID DEFAULT gen_random_uuid(),bucket_id TEXT);
+    ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+    GRANT USAGE ON SCHEMA storage TO authenticated;
+    GRANT SELECT, INSERT ON storage.objects TO authenticated;
+    CREATE POLICY broad_access ON storage.objects FOR ALL TO authenticated USING(TRUE) WITH CHECK(TRUE);
+    INSERT INTO storage.objects(bucket_id) VALUES('payment-receipts'),('other-bucket');`)
+  await db.exec(await readFile('supabase/payment-receipts-upgrade.sql','utf8'))
+  assert.equal((await db.query("SELECT public FROM storage.buckets WHERE id='payment-receipts'")).rows[0].public, false)
+  await db.exec('SET ROLE authenticated')
+  assert.equal((await db.query("SELECT * FROM storage.objects WHERE bucket_id='payment-receipts'")).rows.length, 0)
+  assert.equal((await db.query("SELECT * FROM storage.objects WHERE bucket_id='other-bucket'")).rows.length, 1)
+  await assert.rejects(db.query("INSERT INTO storage.objects(bucket_id) VALUES('payment-receipts')"), /row-level security/)
+  await db.exec('RESET ROLE')
+  console.log('PASS SQL: mobile fee zero, crypto fee 2%, exactly-once credit/retries, browser RPC denied, private receipt policy blocks broad browser grants without affecting other buckets')
 } finally { await db.close() }

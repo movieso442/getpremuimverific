@@ -1,8 +1,12 @@
-# 2% top-up fee release
+# Crypto-only top-up fees, service prices and private receipts
 
 Run the current complete `supabase/topup-fees-upgrade.sql` after the existing platform upgrades, before deploying these changes (rerun if you ran an earlier version). No production SQL has been run automatically. It also installs atomic `start_wallet_topup` and `submit_crypto_payment` routines and updates the customer-service number. The new columns store the fee separately from wallet credit. Existing rows retain fee zero. New mobile-money requests require explicit acceptance of the displayed fee; older APKs must be updated or customers must use the website.
 
-Example: 5,000 XAF credit + 100 XAF service fee = 5,100 XAF requested. Operator/network fees are separate and are not guessed from another provider's screenshots. Fractional XAF fees round up to the nearest whole XAF.
+Current rule: MTN MoMo and Orange Money have no platform top-up fee (5,000 XAF paid credits 5,000 XAF). All crypto methods have a 2% fee on top (5,000 XAF credit + 100 XAF fee = 5,100 XAF transfer value). Operator/network fees remain separate. Existing pending payments keep their originally recorded fees. SMS/social service prices, including custom retail overrides, now include a separate 2% increase regardless of the wallet funding method, rounded up to whole XAF. Base settings/override rows are not overwritten or multiplied on every migration run.
+
+Run `supabase/payment-receipts-upgrade.sql` after the fee migration for optional private PNG/JPG/WebP screenshots (3 MB maximum). Uploads are tied to an owned pending claim or its valid bot capability, one receipt per claim. Viewing requires the customer or confirmed owner session. No public storage URLs or automatic screenshot credits are created. Transaction reference and amount are still required for matching.
+
+The USDT screen displays indicative credit/fee/total equivalents using the dated USD reference rate and an approximate USD/USDT assumption. It is not a locked crypto invoice or a live USDT market quote; support must still confirm the exact transfer amount before sending.
 
 Available methods: MTN MoMo, Orange Money, USDT on Tron/TRC20, BTC on Bitcoin, ETH on Ethereum/ERC20 or BNB Smart Chain/BEP20. Crypto uses the owner-supplied addresses and requires manual receipt/ownership verification. Do not send USDT on ERC20/BEP20 to an ETH option. No cards or PayPal are advertised by either bot.
 

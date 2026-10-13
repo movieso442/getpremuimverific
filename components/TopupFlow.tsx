@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Wallet } from 'lucide-react'
 import { CRYPTO_METHODS, isCryptoMethod, type CryptoMethod } from '@/lib/payments/manual-crypto'
 import { depositXaf, type MobileMoneyMethod } from '@/lib/payments/mobile-money'
@@ -7,11 +8,13 @@ import { topupQuote } from '@/lib/payments/topup-fees'
 import MobileMoneyCheckout from './MobileMoneyCheckout'
 import CryptoDepositPanel from './CryptoDepositPanel'
 import PaymentSupport from './PaymentSupport'
+import UsdtEstimate from './UsdtEstimate'
 
 type Method = MobileMoneyMethod | CryptoMethod
 export default function TopupFlow({ profileId, token, fixedAmount, initialAmount = 5000, initialReference }: {
   profileId: string; token?: string; fixedAmount?: number; initialAmount?: number; initialReference?: string | null
 }) {
+  const router = useRouter()
   const [method, setMethod] = useState<Method | null>(initialReference ? 'mtn_momo' : null)
   const [stage, setStage] = useState<'method' | 'amount' | 'pay'>(initialReference ? 'pay' : 'method')
   const [amount, setAmount] = useState(fixedAmount ?? initialAmount)
@@ -21,6 +24,19 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
   const [error, setError] = useState('')
   const [availability, setAvailability] = useState({ mobile: true, crypto: true })
   const [availabilityNotice, setAvailabilityNotice] = useState('')
+  const checkoutId = useRef<string | null>(null)
+  const recordCheckout = (state: 'started' | 'cancelled', selected: Method) => {
+    // Bot-only identities have no verified website email. Tracking is optional
+    // and its failure must never delay navigation or a real payment.
+    if (!profileId || token || !checkoutId.current) return
+    void fetch('/api/customer/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+      body: JSON.stringify({ id: checkoutId.current, state, method: selected }) }).catch(() => undefined)
+  }
+  const leaveCheckout = () => {
+    if (started && !window.confirm('Leaving checkout cannot stop or reverse a payment already submitted. Reject an unapproved mobile-money prompt on your phone. If you already paid, do not pay again; your payment stays tracked. Leave checkout?')) return
+    if (method) recordCheckout('cancelled', method)
+    router.push('/')
+  }
   useEffect(() => {
     if (!profileId) return
     const controller = new AbortController()
@@ -47,8 +63,12 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
     return () => controller.abort()
   }, [profileId, token, initialReference])
   const valid = depositXaf(amount) !== null
-  const quote = valid ? topupQuote(amount) : null
-  const choose = (value: Method) => { setMethod(value); setStage(fixedAmount ? 'pay' : 'amount') }
+  const quote = valid ? topupQuote(amount, method || 'usdt_trc20') : null
+  const choose = (value: Method) => {
+    checkoutId.current ||= crypto.randomUUID()
+    recordCheckout('started', value)
+    setMethod(value); setStage(fixedAmount ? 'pay' : 'amount')
+  }
   const name = method === 'mtn_momo' ? 'MTN MoMo' : method === 'orange_money' ? 'Orange Money' : method ? CRYPTO_METHODS[method].label : ''
   return <div className="mx-auto max-w-xl space-y-5">
     <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
@@ -74,7 +94,8 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
           <label htmlFor="deposit-amount" className="block text-sm font-semibold">Amount to add to your wallet (XAF)</label>
           <input id="deposit-amount" type="number" min={3000} max={10000000} step={1} value={amount || ''} onChange={event => setAmount(Number(event.target.value))} className="w-full rounded-xl border border-gray-300 p-4 text-xl font-bold" />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[3000, 5000, 10000, 25000].map(value => <button type="button" key={value} onClick={() => setAmount(value)} className="rounded-xl border border-gray-200 py-3 text-sm font-semibold">{value.toLocaleString()}</button>)}</div>
-          <p className="text-xs text-gray-500">Minimum: 3,000 XAF. Service fee: 2% on top.</p>
+          <p className="text-xs text-gray-500">Minimum: 3,000 XAF. {method === 'mtn_momo' || method === 'orange_money' ? 'No platform top-up fee. Operator fees are separate.' : 'Crypto top-up fee: 2% on top.'}</p>
+          {quote && method === 'usdt_trc20' && <UsdtEstimate creditXaf={quote.creditXaf} feeXaf={quote.feeXaf} />}
           {quote && <p className="rounded-xl bg-gray-50 p-4 text-sm">Wallet receives <strong>{quote.creditXaf.toLocaleString()} XAF</strong> · Fee <strong>{quote.feeXaf.toLocaleString()} XAF</strong></p>}
           <button type="button" disabled={!valid} onClick={() => setStage('pay')} className="w-full rounded-xl bg-orange-600 p-4 font-bold text-white disabled:opacity-50">Continue</button>
         </> : method && <>
@@ -86,6 +107,7 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
         </>}
       </div>
     </section>
+    {stage !== 'method' && <button type="button" onClick={leaveCheckout} className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-700">{started ? 'Leave checkout' : 'Cancel top-up'}</button>}
     <PaymentSupport />
   </div>
 }

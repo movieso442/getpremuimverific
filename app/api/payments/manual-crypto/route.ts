@@ -40,8 +40,12 @@ export async function GET(request: Request) {
   // Check the mobile fee column independently and keep missing-schema methods
   // unavailable: taking money before the atomic payment migration is unsafe.
   const { error: mobileSetupError } = await access.admin.from('wallet_transactions').select('service_fee_xaf').limit(0)
+  const { data: receipts, error: receiptError } = await access.admin.from('manual_payment_claims').select('id,receipt_storage_path').eq('profile_id', access.profile.id).order('created_at', { ascending: false }).limit(20)
+  const receiptIds = new Set((receipts || []).filter(receipt => receipt.receipt_storage_path).map(receipt => receipt.id))
   return NextResponse.json({
-    claims: data || [], pending_claim: pendingClaim, pending_mobile: pendingMobile,
+    claims: (data || []).map(claim => ({ ...claim, receipt_attached: receiptIds.has(claim.id) })),
+    pending_claim: pendingClaim ? { ...pendingClaim, receipt_attached: receiptIds.has(pendingClaim.id) } : null,
+    pending_mobile: pendingMobile, receipt_upload_available: !receiptError,
     crypto_available: !error, mobile_available: !mobileSetupError,
     availability_notice: error && mobileSetupError
       ? 'Payments are temporarily unavailable while we complete wallet setup. Please contact support before sending money.'

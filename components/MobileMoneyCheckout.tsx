@@ -55,7 +55,7 @@ export default function MobileMoneyCheckout({ amount, token, initialReference, s
     onStarted?.()
     setBusy(true)
     setPaymentAmount(amount)
-    setVerifiedFee(topupQuote(amount).feeXaf)
+    setVerifiedFee(topupQuote(amount, method).feeXaf)
     setMessage('Sending the payment request to your phone…')
     requestId.current ||= crypto.randomUUID()
     if (!token) {
@@ -70,7 +70,7 @@ export default function MobileMoneyCheckout({ amount, token, initialReference, s
     try { recordAnalytics('checkout_started', token ? '/bot-topup' : '/add-funds', { amount_xaf: amount, method }) } catch {}
     try {
       const response = await fetch(token ? '/api/bot/topup' : '/api/payments/payunit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, amount, currency: 'XAF', phone_number: phone, payment_method: method, idempotency_key: requestId.current, accepted_fee_percent: 2 }) })
+        body: JSON.stringify({ token, amount, currency: 'XAF', phone_number: phone, payment_method: method, idempotency_key: requestId.current, accepted_fee_percent: 0 }) })
       const result = await response.json()
       if (result.reference) {
         setReference(result.reference)
@@ -87,11 +87,11 @@ export default function MobileMoneyCheckout({ amount, token, initialReference, s
   }
   const pending = status === 'pending' || status === 'manual_pending'
   const credit = paymentAmount ?? amount
-  const fee = verifiedFee ?? (Number.isInteger(credit) && credit >= 3000 && credit <= 10000000 ? topupQuote(credit).feeXaf : 0)
+  const fee = verifiedFee ?? (Number.isInteger(credit) && credit >= 3000 && credit <= 10000000 ? topupQuote(credit, method).feeXaf : 0)
   return <form onSubmit={pay} className="space-y-4 text-gray-900">
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm space-y-2">
       <p className="flex justify-between gap-3"><span>Wallet credit after verification</span><strong>{(paymentAmount ?? amount).toLocaleString()} XAF</strong></p>
-      <p className="flex justify-between gap-3"><span>Platform top-up fee (2%, rounded up)</span><strong>{fee.toLocaleString()} XAF</strong></p>
+      <p className="flex justify-between gap-3"><span>Platform top-up fee{fee ? ' (previous payment)' : ''}</span><strong>{fee.toLocaleString()} XAF</strong></p>
       <p className="flex justify-between gap-3"><span>Payment request amount</span><strong>{(credit + fee).toLocaleString()} XAF</strong></p>
       <p className="text-xs text-gray-600">Your operator may charge a separate fee. Check its approval prompt before confirming. We do not calculate or collect that fee.</p>
     </div>
@@ -104,7 +104,7 @@ export default function MobileMoneyCheckout({ amount, token, initialReference, s
     {message && <p role="status" aria-live="polite" className="rounded-xl bg-blue-50 p-4 text-sm text-blue-900">{message}</p>}
     {reference && <p className="break-all text-xs text-gray-500">Payment reference: {reference}</p>}
     {reference && paymentAmount !== null && <p className="text-sm font-semibold text-gray-700">This payment: {paymentAmount.toLocaleString()} XAF</p>}
-    <button disabled={busy || pending || status === 'completed'} className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-4 font-bold text-white disabled:opacity-60">{busy && <Loader2 className="h-5 w-5 animate-spin" />}{pending ? 'Waiting for phone approval' : status === 'completed' ? 'Wallet credited' : `Pay ${(amount + fee).toLocaleString()} XAF including fee`}</button>
+    <button disabled={busy || pending || status === 'completed'} className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-4 font-bold text-white disabled:opacity-60">{busy && <Loader2 className="h-5 w-5 animate-spin" />}{pending ? 'Waiting for phone approval' : status === 'completed' ? 'Wallet credited' : `Pay ${(amount + fee).toLocaleString()} XAF${fee ? ' including recorded fee' : ''}`}</button>
     {status === 'failed' && !token && <button type="button" onClick={() => { requestId.current = ''; setReference(''); setStatus('ready'); setMessage('Check your operator account before retrying.'); }} className="text-sm font-semibold text-orange-700">Start a new payment</button>}
     {status === 'failed' && token && <p className="text-sm text-gray-600">Return to the bot for a new top-up link. Check your operator account before paying again.</p>}
   </form>

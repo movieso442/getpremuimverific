@@ -26,7 +26,7 @@ export default function RootLayout({
   const openDeposit = () => router.push('/add-funds')
 
   // Public pages that should render with PublicHeader & PublicFooter instead of Dashboard Sidebar
-  const publicRoutes = ['/', '/terms', '/privacy', '/refund-policy', '/login', '/signup', '/downloads']
+  const publicRoutes = ['/', '/terms', '/privacy', '/refund-policy', '/login', '/signup', '/downloads', '/email-preferences']
   const isPublicPage = publicRoutes.includes(pathname)
   const isAdminPage = pathname.startsWith('/admin')
 
