@@ -6,9 +6,8 @@ import { Smartphone, RefreshCw, Copy, Check, AlertTriangle, ArrowRight } from 'l
 import confetti from 'canvas-confetti'
 import { useRouter } from 'next/navigation'
 import { useAppState } from '@/lib/store'
-import { retailPrice } from '@/lib/platform/settings'
-import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 import LocalAmount from '@/components/LocalAmount'
+import {SMS_COUNTRY_CODES} from '@/lib/providers/sms-catalogue'
 
 type SmsInboxOrder = {
   id: string; provider_order_id: string | null; service_name: string; country_name: string;
@@ -18,7 +17,6 @@ type SmsInboxOrder = {
 export default function SmsVerificationPage() {
   const router = useRouter()
   const { profile } = useAppState()
-  const platformSettings = usePlatformSettings()
 
   const [selectedService, setSelectedService] = useState(SMS_SERVICES[0])
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
@@ -30,7 +28,17 @@ export default function SmsVerificationPage() {
   const [isRequesting, setIsRequesting] = useState(false)
   const [inboxOrders, setInboxOrders] = useState<SmsInboxOrder[]>([])
   const [inboxError, setInboxError] = useState<string | null>(null)
-  const priceXaf = retailPrice(selectedService.price, platformSettings.sms_markup_multiplier)
+  const [priceXaf,setPriceXaf]=useState<number | null>(null)
+  const [quoteError,setQuoteError]=useState<string | null>(null)
+  const [quoteRetry,setQuoteRetry]=useState(0)
+  useEffect(()=>{
+    let active=true
+    if(!profile.id)return
+    void fetch('/api/v1/sms/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'quote',service:selectedService.code,country:selectedCountry.code})})
+      .then(async response=>{const result=await response.json();if(!active)return;if(!response.ok||!Number.isFinite(result.price_xaf)||result.price_xaf<=0){setPriceXaf(null);setQuoteError('No live quote is available for this selection. Try another country or service.');return}setPriceXaf(result.price_xaf);setQuoteError(null)})
+      .catch(()=>{if(active){setPriceXaf(null);setQuoteError('Could not refresh the live price. Please try again.')}})
+    return()=>{active=false}
+  },[profile.id,selectedService.code,selectedCountry.code,quoteRetry])
   useEffect(() => { router.prefetch('/add-funds') }, [router])
 
   const handleGetNumber = async () => {
@@ -41,6 +49,7 @@ export default function SmsVerificationPage() {
       router.push(`/signup?next=${encodeURIComponent('/sms-verification')}`)
       return
     }
+    if(priceXaf===null){setRequestError('Wait for a live price before requesting a number.');return}
 
     if (profile.balance_xaf < priceXaf) {
       setShowInsufficientBanner(true)
@@ -52,10 +61,12 @@ export default function SmsVerificationPage() {
     try {
       const response = await fetch('/api/v1/sms/order', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service: selectedService.code, country: selectedCountry.code })
+        body: JSON.stringify({ service: selectedService.code, country: selectedCountry.code,max_price_xaf:priceXaf })
       })
       const result = await response.json()
       if (!response.ok) {
+        if(response.status===402&&Number.isFinite(result.required_xaf)){router.push(`/add-funds?amount=${result.required_xaf}&reason=insufficient_balance`);return}
+        if(response.status===409&&Number.isFinite(result.required_xaf))setPriceXaf(result.required_xaf)
         setRequestError(result.error || 'Could not allocate a live number. No funds were charged.')
         return
       }
@@ -130,7 +141,7 @@ export default function SmsVerificationPage() {
     <div className="space-y-6 max-w-5xl mx-auto">
       
       {/* Insufficient Balance Banner */}
-      {showInsufficientBanner && (
+      {showInsufficientBanner && priceXaf!==null && (
         <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-4 text-amber-900 animate-in fade-in slide-in-from-top duration-200">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
@@ -153,7 +164,7 @@ export default function SmsVerificationPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-[#ff5722]" />
-            <span>Virtual SMS Activation (197+ Countries)</span>
+            <span>Virtual SMS Activation</span>
           </h1>
           <p className="text-xs text-gray-500 mt-1">
             Get instant virtual phone numbers for WhatsApp, Telegram, TikTok, Facebook, Google & OpenAI verification.
@@ -168,13 +179,13 @@ export default function SmsVerificationPage() {
               value={selectedService.id}
               onChange={(e) => {
                 const s = SMS_SERVICES.find(srv => srv.id === e.target.value)
-                if (s) setSelectedService(s)
+                if (s) {setPriceXaf(null);setQuoteError(null);setSelectedService(s)}
               }}
               className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-900 outline-none focus:border-[#ff5722]"
             >
               {SMS_SERVICES.map((srv) => (
                 <option key={srv.id} value={srv.id}>
-                  {srv.name} — {retailPrice(srv.price, platformSettings.sms_markup_multiplier).toLocaleString()} XAF
+                  {srv.name}
                 </option>
               ))}
             </select>
@@ -187,11 +198,11 @@ export default function SmsVerificationPage() {
               value={selectedCountry.code}
               onChange={(e) => {
                 const c = COUNTRIES.find(cnt => cnt.code === e.target.value)
-                if (c) setSelectedCountry(c)
+                if (c) {setPriceXaf(null);setQuoteError(null);setSelectedCountry(c)}
               }}
               className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-900 outline-none focus:border-[#ff5722]"
             >
-              {COUNTRIES.map((cnt) => (
+              {COUNTRIES.filter(cnt=>SMS_COUNTRY_CODES.some(code=>code===cnt.code)).map((cnt) => (
                 <option key={cnt.code} value={cnt.code}>
                   {cnt.flag} {cnt.name} ({cnt.prefix})
                 </option>
@@ -202,13 +213,14 @@ export default function SmsVerificationPage() {
 
         <button
           onClick={handleGetNumber}
-          disabled={isRequesting}
+          disabled={isRequesting || Boolean(profile.id && priceXaf===null)}
           className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-xs uppercase shadow-md transition flex items-center justify-center gap-2"
         >
           <Smartphone className="w-4 h-4" />
-          <span>{isRequesting ? 'Requesting live number…' : <>Get virtual number · <LocalAmount amountXaf={priceXaf} /></>}</span>
+          <span>{isRequesting ? 'Requesting live number…' : !profile.id ? 'Sign in to get a number' : priceXaf===null ? 'Waiting for a live price' : <>Get virtual number · <LocalAmount amountXaf={priceXaf} /></>}</span>
         </button>
         {requestError && <p className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">{requestError}</p>}
+        {quoteError && <div role="status" className="rounded-xl bg-amber-50 p-3 text-base text-amber-900"><p>{quoteError}</p><button onClick={()=>{setPriceXaf(null);setQuoteError(null);setQuoteRetry(value=>value+1)}} className="mt-2 font-bold underline">Refresh live price</button></div>}
       </div>
 
       {/* Number Status & Code Box */}

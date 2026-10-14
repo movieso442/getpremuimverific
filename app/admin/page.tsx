@@ -150,7 +150,7 @@ export default function AdminPage() {
   if (!data) return null
 
   const cards = [
-    ['Recorded profit', data.metrics.recorded_profit_xaf, 'Sales minus provider fees and recorded operating costs'],
+    ['Sales less recorded expenses', data.metrics.recorded_profit_xaf, 'Not verified net profit: supplier costs, refunds and fees need reconciliation'],
     ['Customer service sales', data.metrics.service_sales_xaf, 'Completed SMM, SMS, and account purchases'],
     ['Cash received', data.metrics.cash_received_xaf, 'Completed Payunit wallet top-ups'],
     ['Wallet liability', data.metrics.wallet_liability_xaf, 'Customer balances currently held on platform'],
@@ -161,8 +161,9 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div><p className="text-orange-400 text-xs font-bold uppercase tracking-[0.2em]">Premium Verific</p><h1 className="text-3xl font-black mt-1">Administrator portal</h1><p className="text-slate-400 text-sm mt-1">Live platform financial, customer, payment, and fulfillment monitoring.</p></div>
-          <div className="flex flex-wrap gap-2"><Link href="/admin/pricing" className="inline-flex items-center justify-center rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 font-bold text-sm">Service prices</Link><button onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 font-bold text-sm"><RefreshCw className="w-4 h-4" />Refresh live data</button><button onClick={() => void signOut()} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-bold">Sign out</button></div>
+          <div className="flex flex-wrap gap-2"><Link href="/admin/refunds" className="rounded-xl bg-orange-700 px-4 py-2.5 font-bold">Refund review</Link><Link href="/admin/pricing" className="inline-flex items-center justify-center rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 font-bold text-sm">Service prices</Link><button onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 font-bold text-sm"><RefreshCw className="w-4 h-4" />Refresh live data</button><button onClick={() => void signOut()} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-bold">Sign out</button></div>
         </header>
+        <Link href="/admin/sms-providers" className="inline-block rounded-xl border border-slate-700 px-4 py-3 font-bold">SMS suppliers and cost ledger</Link>
 
         {error && <div className="rounded-xl border border-red-400/30 bg-red-500/10 text-red-100 p-4 text-sm">{error}</div>}
         <AdminNotificationPanel />

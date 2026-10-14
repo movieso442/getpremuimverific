@@ -2,7 +2,8 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ThumbsUp, MessageCircle } from 'lucide-react'
+import BrandLogo from './BrandLogo'
+import { MessageCircle } from 'lucide-react'
 import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 export const PublicFooter: React.FC = () => {
@@ -14,15 +15,7 @@ export const PublicFooter: React.FC = () => {
           
           {/* Brand Info */}
           <div className="space-y-4 md:col-span-1">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#ff5722] to-[#ea580c] flex items-center justify-center text-white font-extrabold shadow-sm">
-                <ThumbsUp className="w-5 h-5 fill-current stroke-[2.5]" />
-              </div>
-              <div>
-                <span className="text-xl font-black text-gray-900">PV</span>
-                <span className="text-xs font-bold text-gray-600 block uppercase">Premium Verific</span>
-              </div>
-            </div>
+            <BrandLogo />
             <p className="text-xs text-gray-500 leading-relaxed">
               Automated virtual SMS numbers across 197 countries and high quality social media growth services.
             </p>
@@ -32,8 +25,9 @@ export const PublicFooter: React.FC = () => {
           <div className="space-y-3">
             <h3 className="font-extrabold text-gray-900 text-sm">Services & Features</h3>
             <ul className="space-y-2 text-xs">
-              <li><Link href="/services" className="hover:text-[#ff5722] transition">SMS Virtual Numbers</Link></li>
-              <li><Link href="/services" className="hover:text-[#ff5722] transition">SMM Panel Growth</Link></li>
+              <li><Link href="/virtual-numbers" className="hover:text-[#ff5722] transition">SMS Virtual Numbers</Link></li>
+              <li><Link href="/sms-verification-guide" className="hover:text-[#ff5722] transition">SMS verification guide</Link></li>
+              <li><Link href="/social-media-growth" className="hover:text-[#ff5722] transition">Social media services</Link></li>
               <li><Link href="/whatsapp" className="hover:text-[#ff5722] transition">WhatsApp Assistant Bot</Link></li>
               <li><Link href="/downloads" className="hover:text-[#ff5722] transition">Download our App</Link></li>
             </ul>

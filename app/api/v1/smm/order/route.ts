@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     const admin = createAdminClient()
     const { data: profile, error: profileError } = await admin.from('profiles').select('*').eq('user_id', user.id).single()
     if (profileError || !profile) return NextResponse.json({ error: 'Your wallet profile is unavailable. Please sign in again.' }, { status: 409 })
+    if (profile.refund_hold) return NextResponse.json({ error: 'Purchases are paused while an unused-deposit return is being settled. Contact support.' }, { status: 409 })
 
     // Query JAP immediately before the charge. Browser and cached prices are never trusted.
     const service = await fetchJapService(Number(service_id))

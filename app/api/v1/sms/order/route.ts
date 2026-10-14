@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { fetchFiveSimQuote } from '@/lib/providers/fivesim'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
+import { recordFiveSimCost } from '@/lib/providers/sms-accounting'
 
 const FIVE_SIM_BASE_URL = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
 const COUNTRY_SLUGS: Record<string, string> = {
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
     const admin = createAdminClient()
     const { data: profile, error: profileError } = await admin.from('profiles').select('*').eq('user_id', user.id).single()
     if (profileError || !profile) return NextResponse.json({ error: 'Your wallet profile is unavailable. Please sign in again.' }, { status: 409 })
+    if (profile.refund_hold && !['getStatus','getSms'].includes(action)) return NextResponse.json({ error: 'Purchases are paused during an unused-deposit return. Contact support.' }, { status: 409 })
 
     if (action === 'getStatus' || action === 'getSms') {
       if (!id) return NextResponse.json({ error: '5SIM order ID is required.' }, { status: 400 })
@@ -103,6 +105,8 @@ export async function POST(request: Request) {
     const priceXaf = retailPrice(providerCostXaf, settings.sms_markup_multiplier)
     if (action === 'quote') return NextResponse.json({ price_xaf: priceXaf, available: quote.available }, { headers: { 'Cache-Control': 'private, no-store' } })
     if (action !== 'getNumber') return NextResponse.json({ error: 'Unknown SMS action.' }, { status: 400 })
+    if (body.max_price_xaf!==undefined && (!Number.isFinite(body.max_price_xaf)||body.max_price_xaf<=0))return NextResponse.json({error:'Invalid confirmed price.'},{status:400})
+    if (body.max_price_xaf!==undefined && priceXaf>body.max_price_xaf)return NextResponse.json({error:'The live price changed. Review the new price and confirm again.',required_xaf:priceXaf},{status:409})
     if (Number(profile.balance_xaf) < priceXaf)
       return NextResponse.json({ error: 'Insufficient wallet balance.', required_xaf: priceXaf }, { status: 402 })
 
@@ -120,6 +124,7 @@ export async function POST(request: Request) {
       price_xaf: priceXaf, status: 'waiting_sms', expires_at: providerOrder.expires || new Date(Date.now() + 20 * 60 * 1000).toISOString(),
     }).select().single()
     if (orderError) throw orderError
+    await recordFiveSimCost(admin,{orderId:order.id,quoteUsd:quote.costUsd,actualUsd:providerOrder.price,operator:quote.operator,service:providerProduct,country:providerCountry})
 
     const { error: transactionError } = await admin.from('wallet_transactions').insert({
       profile_id: profile.id, amount: priceXaf, type: 'sms_purchase', payment_method: 'mtn_momo',

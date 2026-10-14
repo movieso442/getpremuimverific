@@ -2,7 +2,8 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ThumbsUp, ArrowRight } from 'lucide-react'
+import BrandLogo from './BrandLogo'
+import { ArrowRight } from 'lucide-react'
 
 export const PublicHeader: React.FC = () => {
   return (
@@ -10,26 +11,16 @@ export const PublicHeader: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#ff5722] to-[#ea580c] flex items-center justify-center text-white font-extrabold shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
-            <ThumbsUp className="w-6 h-6 fill-current stroke-[2.5]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-2xl font-black text-gray-900 tracking-tight">PV</span>
-              <span className="text-[10px] sm:text-xs font-bold text-gray-700 uppercase tracking-wider">Premium Verific</span>
-            </div>
-            <div className="hidden sm:block text-[10px] font-extrabold text-[#ff5722] uppercase tracking-wider">WE LEAD. THEY FOLLOW</div>
-          </div>
-        </Link>
+        <Link href="/" aria-label="Premium Verific home"><BrandLogo /></Link>
 
         {/* Public Navigation Links */}
         <nav aria-label="Public navigation" className="hidden xl:flex items-center gap-5 text-sm font-semibold text-gray-700">
-          <Link href="/services" className="hover:text-[#ff5722] transition-colors">Services Catalog</Link>
+          <Link href="/virtual-numbers" className="hover:text-[#ff5722] transition-colors">Virtual numbers</Link>
+          <Link href="/social-media-growth" className="hover:text-[#ff5722] transition-colors">Social services</Link>
           <Link href="/downloads" className="hover:text-[#ff5722] transition-colors">Get the App</Link>
           <Link href="/privacy" className="hover:text-[#ff5722] transition-colors">Privacy Policy</Link>
           <Link href="/terms" className="hover:text-[#ff5722] transition-colors">Terms of Service</Link>
-          <Link href="/refund-policy" className="hover:text-[#ff5722] transition-colors">Refund Policy</Link>
+          <Link href="/refunds" className="hover:text-[#ff5722] transition-colors">Refunds</Link>
         </nav>
 
         {/* Action Buttons */}

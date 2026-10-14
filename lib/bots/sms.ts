@@ -1,10 +1,11 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { fetchFiveSimCountries, fetchFiveSimQuote } from '@/lib/providers/fivesim'
+import { recordFiveSimCost } from '@/lib/providers/sms-accounting'
 
 const baseUrl = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
 
-type ProviderOrder = { id?: number | string; phone?: string; expires?: string; error?: string }
+type ProviderOrder = { id?: number | string; phone?: string; expires?: string; error?: string; price?:number }
 
 export type BotSmsReservation =
   | { kind: 'success'; phone: string; priceXaf: number; service: string; country: string; expiresAt: string }
@@ -33,12 +34,13 @@ export async function reserveLiveBotSms(profileId: string, countryInput: string,
     const admin = createAdminClient()
     const [countries, profileResult, settings] = await Promise.all([
       fetchFiveSimCountries(baseUrl),
-      admin.from('profiles').select('id, balance_xaf').eq('id', profileId).maybeSingle(),
+      admin.from('profiles').select('id, balance_xaf, refund_hold').eq('id', profileId).maybeSingle(),
       getPlatformSettings(admin),
     ])
     const country = countryForInput(countryInput, countries)
     if (!country) return { kind: 'unavailable', message: 'That country is no longer available. Please choose another country.' }
     if (!profileResult.data) return { kind: 'error', message: 'Your customer wallet could not be found.' }
+    if (profileResult.data.refund_hold) return { kind: 'error', message: 'Purchases are paused while your unused-deposit return is reserved. Contact customer support for help.' }
 
     const quote = await fetchFiveSimQuote(baseUrl, country.slug, product)
     if (!quote) return { kind: 'unavailable', message: 'This verification number is no longer available. Please choose another service.' }
@@ -85,6 +87,7 @@ export async function reserveLiveBotSms(profileId: string, countryInput: string,
       await fetch(`${baseUrl}/user/cancel/${encodeURIComponent(String(providerOrder.id))}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }).catch(() => undefined)
       return { kind: 'error', message: 'We could not charge the wallet safely, so the number was cancelled.' }
     }
+    await recordFiveSimCost(admin,{orderId:localOrder.id,quoteUsd:quote.costUsd,actualUsd:providerOrder.price,operator:quote.operator,service:product,country:country.slug})
     return { kind: 'success', phone: providerOrder.phone, priceXaf, service: product, country: country.label, expiresAt }
   } catch (error) {
     console.error('[Bot SMS reservation failed]', error)
