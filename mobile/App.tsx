@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, AppState, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Alert, AppState, Image, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import * as WebBrowser from 'expo-web-browser'
@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics'
 import { ActionButton, Icon, ScreenTransition, useReducedMotion } from './src/ui'
 import type { Session } from '@supabase/supabase-js'
 import { api, configured, manageRefresh, supabase } from './src/client'
+import CardTopup from './src/CardTopup'
 WebBrowser.maybeCompleteAuthSession()
 
 type Account = { profile: { id: string; email: string; full_name: string; balance_xaf: number }; transactions: { id: string; amount: number; type: string; status: string; reference: string }[]; orders: { id: string; service_name: string; quantity: number; status: string }[] }
@@ -40,7 +41,7 @@ function Application() {
     const stop = manageRefresh()
     return () => { mounted = false; data.subscription.unsubscribe(); stop() }
   }, [])
-  if (!configured) return <View style={s.card}><Text style={s.title}>Premium Verific</Text><Text style={s.text}>Set the public API URL and Supabase project variables in mobile/.env to connect this app. Never add server/provider secrets.</Text></View>
+  if (!configured) return <View style={s.card}><Text style={s.title}>premiumverific</Text><Text style={s.text}>Set the public API URL and Supabase project variables in mobile/.env to connect this app. Never add server/provider secrets.</Text></View>
   if (loading) return <Text style={s.text}>Restoring your account...</Text>
   return session ? <Panel key={session.user.id} userId={session.user.id} /> : <Login />
 }
@@ -76,7 +77,7 @@ function Login() {
     } catch (error) { setNotice(messageOf(error)) } finally { setBusy(false) }
   }
   return <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-    <Text style={s.brand}>PREMIUM VERIFIC</Text><Text style={s.title}>Your numbers. Your panel.</Text>
+    <View style={s.row}><Image source={require('./assets/app-icon.png')} accessibilityLabel="premiumverific logo" style={{width:64,height:64}} /><Text style={s.subtitle}>premiumverific</Text></View><Text style={s.title}>Your numbers. Your panel.</Text>
     <Text style={s.text}>Sign in with your existing website account. Your wallet and OTP inbox stay together.</Text>
     <View style={s.card}><Text style={s.label}>Email</Text><TextInput style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
       <Text style={s.label}>Password</Text><TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" />
@@ -161,7 +162,7 @@ function Panel({ userId }: { userId: string }) {
   }
   return <View style={s.fill}>
     <View style={s.header}>
-      <View style={{ flex: 1, minWidth: 0 }}><Text style={s.brand}>PREMIUM VERIFIC</Text><Text numberOfLines={1} style={s.greeting}>{account?.profile.full_name ? 'Hi, ' + account.profile.full_name.split(' ')[0] : 'Welcome back'}</Text></View>
+      <Image source={require('./assets/app-icon.png')} accessibilityLabel="premiumverific logo" style={{width:36,height:36}} /><View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={1} style={s.brand}>premiumverific</Text><Text numberOfLines={1} style={s.greeting}>{account?.profile.full_name ? 'Hi, ' + account.profile.full_name.split(' ')[0] : 'Welcome back'}</Text></View>
       <Pressable accessibilityRole="button" accessibilityLabel="Open wallet" onPress={() => navigate('Wallet')} style={s.walletBadge}><Icon name="wallet-outline" color="#1d4ed8" size={18} /><Text style={s.balance}>{account ? money(account.profile.balance_xaf) : 'Loading...'}</Text></Pressable>
     </View>
     <ScrollView ref={scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}>
@@ -249,6 +250,9 @@ function Boost({ onOrdered, onSelect, active }: { onOrdered: () => void; onSelec
   </>
 }
 function Wallet({ userId, onCredit }: { userId: string; onCredit: () => void }) {
+  return <><CardTopup userId={userId} onCredit={onCredit} /><MobileMoneyWallet userId={userId} onCredit={onCredit} /></>
+}
+function MobileMoneyWallet({ userId, onCredit }: { userId: string; onCredit: () => void }) {
   const [amount, setAmount] = useState('5000'), [phone, setPhone] = useState('')
   const [method, setMethod] = useState('mtn_momo')
   const [reference, setReference] = useState(''), [notice, setNotice] = useState(''), [status, setStatus] = useState('ready')

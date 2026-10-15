@@ -9,8 +9,10 @@ import MobileMoneyCheckout from './MobileMoneyCheckout'
 import CryptoDepositPanel from './CryptoDepositPanel'
 import PaymentSupport from './PaymentSupport'
 import UsdtEstimate from './UsdtEstimate'
+import CardCheckout from './CardCheckout'
+import { cardAmount } from '@/lib/payments/cards'
 
-type Method = MobileMoneyMethod | CryptoMethod
+type Method = MobileMoneyMethod | CryptoMethod | 'payunit_card'
 export default function TopupFlow({ profileId, token, fixedAmount, initialAmount = 5000, initialReference }: {
   profileId: string; token?: string; fixedAmount?: number; initialAmount?: number; initialReference?: string | null
 }) {
@@ -28,7 +30,7 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
   const recordCheckout = (state: 'started' | 'cancelled', selected: Method) => {
     // Bot-only identities have no verified website email. Tracking is optional
     // and its failure must never delay navigation or a real payment.
-    if (!profileId || token || !checkoutId.current) return
+    if (!profileId || token || !checkoutId.current || selected === 'payunit_card') return
     void fetch('/api/customer/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
       body: JSON.stringify({ id: checkoutId.current, state, method: selected }) }).catch(() => undefined)
   }
@@ -53,7 +55,7 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
           if (!isCryptoMethod(claim.payment_method)) { setError('A payment is being checked. Contact support before sending another transfer.'); return }
           setMethod(claim.payment_method); setAmount(Number(claim.amount_xaf)); setStage('pay'); setStarted(true)
         } else if (payment && !token) {
-          if (!['mtn_momo', 'orange_money'].includes(payment.payment_method)) { setError('An existing payment needs checking. Contact support before paying again.'); return }
+          if (!['mtn_momo', 'orange_money', 'payunit_card'].includes(payment.payment_method)) { setError('An existing payment needs checking. Contact support before paying again.'); return }
           setMethod(payment.payment_method); setAmount(Number(payment.amount)); setReference(payment.reference); setStage('pay'); setStarted(true)
         } else if (payment && token && payment.reference !== initialReference) {
           setError('An existing payment is being checked. Contact support before paying again.')
@@ -62,14 +64,14 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
       .finally(() => { if (!controller.signal.aborted) setChecking(false) })
     return () => controller.abort()
   }, [profileId, token, initialReference])
-  const valid = depositXaf(amount) !== null
+  const valid = method === 'payunit_card' ? cardAmount(amount) : depositXaf(amount) !== null
   const quote = valid ? topupQuote(amount, method || 'usdt_trc20') : null
   const choose = (value: Method) => {
     checkoutId.current ||= crypto.randomUUID()
     recordCheckout('started', value)
     setMethod(value); setStage(fixedAmount ? 'pay' : 'amount')
   }
-  const name = method === 'mtn_momo' ? 'MTN MoMo' : method === 'orange_money' ? 'Orange Money' : method ? CRYPTO_METHODS[method].label : ''
+  const name = method === 'payunit_card' ? 'Credit or debit card' : method === 'mtn_momo' ? 'MTN MoMo' : method === 'orange_money' ? 'Orange Money' : method ? CRYPTO_METHODS[method].label : ''
   return <div className="mx-auto max-w-xl space-y-5">
     <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
       <header className="border-b border-gray-100 px-5 py-6 sm:px-8">
@@ -87,20 +89,22 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
           <div className="grid gap-3 sm:grid-cols-2">
             {(['mtn_momo', 'orange_money'] as const).map(value => <button key={value} type="button" disabled={!availability.mobile} onClick={() => choose(value)} className="flex min-h-20 items-center justify-between rounded-2xl border border-gray-200 p-4 text-left hover:border-orange-400 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-600 disabled:cursor-not-allowed disabled:opacity-60"><span><strong className="block text-gray-900">{value === 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}</strong><span className="text-xs text-gray-500">{availability.mobile ? 'Approve on your phone' : 'Temporarily unavailable'}</span></span><ArrowRight size={18} /></button>)}
           </div>
+          {!token && <button type="button" onClick={() => choose('payunit_card')} className="flex min-h-20 w-full items-center justify-between rounded-2xl border border-gray-200 p-4 text-left hover:border-orange-400 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-600"><span><strong className="block text-gray-900">Credit or debit card</strong><span className="text-xs text-gray-500">Secure Payunit checkout · 1.4% fee · up to 100,000 XAF</span></span><ArrowRight size={18} /></button>}
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Crypto</h3>
           <div className="grid gap-3 sm:grid-cols-2">{Object.entries(CRYPTO_METHODS).map(([key, option]) => <button key={key} type="button" disabled={!availability.crypto} onClick={() => choose(key as CryptoMethod)} className="flex min-h-20 items-center justify-between rounded-2xl border border-gray-200 p-4 text-left hover:border-orange-400 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-600 disabled:cursor-not-allowed disabled:opacity-60"><span><strong className="block text-gray-900">{option.asset}</strong><span className="text-xs text-gray-500">{option.label.split(' · ')[1]}</span></span><ArrowRight size={18} /></button>)}</div>
         </> : stage === 'amount' ? <>
           <h2 className="font-bold text-gray-900">Add funds with {name}</h2>
           <label htmlFor="deposit-amount" className="block text-sm font-semibold">Amount to add to your wallet (XAF)</label>
-          <input id="deposit-amount" type="number" min={3000} max={10000000} step={1} value={amount || ''} onChange={event => setAmount(Number(event.target.value))} className="w-full rounded-xl border border-gray-300 p-4 text-xl font-bold" />
+          <input id="deposit-amount" type="number" min={3000} max={method === 'payunit_card' ? 100000 : 10000000} step={1} value={amount || ''} onChange={event => setAmount(Number(event.target.value))} className="w-full rounded-xl border border-gray-300 p-4 text-xl font-bold" />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[3000, 5000, 10000, 25000].map(value => <button type="button" key={value} onClick={() => setAmount(value)} className="rounded-xl border border-gray-200 py-3 text-sm font-semibold">{value.toLocaleString()}</button>)}</div>
-          <p className="text-xs text-gray-500">Minimum: 3,000 XAF. {method === 'mtn_momo' || method === 'orange_money' ? 'No platform top-up fee. Operator fees are separate.' : 'Crypto top-up fee: 2% on top.'}</p>
+          <p className="text-xs text-gray-500">Minimum: 3,000 XAF. {method === 'payunit_card' ? 'Card top-up fee: 1.4% on top. Maximum wallet credit: 100,000 XAF.' : method === 'mtn_momo' || method === 'orange_money' ? 'No platform top-up fee. Operator fees are separate.' : 'Crypto top-up fee: 2% on top.'}</p>
           {quote && method === 'usdt_trc20' && <UsdtEstimate creditXaf={quote.creditXaf} feeXaf={quote.feeXaf} />}
           {quote && <p className="rounded-xl bg-gray-50 p-4 text-sm">Wallet receives <strong>{quote.creditXaf.toLocaleString()} XAF</strong> · Fee <strong>{quote.feeXaf.toLocaleString()} XAF</strong></p>}
           <button type="button" disabled={!valid} onClick={() => setStage('pay')} className="w-full rounded-xl bg-orange-600 p-4 font-bold text-white disabled:opacity-50">Continue</button>
         </> : method && <>
           <h2 className="font-bold text-gray-900">{name}</h2>
-          {!profileId ? <a href="/login?next=/add-funds" className="block rounded-xl bg-orange-600 p-4 text-center font-bold text-white">Sign in to continue</a> : (isCryptoMethod(method) ? !availability.crypto : !availability.mobile)
+          {!profileId ? <a href="/login?next=/add-funds" className="block rounded-xl bg-orange-600 p-4 text-center font-bold text-white">Sign in to continue</a> : method === 'payunit_card'
+            ? <CardCheckout amount={amount} profileId={profileId} onStarted={() => setStarted(true)} /> : (isCryptoMethod(method) ? !availability.crypto : !availability.mobile)
             ? <p className="text-base text-amber-900">This payment method needs checking. Please do not send another payment; contact support for its status.</p> : method === 'mtn_momo' || method === 'orange_money'
             ? <MobileMoneyCheckout amount={amount} token={token} initialReference={reference} selectedMethod={method} onStarted={() => setStarted(true)} />
             : <CryptoDepositPanel profileId={profileId} token={token} selectedMethod={method} walletAmount={amount} onStarted={() => setStarted(true)} />}

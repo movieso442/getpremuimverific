@@ -1,5 +1,31 @@
 # Release and website downloads
 
+## Name and public presentation — 15 October 2026
+
+Verified signed artifact: EAS `b14612da-8152-4cd6-8c00-6c677b8fb7e3`, version
+0.1.0 / versionCode 6, 72,809,304 bytes. SHA-256:
+`266291237a175486b4353d9f46300430e6797bbedf804f20529749fbc0818859`.
+`aapt` reports `application-label:'premiumverific'`; the adaptive launcher
+foreground was extracted and visually checked against the PV mark. APK v2
+signature verifies and certificate SHA-256 matches build 3:
+`539da41782995ed2ee22205cce9a8ec662a647c266ab3d4dca404ff91b7fc425`.
+The APK is not debuggable. This is artifact verification, not a new live-payment
+acceptance test.
+
+The requested app display name is `premiumverific`; the Android package remains
+`com.premiumverify.app` so existing installs can upgrade with the same signing
+key. Build 6 adds the PV logo to the login screen and panel header and keeps the
+existing branded launcher/adaptive icons. The public download filename is
+`premiumverific.apk`. The website's beta banner/badge were removed at the owner's
+request. This presentation change does not waive the documented acceptance tests
+or paid-launch blockers. The older build-3 notes below are historical.
+
+## Android beta build 3 — 14 October 2026
+
+The owner requested direct website APK distribution. EAS build `1c7902ef-646b-4c4d-9ba3-99f20b106f5f` finished: version 0.1.0, versionCode 3, package `com.premiumverify.app`, 72,693,196 bytes. APK Signature Scheme v2 verifies, its signing certificate SHA-256 matches build 2 (`539da41782995ed2ee22205cce9a8ec662a647c266ab3d4dca404ff91b7fc425`), and its package is not debuggable. Binary SHA-256: `8c232b8f5885bf5bcb95403b7776696883307db915c1dada4d833127a8433915`.
+
+The new website release mechanism keeps the APK in `public/downloads` and restores a verified GitHub release asset during build. The website displays it as a **beta**, not a cleared paid-launch release. See `docs/android-website-publishing.md`. The inspection/paid-launch blockers below still apply; download availability is not financial acceptance testing. The older paragraphs record the earlier build-2 inspection, not the current bundled beta publication policy.
+
 The signed Android APK has been built, downloaded, signature-verified and smoke-tested at the native login screen in an isolated emulator. It is available for testing, not yet approved for public paid launch. See [INSPECTION.md](./INSPECTION.md) for verified checks and blockers. Exported JavaScript bundles in dist are NOT installable apps. Website APK download variables remain unset until release acceptance checks pass; iPhone customers use the website.
 
 Android build submitted on 12 October 2026: [EAS build 1846930c](https://expo.dev/accounts/student-admin/projects/getpremuimverific/builds/1846930c-5f97-4f3f-a95f-4b69f6a6a547), version 0.1.0 / versionCode 2, release keystore generated and managed by EAS. Check its current result rather than assuming submission means success. Back up the signing credentials securely using `npx eas-cli credentials --platform android`; never commit/export them into the public download directory.

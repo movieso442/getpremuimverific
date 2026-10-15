@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getPayunitConfig, getPayunitPaymentStatus } from './payunit'
 import type { MobileMoneyMethod } from './mobile-money'
+import { cardReference } from './cards'
+import { reconcileCard } from './payunit-cards'
 type Config = NonNullable<ReturnType<typeof getPayunitConfig>>
 type Result = { accepted: boolean; uncertain?: boolean; error?: string }
 
@@ -24,6 +26,7 @@ export async function requestMobileMoney(config: Config, input: { amount: number
 }
 
 export async function reconcilePayunit(admin: SupabaseClient, transaction: { id: string; reference: string; amount: number | string; status: string; service_fee_xaf?: number | string }) {
+  if (cardReference(transaction.reference)) return reconcileCard(admin, { ...transaction, service_fee_xaf: transaction.service_fee_xaf ?? NaN })
   if (transaction.status === 'completed') return 'completed'
   const config = getPayunitConfig()
   if (!config || transaction.status !== 'pending') return transaction.status

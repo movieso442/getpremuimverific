@@ -4,13 +4,16 @@ Deploy only after running `supabase/refund-process-upgrade.sql` after the previo
 
 ## Google Search Console
 
-Verify the **Domain property** `premiumverific.com` using Google's provided DNS TXT value. DNS verification is not performed by adding a website logo or meta tag. Alternatively choose the HTTPS URL-prefix property and put its HTML verification token in Vercel `GOOGLE_SITE_VERIFICATION`, then redeploy. Submit `https://premiumverific.com/sitemap.xml` and inspect/request indexing of these five public URLs:
+Verify the **Domain property** `premiumverific.com` using Google's provided DNS TXT value. DNS verification is not performed by adding a website logo or meta tag. Alternatively choose the HTTPS URL-prefix property and put its HTML verification token in Vercel `GOOGLE_SITE_VERIFICATION`, then redeploy. Submit `https://premiumverific.com/sitemap.xml` and inspect/request indexing of these six public URLs:
 
 1. https://premiumverific.com/
 2. https://premiumverific.com/virtual-numbers
 3. https://premiumverific.com/sms-verification-guide
 4. https://premiumverific.com/social-media-growth
 5. https://premiumverific.com/refunds
+6. https://premiumverific.com/downloads
+
+`/download` permanently redirects to `/downloads`; submit only the canonical plural URL. It is indexable even while the APK is unavailable because the page also provides useful web-access information.
 
 Titles, descriptions, canonical URLs, Open Graph/Twitter metadata, WebSite/Organization data, internal navigation and a public-only sitemap are implemented. App/admin/wallet/refund-form routes and alternate deployment hosts carry noindex. Private HTML remains crawlable so Google can read noindex; API/token routes are disallowed in robots. Admin robots blocks its whole hostname. Noindex is not authentication. Google decides indexing/ranking and search-result logos; no top ranking, free-number offering, invented reviews or guaranteed monetisation is promised.
 
@@ -30,4 +33,4 @@ Apply the policy to website/bot/support operations consistently and obtain local
 
 ## Local checks
 
-`scripts/check-refunds-sql.mjs` runs the actual migration and existing balance trigger in an isolated PGlite database; set `PGLITE_MODULE` to an installed PGlite module path. It never connects to Supabase. `scripts/check-public-seo.mjs` checks a local production server on port 3100 (or `CHECK_ORIGIN`): canonical metadata, five-entry sitemap, private noindex, genuine HTTP 404, icon delivery and unauthenticated refund API rejection. These checks do not replace real-provider staging tests or publish changes.
+`scripts/check-refunds-sql.mjs` runs the actual migration and existing balance trigger in an isolated PGlite database; set `PGLITE_MODULE` to an installed PGlite module path. It never connects to Supabase. `scripts/check-public-seo.mjs` checks a local production server on port 3100 (or `CHECK_ORIGIN`): canonical metadata, six-entry sitemap, private noindex, genuine HTTP 404, icon delivery and unauthenticated refund API rejection. These checks do not replace real-provider staging tests or publish changes.

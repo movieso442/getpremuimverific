@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import LocalAmount from '@/components/LocalAmount'
+import {smmPlatform,sortSmmPlatforms} from '@/lib/smm/catalogue'
 type Service = { service_id?: number; id: number; name: string; category: string; retail_rate_xaf: number; min: number; max: number }
 export default function OrderCalculator() {
   const [services, setServices] = useState<Service[]>([])
@@ -19,8 +20,8 @@ export default function OrderCalculator() {
     }).catch(reason => { if (!controller.signal.aborted) setError(reason.message) }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [])
-  const categories = [...new Set(services.map(service => service.category))].sort()
-  const options = services.filter(service => service.category === category)
+  const categories = sortSmmPlatforms(services.map(smmPlatform))
+  const options = services.filter(service => smmPlatform(service) === category)
   const service = options.find(service => String(service.service_id || service.id) === serviceId)
   const valid = service && Number.isInteger(quantity) && quantity >= service.min && quantity <= service.max
   return <div className="rounded-3xl border bg-white p-6 sm:p-8 space-y-5">

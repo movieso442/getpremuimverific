@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict'
+const origin=process.env.CHECK_ORIGIN||'http://localhost:3100'
+const response=await fetch(origin+'/api/v1/smm/services')
+assert.equal(response.status,200)
+const result=await response.json()
+assert.equal(result.total,result.services.length)
+const tiktok=result.services.filter(service=>service.platform==='TikTok')
+assert.ok(tiktok.length>0,'TikTok must be present in this configured live catalogue')
+assert.ok(result.total>1000,'The configured catalogue must not be truncated at the Supabase default row limit')
+assert.ok(result.services.every(service=>Number.isFinite(service.retail_rate_xaf)&&service.retail_rate_xaf>0))
+const ids=result.services.map(service=>service.service_id||service.id)
+assert.equal(new Set(ids).size,ids.length)
+const alias=await fetch(origin+'/download',{redirect:'manual'})
+assert.equal(alias.status,308);assert.ok(alias.headers.get('location')?.endsWith('/downloads'))
+console.log(`PASS: ${result.total} unique live services, ${tiktok.length} grouped TikTok services, positive retail prices, canonical download redirect.`)

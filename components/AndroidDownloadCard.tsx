@@ -1,0 +1,10 @@
+import Link from 'next/link'
+import Image from 'next/image'
+import {Download} from 'lucide-react'
+type Release={url:string;version:string;checksum:string;filename?:string;channel?:'beta';sizeBytes?:number;versionCode?:number}
+export default function AndroidDownloadCard({release}:{release:Release|null}){
+ return <article className="rounded-3xl border border-slate-200 bg-white p-7"><div className="mb-5 flex items-center gap-3"><Image src="/brand/icon-192.png" alt="premiumverific app logo" width={56} height={56} className="h-14 w-14 shrink-0 rounded-xl" /><p className="text-xl font-extrabold text-slate-950">premiumverific</p></div><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-xl font-bold">Android</h3><span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold">{release?`Version ${release.version}`:'Web panel available'}</span></div>
+ <p className="my-4 text-base leading-relaxed text-slate-600">Install the signed APK directly. Android may ask you to allow installation from your browser; only use the official link on this page.</p>
+ {release?<><a href={release.url} download="premiumverific.apk" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-700 px-5 py-4 font-bold text-white"><Download size={18}/>Download Android APK</a>{release.sizeBytes&&<p className="mt-3 text-base text-slate-600">{(release.sizeBytes/1024/1024).toFixed(1)} MB · Build {release.versionCode}</p>}<details className="mt-4 text-sm text-slate-600"><summary className="cursor-pointer">Verify your download (SHA-256)</summary><p className="mt-2 break-all font-mono">{release.checksum}</p></details></>:<><Link href="/sms-verification" className="inline-flex w-full justify-center rounded-xl bg-orange-700 px-5 py-4 font-bold text-white">Use the web panel on Android</Link><p className="mt-3 text-base text-slate-500">The Android build is not available for download yet. Use the web panel while the build and release checks are completed.</p></>}
+ </article>
+}

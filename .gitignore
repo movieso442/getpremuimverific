@@ -6,6 +6,8 @@
 /mobile/.expo/
 /mobile/dist/
 /mobile/artifacts/
+/public/downloads/*.apk
+/public/downloads/*.part
 /.pnp
 .pnp.*
 .yarn/*

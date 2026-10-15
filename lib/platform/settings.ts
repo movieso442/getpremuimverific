@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import {collectCataloguePages} from '@/lib/smm/catalogue'
 
 export type PlatformSettings = {
   support_email: string
@@ -33,12 +34,17 @@ export type SmmPriceOverride = {
  * service, the platform-wide multiplier remains the safe default.
  */
 export async function getSmmPriceOverrides(admin: SupabaseClient, serviceIds?: number[]) {
-  let query = admin.from('smm_service_prices').select('service_id, retail_rate_xaf, is_active')
-  if (serviceIds?.length) query = query.in('service_id', serviceIds)
-  const { data, error } = await query
+  let data:SmmPriceOverride[]
   // Older installations may not have run the pricing upgrade yet. A catalogue
   // must still be viewable; checkout falls back to the global margin rule.
-  if (error) return new Map<number, SmmPriceOverride>()
+  try {
+    data=await collectCataloguePages(async(start,end)=>{
+      const {data:rows,error}=await admin.from('smm_service_prices').select('service_id, retail_rate_xaf, is_active').order('service_id').range(start,end)
+      if(error)throw error
+      return rows||[]
+    })
+  }catch{return new Map<number,SmmPriceOverride>()}
+  if(serviceIds?.length){const ids=new Set(serviceIds);data=data.filter(row=>ids.has(Number(row.service_id)))}
   return new Map((data || []).map((row) => [Number(row.service_id), {
     service_id: Number(row.service_id),
     retail_rate_xaf: Number(row.retail_rate_xaf),

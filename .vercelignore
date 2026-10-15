@@ -1,5 +1,7 @@
 # The website deployment does not need native mobile source or signing data.
 /mobile/**
+/public/downloads/*.apk
+/public/downloads/*.part
 node_modules/
 .next/
 .git/

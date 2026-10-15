@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import http from 'node:http'
 const origin=process.env.CHECK_ORIGIN||'http://localhost:3100'
 const get=(path,host='premiumverific.com')=>new Promise((resolve,reject)=>{http.get(origin+path,{headers:{host}},result=>{let body='';result.setEncoding('utf8');result.on('data',chunk=>{body+=chunk});result.on('end',()=>resolve({response:{status:result.statusCode,headers:new Headers(result.headers)},body}))}).on('error',reject)})
-for(const path of ['/','/virtual-numbers','/sms-verification-guide','/social-media-growth','/refunds']){
+for(const path of ['/','/virtual-numbers','/sms-verification-guide','/social-media-growth','/refunds','/downloads']){
  const {response,body}=await get(path)
  assert.equal(response.status,200,path)
  assert.equal(response.headers.get('x-robots-tag'),null,path)
@@ -21,11 +21,12 @@ for(const path of ['/dashboard','/add-funds','/refund-request','/admin']){
 }
 const sitemap=await get('/sitemap.xml')
 assert.equal(sitemap.response.status,200)
-assert.equal((sitemap.body.match(/<loc>/g)||[]).length,5)
+assert.equal((sitemap.body.match(/<loc>/g)||[]).length,6)
+assert.ok(sitemap.body.includes('https://premiumverific.com/downloads'))
 assert.ok(!sitemap.body.includes('/dashboard'))
 const adminRobots=await get('/robots.txt','admin.premiumverific.com')
 assert.ok(adminRobots.body.includes('Disallow: /'))
 assert.equal((await get('/sitemap.xml','admin.premiumverific.com')).response.status,404)
 for(const path of ['/api/refunds','/api/admin/refunds']) assert.equal((await get(path)).response.status,401,path)
 for(const path of ['/favicon.ico','/brand/icon-192.png','/brand/icon-512.png','/brand/apple-touch-icon.png']) assert.equal((await get(path)).response.status,200,path)
-console.log('PASS: five indexable canonical pages, branded 404 HTTP status, private noindex, sitemap, admin robots, unauthenticated API protection and icon delivery.')
+console.log('PASS: six indexable canonical pages, branded 404 HTTP status, private noindex, sitemap, admin robots, unauthenticated API protection and icon delivery.')
