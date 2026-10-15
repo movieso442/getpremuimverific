@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Profile, WalletTransaction, SmsOrder, SmmOrder, AccountOrder, ApiKeyItem, WebhookEndpoint } from './supabase/types'
 import { createClient } from './supabase/client'
+import { webAuthCallback } from './auth/flows'
 
 interface AppStateContextType {
   profile: Profile
@@ -234,14 +235,16 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Google OAuth Handler
   const loginWithGoogle = async () => {
     try {
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: webAuthCallback(window.location.origin, '/dashboard'),
         },
       })
+      if (error) throw error
     } catch (err) {
       console.error('Google login error', err)
+      throw new Error('Google sign-in could not be started. Please try again.')
     }
   }
 

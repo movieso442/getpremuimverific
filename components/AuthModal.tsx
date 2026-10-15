@@ -1,8 +1,11 @@
 'use client'
 
 import React, { useState } from 'react'
-import { X, Lock, Mail, ShieldCheck, ArrowRight } from 'lucide-react'
+import { X, Lock, Mail } from 'lucide-react'
 import { useAppState } from '@/lib/store'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { authErrorMessage } from '@/lib/auth/flows'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -11,6 +14,7 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const { loginWithGoogle } = useAppState()
+  const router = useRouter()
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,10 +24,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null
 
   const handleGoogleSignIn = async () => {
-    await loginWithGoogle()
+    try { await loginWithGoogle() } catch (error) { setAuthMsg(authErrorMessage(error)) }
   }
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setAuthMsg(null)
     if (!email || !password) {
@@ -31,11 +35,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       return
     }
 
+    if (authMode === 'signup') { onClose(); router.push('/signup'); return }
     setIsSubmitting(true)
-    setTimeout(() => {
-      setIsSubmitting(false)
-      onClose()
-    }, 1000)
+    try {
+      const { data, error } = await createClient().auth.signInWithPassword({ email: email.trim(), password })
+      if (error) throw error
+      if (!data.session) throw new Error('Sign-in could not be completed.')
+      onClose(); router.push('/dashboard'); router.refresh()
+    } catch (error) { setAuthMsg(authErrorMessage(error)) } finally { setIsSubmitting(false) }
   }
 
   return (
@@ -61,6 +68,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
+        {authMsg && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{authMsg}</p>}
         {/* Google Sign In Button */}
         <button
           onClick={handleGoogleSignIn}
@@ -147,10 +155,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <div className="text-center text-xs text-gray-500">
           {authMode === 'signin' ? (
             <span>
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button
                 type="button"
-                onClick={() => setAuthMode('signup')}
+                onClick={() => { onClose(); router.push('/signup') }}
                 className="text-[#ff6b00] font-bold hover:underline"
               >
                 Sign Up

@@ -1,5 +1,11 @@
 # Card wallet top-ups — activation checklist
 
+**Retired at the owner's request on 15 October 2026.** The customer card UI has
+been removed from web/native and `POST /api/payments/cards` always returns 410.
+An environment flag cannot reactivate it. The historical SQL/verification code
+and records are retained for reconciliation; do not drop payment history. The
+activation notes below document the earlier investigation, not current setup.
+
 The web wallet and native source use Payunit-hosted checkout temporarily. No
 Premium Verific field, API, log or table collects PANs or CVVs. Moving to an
 embedded form requires a documented provider-hosted-fields/tokenization SDK and

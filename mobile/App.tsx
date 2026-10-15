@@ -10,7 +10,8 @@ import * as Haptics from 'expo-haptics'
 import { ActionButton, Icon, ScreenTransition, useReducedMotion } from './src/ui'
 import type { Session } from '@supabase/supabase-js'
 import { api, configured, manageRefresh, supabase } from './src/client'
-import CardTopup from './src/CardTopup'
+import { completeNativeAuth, signupRedirect, startNativeAuth } from './src/auth'
+import { isNativeAuthUrl, nativeAuthRedirect } from './src/auth-links'
 WebBrowser.maybeCompleteAuthSession()
 
 type Account = { profile: { id: string; email: string; full_name: string; balance_xaf: number }; transactions: { id: string; amount: number; type: string; status: string; reference: string }[]; orders: { id: string; service_name: string; quantity: number; status: string }[] }
@@ -33,58 +34,84 @@ export default function App() {
 function Application() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
   useEffect(() => {
     if (!supabase) { setLoading(false); return }
     let mounted = true
     void supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session); setLoading(false) } }).catch(() => { if (mounted) setLoading(false) })
     const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
+    const receive = (url: string) => {
+      if (!isNativeAuthUrl(url)) return
+      setAuthError('')
+      void completeNativeAuth(url).catch(error => { if (mounted) setAuthError(messageOf(error)) })
+    }
+    const links = Linking.addEventListener('url', event => receive(event.url))
+    void Linking.getInitialURL().then(url => { if (mounted && url) receive(url) }).catch(() => undefined)
     const stop = manageRefresh()
-    return () => { mounted = false; data.subscription.unsubscribe(); stop() }
+    return () => { mounted = false; data.subscription.unsubscribe(); links.remove(); stop() }
   }, [])
   if (!configured) return <View style={s.card}><Text style={s.title}>premiumverific</Text><Text style={s.text}>Set the public API URL and Supabase project variables in mobile/.env to connect this app. Never add server/provider secrets.</Text></View>
   if (loading) return <Text style={s.text}>Restoring your account...</Text>
-  return session ? <Panel key={session.user.id} userId={session.user.id} /> : <Login />
+  return session ? <Panel key={session.user.id} userId={session.user.id} /> : <Login authError={authError} />
 }
-function Login() {
+function Login({ authError }: { authError: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
-  const submit = async (signup: boolean) => {
+  const [signup, setSignup] = useState(false), [fullName, setFullName] = useState(''), [confirmation, setConfirmation] = useState('')
+  const [terms, setTerms] = useState(false), [confirmationRequested, setConfirmationRequested] = useState(false), [cooldown, setCooldown] = useState(0)
+  useEffect(() => { if (cooldown <= 0) return; const timer = setTimeout(() => setCooldown(value => value - 1), 1000); return () => clearTimeout(timer) }, [cooldown])
+  const confirmationNotice = 'Request accepted. If this address needs confirmation, check your inbox and spam folder. If you already used Google, sign in with Google; another signup email may not be sent.'
+  const submit = async () => {
     if (!supabase || busy) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || !password) { setNotice('Enter a valid email address and password.'); return }
+    if (signup && (password.length < 8 || password !== confirmation || !terms)) { setNotice('Use at least 8 characters, repeat the same password and agree to the Terms of Service.'); return }
+    setBusy(true)
+    setNotice('')
+    try {
+      const result = signup ? await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: await startNativeAuth('signup'), data: { full_name: fullName.trim() || undefined } } }) : await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      if (result.error) throw result.error
+      if (signup && !result.data.session) { setNotice(confirmationNotice); setConfirmationRequested(true); setCooldown(60) }
+    } catch (error) { setNotice(messageOf(error)) } finally { setBusy(false) }
+  }
+  const resend = async () => {
+    if (!supabase || busy || cooldown > 0 || !email.trim()) return
     setBusy(true)
     try {
-      const result = signup ? await supabase.auth.signUp({ email: email.trim(), password }) : await supabase.auth.signInWithPassword({ email: email.trim(), password })
-      if (result.error) throw result.error
-      setNotice(signup && !result.data.session ? 'Check your email to confirm your account, then sign in.' : '')
+      const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: await signupRedirect() } })
+      if (error) throw error
+      setNotice(confirmationNotice); setCooldown(60)
     } catch (error) { setNotice(messageOf(error)) } finally { setBusy(false) }
   }
   const google = async () => {
     if (!supabase || busy) return
     setBusy(true)
     try {
-      const redirectTo = 'premiumverify://auth/callback'
+      const redirectTo = await startNativeAuth('oauth')
       const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo, skipBrowserRedirect: true } })
       if (error || !data.url) throw error || new Error('Google sign-in is unavailable.')
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
+      const result = await WebBrowser.openAuthSessionAsync(data.url, nativeAuthRedirect)
       if (result.type === 'success') {
-        const url = new URL(result.url)
-        const code = url.searchParams.get('code')
-        if (!code) throw new Error(url.searchParams.get('error_description') || 'Sign-in was not completed.')
-        const exchange = await supabase.auth.exchangeCodeForSession(code)
-        if (exchange.error) throw exchange.error
-      }
+        await completeNativeAuth(result.url)
+      } else setNotice('Google sign-in was closed. You can try again.')
     } catch (error) { setNotice(messageOf(error)) } finally { setBusy(false) }
   }
   return <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     <View style={s.row}><Image source={require('./assets/app-icon.png')} accessibilityLabel="premiumverific logo" style={{width:64,height:64}} /><Text style={s.subtitle}>premiumverific</Text></View><Text style={s.title}>Your numbers. Your panel.</Text>
-    <Text style={s.text}>Sign in with your existing website account. Your wallet and OTP inbox stay together.</Text>
-    <View style={s.card}><Text style={s.label}>Email</Text><TextInput style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
-      <Text style={s.label}>Password</Text><TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" />
-      <Button title="Sign in" disabled={busy} onPress={() => void submit(false)} />
-      <Button title="Create an account" disabled={busy || password.length < 8} onPress={() => void submit(true)} />
+    <Text style={s.text}>{signup ? 'Create your account here. The same account works on the app and website.' : 'Sign in with your existing website account. Your wallet and OTP inbox stay together.'}</Text>
+    <View style={s.card}>
+      <Text style={s.subtitle}>{signup ? 'Create your account' : 'Welcome back'}</Text>
+      {signup && <><Text style={s.label}>Full name</Text><TextInput accessibilityLabel="Full name" style={s.input} value={fullName} onChangeText={setFullName} autoComplete="name" maxLength={120} editable={!busy} /></>}
+      <Text style={s.label}>Email</Text><TextInput accessibilityLabel="Email" style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" editable={!busy} />
+      <Text style={s.label}>Password{signup ? ' (at least 8 characters)' : ''}</Text><TextInput accessibilityLabel="Password" style={s.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete={signup ? 'new-password' : 'current-password'} editable={!busy} />
+      {signup && <><Text style={s.label}>Confirm password</Text><TextInput accessibilityLabel="Confirm password" style={s.input} value={confirmation} onChangeText={setConfirmation} secureTextEntry autoComplete="new-password" editable={!busy} /><Pressable accessibilityRole="checkbox" accessibilityLabel="I agree to the Terms of Service" accessibilityState={{ checked: terms }} onPress={() => setTerms(value => !value)} style={[s.row,{minHeight:48}]}><Icon name={terms ? 'checkbox' : 'square-outline'} color="#c2410c" /><Text style={s.text}>I agree to the Terms of Service</Text></Pressable><Button secondary title="Read Terms of Service" onPress={() => void Linking.openURL('https://premiumverific.com/terms')} /></>}
+      <Button title={busy ? 'Please wait…' : signup ? 'Create my account' : 'Sign in'} disabled={busy || (signup && cooldown > 0)} onPress={() => void submit()} />
+      <Button secondary title={signup ? 'Already registered? Sign in' : 'Create an account'} disabled={busy} onPress={() => { setSignup(value => !value); setNotice('') }} />
       <Button title="Continue with Google" disabled={busy} onPress={() => void google()} />
+      {confirmationRequested && <Button secondary title={cooldown > 0 ? `Request another confirmation in ${cooldown}s` : 'Request another confirmation'} disabled={busy || cooldown > 0} onPress={() => void resend()} />}
       {!!notice && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text>}
+      {!!authError && <Text accessibilityLiveRegion="polite" style={s.notice}>{authError}</Text>}
     </View>
     <Pressable onPress={() => void Linking.openURL('https://premiumverific.com/login')}><Text style={s.link}>Need help signing in? Open the website</Text></Pressable>
   </ScrollView>
@@ -250,9 +277,6 @@ function Boost({ onOrdered, onSelect, active }: { onOrdered: () => void; onSelec
   </>
 }
 function Wallet({ userId, onCredit }: { userId: string; onCredit: () => void }) {
-  return <><CardTopup userId={userId} onCredit={onCredit} /><MobileMoneyWallet userId={userId} onCredit={onCredit} /></>
-}
-function MobileMoneyWallet({ userId, onCredit }: { userId: string; onCredit: () => void }) {
   const [amount, setAmount] = useState('5000'), [phone, setPhone] = useState('')
   const [method, setMethod] = useState('mtn_momo')
   const [reference, setReference] = useState(''), [notice, setNotice] = useState(''), [status, setStatus] = useState('ready')

@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { customerUser } from '@/lib/supabase/customer'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { cardAmount } from '@/lib/payments/cards'
-import { cardCheckoutEnabled, initializeCardCheckout, reconcileCard } from '@/lib/payments/payunit-cards'
-import { topupQuote } from '@/lib/payments/topup-fees'
+import { reconcileCard } from '@/lib/payments/payunit-cards'
 
 export const dynamic = 'force-dynamic'
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value)
@@ -31,32 +29,11 @@ export async function GET(request: Request) {
     // Supabase relation inference can be an array without generated schema types.
     const payment = data ? (Array.isArray(data.wallet_transactions) ? data.wallet_transactions[0] : data.wallet_transactions) : null
     const status = payment ? await reconcileCard(admin, payment) : null
-    return json({ available: cardCheckoutEnabled() && !setupError, payment: payment ? { ...payment, status, checkout_url: data?.checkout_url, expires_at: data?.expires_at } : null })
+    return json({ available: false, payment: payment ? { ...payment, status } : null })
   } catch { return json({ error: 'Card payment status is temporarily unavailable.' }, 503) }
 }
-export async function POST(request: Request) {
-  try {
-    const origin = request.headers.get('origin')
-    if (origin && origin !== new URL(request.url).origin) return json({ error: 'Invalid payment origin.' }, 403)
-    const session = await access(request)
-    if (!session) return json({ error: 'Sign in with a verified email before adding funds.' }, 401)
-    if (!cardCheckoutEnabled()) return json({ error: 'Card payments are not enabled yet. Choose another method.' }, 503)
-    const body = await request.json()
-    if (!cardAmount(body.amount) || !uuid(body.idempotency_key) || body.accepted_fee_percent !== 1.4) return json({ error: 'Choose 3,000–100,000 XAF and accept the 1.4% card top-up fee.' }, 400)
-    const { admin, profile } = session
-    const { data: reserved, error } = await admin.rpc('reserve_card_topup', { p_profile: profile.id, p_key: body.idempotency_key, p_amount: body.amount })
-    if (error) return json({ error: error.code === 'P0001' ? 'Check existing payments and card limits before trying again. Contact support if a payment is stuck.' : 'Card wallet setup is not ready. Choose another method.' }, error.code === 'P0001' ? 409 : 503)
-    if (!reserved) return json({ error: 'Could not reserve this payment.' }, 503)
-    if (!reserved.created) return json({ ...reserved, checkout_url: new Date(reserved.expires_at).getTime() > Date.now() ? reserved.checkout_url : null, uncertain: !reserved.checkout_url && reserved.status === 'pending' })
-    try {
-      const checkout = await initializeCardCheckout(reserved.reference, topupQuote(body.amount, 'payunit_card').totalXaf)
-      const attached = await admin.rpc('attach_card_checkout', { p_reference: reserved.reference, p_checkout: checkout.checkoutId, p_url: checkout.url })
-      if (attached.error) throw new Error('Could not save checkout')
-      return json({ reference: reserved.reference, status: 'pending', checkout_url: checkout.url }, 201)
-    } catch {
-      // The provider may have created a checkout even if its response was lost.
-      // Never repeat initialization, fail the ledger, or release the reservation here.
-      return json({ reference: reserved.reference, status: 'pending', uncertain: true, message: 'We could not confirm checkout creation. Do not start another payment; contact support with this reference.' }, 202)
-    }
-  } catch { return json({ error: 'Could not start checkout. Check your previous payment before trying again.' }, 503) }
+export async function POST() {
+  // Retired deliberately. No environment toggle may reactivate old clients.
+  // Existing records/webhooks remain available for financial reconciliation.
+  return json({ error: 'Card top-ups have been removed. Use MTN MoMo, Orange Money or an available crypto method.' }, 410)
 }

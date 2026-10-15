@@ -31,7 +31,7 @@ export default function AppShell({
 
   return (
     <>
-        {isAdminPage || pathname === '/bot-topup' ? <main className="min-h-screen">{children}</main> : <AppStateProvider>
+        {isAdminPage || pathname === '/bot-topup' || pathname.startsWith('/auth/') ? <main className="min-h-screen">{children}</main> : <AppStateProvider>
           <AnalyticsTracker />
           {isPublicPage ? (
             /* Public Website Page View (Header, Body, Public Footer) */

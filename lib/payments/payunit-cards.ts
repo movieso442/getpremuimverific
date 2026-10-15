@@ -1,7 +1,7 @@
 import type {SupabaseClient} from '@supabase/supabase-js'
 import {getPayunitConfig} from './payunit'
 import {cardProof,hostedCardUrl} from './cards'
-export function cardCheckoutEnabled(){return process.env.PAYUNIT_CARD_ENABLED==='true'&&getPayunitConfig()?.mode==='live'}
+export function cardCheckoutEnabled(){return false}
 export async function initializeCardCheckout(reference:string,amount:number){
  const config=getPayunitConfig()
  if(!config||config.mode!=='live')throw new Error('Live hosted card checkout is not configured.')

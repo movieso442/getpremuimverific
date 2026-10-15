@@ -1,19 +1,17 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ThumbsUp } from 'lucide-react'
-import { useAppState } from '@/lib/store'
+import { authErrorMessage, safeNextPath, signupNotice, webAuthCallback } from '@/lib/auth/flows'
 import { createClient } from '@/lib/supabase/client'
 import confetti from 'canvas-confetti'
 
 export default function SignupPage() {
   const router = useRouter()
-  const { setProfile } = useAppState()
   const supabase = createClient()
   const requestedNext = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next')
-  const nextPath = requestedNext?.startsWith('/') ? requestedNext : '/dashboard'
+  const nextPath = safeNextPath(requestedNext)
 
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -22,9 +20,12 @@ export default function SignupPage() {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [termsAgreed, setTermsAgreed] = useState(true)
+  const [termsAgreed, setTermsAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [notice, setNotice] = useState('')
+  const [cooldown, setCooldown] = useState(0)
+  useEffect(() => { if (cooldown <= 0) return; const timer = setTimeout(() => setCooldown(value => value - 1), 1000); return () => clearTimeout(timer) }, [cooldown])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,6 +37,7 @@ export default function SignupPage() {
       setErrorMsg('Passwords do not match.')
       return
     }
+    if (password.length < 8) { setErrorMsg('Use at least 8 characters for your password.'); return }
     if (!termsAgreed) {
       setErrorMsg('You must agree to the Terms of Service.')
       return
@@ -43,12 +45,14 @@ export default function SignupPage() {
 
     setLoading(true)
     setErrorMsg('')
+    setNotice('')
 
     try {
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
+          emailRedirectTo: webAuthCallback(window.location.origin, nextPath),
           data: {
             full_name: `${firstName} ${lastName}`.trim() || username || 'Member',
             phone: phone || undefined
@@ -57,35 +61,37 @@ export default function SignupPage() {
       })
 
       if (error) throw error
-      if (data.user) {
-        setProfile({
-          id: data.user.id,
-          email: data.user.email || email,
-          full_name: `${firstName} ${lastName}`.trim() || username || 'Premium Partner',
-          phone_number: phone || '',
-          balance_xaf: 0
-        })
-      }
-
       if (!data.session) {
-        setErrorMsg('Check your email to confirm your account, then sign in to continue.')
+        setNotice(signupNotice)
+        setCooldown(60)
         return
       }
       confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } })
       router.push(nextPath)
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Signup failed')
+      router.refresh()
+    } catch (err: unknown) {
+      setErrorMsg(authErrorMessage(err))
     } finally {
       setLoading(false)
     }
   }
+  const resend = async () => {
+    if (loading || cooldown > 0) return
+    setLoading(true); setErrorMsg('')
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: webAuthCallback(window.location.origin, nextPath) } })
+      if (error) throw error
+      setNotice(signupNotice); setCooldown(60)
+    } catch (error) { setErrorMsg(authErrorMessage(error)) } finally { setLoading(false) }
+  }
 
   const handleGoogleLogin = async () => {
     try {
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}${nextPath}` }
+        options: { redirectTo: webAuthCallback(window.location.origin, nextPath) }
       })
+      if (error) throw error
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Google sign-in could not be started.')
     }
@@ -107,6 +113,7 @@ export default function SignupPage() {
                 {errorMsg}
               </div>
             )}
+            {notice && <div role="status" className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><p>{notice}</p><button type="button" disabled={loading || cooldown > 0} onClick={() => void resend()} className="font-bold underline disabled:opacity-50">{cooldown > 0 ? `Request another confirmation in ${cooldown}s` : 'Request another confirmation'}</button><p><Link href="/login" className="font-bold underline">Already have an account? Sign in</Link></p></div>}
 
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -167,6 +174,8 @@ export default function SignupPage() {
                 <div>
                   <input
                     type="password"
+                    minLength={8}
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
@@ -180,6 +189,7 @@ export default function SignupPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm password"
+                    autoComplete="new-password"
                     className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                     required
                   />

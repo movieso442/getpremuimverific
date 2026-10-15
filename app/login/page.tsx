@@ -3,10 +3,11 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ThumbsUp, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { useAppState } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import confetti from 'canvas-confetti'
+import { authErrorMessage, safeNextPath, webAuthCallback } from '@/lib/auth/flows'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,7 +15,7 @@ export default function LoginPage() {
   const supabase = createClient()
   const requestedNext = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next')
   const isAdministratorHost = typeof window !== 'undefined' && window.location.hostname.startsWith('admin.')
-  const nextPath = requestedNext?.startsWith('/') ? requestedNext : isAdministratorHost ? '/admin' : '/dashboard'
+  const nextPath = safeNextPath(requestedNext, isAdministratorHost ? '/admin' : '/dashboard')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -50,8 +51,8 @@ export default function LoginPage() {
 
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } })
       router.push(nextPath)
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Login failed')
+    } catch (err: unknown) {
+      setErrorMsg(authErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -59,9 +60,9 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}${nextPath}` }
+        options: { redirectTo: webAuthCallback(window.location.origin, nextPath) }
       })
       if (error) throw error
     } catch (err: unknown) {

@@ -1,5 +1,17 @@
 # Release and website downloads
 
+## Account creation and card removal — 15 October 2026
+
+EAS build `6dbf8989-c2dc-430f-bf8e-0745139908b6` (versionCode 7) was submitted
+with the native registration form, confirmation resend, HTTPS-to-app PKCE return,
+warm/cold callback handling, card UI removal and least-privilege Android permission
+blocking. Native TypeScript and Android/iOS production JS exports passed.
+Pure callback tests check nonce/age, exact scheme/path and token-relay rejection.
+This build was still queued at the last check; the bundled website manifest
+continues to reference verified build 6 until build 7 is completed, inspected,
+signature-verified and published. A real device Google/confirmation flow and
+Google's app review are separate acceptance steps, not implied by compilation.
+
 ## Name and public presentation — 15 October 2026
 
 Verified signed artifact: EAS `b14612da-8152-4cd6-8c00-6c677b8fb7e3`, version

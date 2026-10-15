@@ -18,7 +18,7 @@ for (const path of ['/favicon.ico','/brand/favicon.png','/brand/apple-touch-icon
 }
 for (const method of ['GET','POST']) {
   const response = await fetch(origin+'/api/payments/cards',{method,headers:method==='POST'?{'Content-Type':'application/json'}:{},body:method==='POST'?'{}':undefined})
-  assert.equal(response.status,401)
+  assert.equal(response.status,method==='POST'?410:401)
   console.log('Unauthenticated card API rejected:',method,response.status)
 }
 const response = await fetch(origin+'/payments/card-return')
