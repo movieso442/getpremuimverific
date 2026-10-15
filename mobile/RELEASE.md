@@ -7,9 +7,13 @@ with the native registration form, confirmation resend, HTTPS-to-app PKCE return
 warm/cold callback handling, card UI removal and least-privilege Android permission
 blocking. Native TypeScript and Android/iOS production JS exports passed.
 Pure callback tests check nonce/age, exact scheme/path and token-relay rejection.
-This build was still queued at the last check; the bundled website manifest
-continues to reference verified build 6 until build 7 is completed, inspected,
-signature-verified and published. A real device Google/confirmation flow and
+Build 7 finished and was published as `android-v0.1.0-build7`; its signed APK
+is 72,811,168 bytes with SHA-256
+`f7fad61ea95c022428be439c3017673281875d0a914fdc2958a87e203666c56c`.
+`aapt` reports package `com.premiumverify.app`, versionCode 7, and display name
+`premiumverific`. APK v2 signature verification passed and the signing
+certificate matches build 6. The website manifest now references build 7.
+A real device Google/confirmation flow and
 Google's app review are separate acceptance steps, not implied by compilation.
 
 ## Name and public presentation — 15 October 2026

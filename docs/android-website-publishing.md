@@ -2,9 +2,9 @@
 
 ## Current automated bundled release
 
-Build 6 is declared in `lib/mobile/android-release.json`. Its verified APK is
+Build 7 is declared in `lib/mobile/android-release.json`. Its verified APK is
 kept locally at `public/downloads/premiumverific.apk`, backed by the versioned
-public GitHub release asset `android-v0.1.0-build6/premiumverific.apk`. The
+public GitHub release asset `android-v0.1.0-build7/premiumverific.apk`. The
 installed display name is `premiumverific` and its PV launcher icon was inspected
 inside the signed APK. The package/signing certificate remain update-compatible
 with build 3. The binary is intentionally ignored by Git and Vercel source
