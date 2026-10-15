@@ -11,7 +11,8 @@ import { ActionButton, Icon, ScreenTransition, useReducedMotion } from './src/ui
 import type { Session } from '@supabase/supabase-js'
 import { api, configured, manageRefresh, supabase } from './src/client'
 import { completeNativeAuth, signupRedirect, startNativeAuth } from './src/auth'
-import { isNativeAuthUrl, nativeAuthRedirect } from './src/auth-links'
+import { isMobileBridgeUrl, isNativeAuthUrl } from './src/auth-links'
+import CryptoTopup from './src/CryptoTopup'
 WebBrowser.maybeCompleteAuthSession()
 
 type Account = { profile: { id: string; email: string; full_name: string; balance_xaf: number }; transactions: { id: string; amount: number; type: string; status: string; reference: string }[]; orders: { id: string; service_name: string; quantity: number; status: string }[] }
@@ -41,9 +42,9 @@ function Application() {
     void supabase.auth.getSession().then(({ data }) => { if (mounted) { setSession(data.session); setLoading(false) } }).catch(() => { if (mounted) setLoading(false) })
     const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
     const receive = (url: string) => {
-      if (!isNativeAuthUrl(url)) return
+      if (!isNativeAuthUrl(url) && !isMobileBridgeUrl(url)) return
       setAuthError('')
-      void completeNativeAuth(url).catch(error => { if (mounted) setAuthError(messageOf(error)) })
+      void completeNativeAuth(url).then(() => { try { WebBrowser.dismissBrowser() } catch { /* no browser session for email links */ } }).catch(error => { if (mounted) setAuthError(messageOf(error)) })
     }
     const links = Linking.addEventListener('url', event => receive(event.url))
     void Linking.getInitialURL().then(url => { if (mounted && url) receive(url) }).catch(() => undefined)
@@ -60,6 +61,7 @@ function Login({ authError }: { authError: string }) {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [signup, setSignup] = useState(false), [fullName, setFullName] = useState(''), [confirmation, setConfirmation] = useState('')
+  const [confirmationCode, setConfirmationCode] = useState('')
   const [terms, setTerms] = useState(false), [confirmationRequested, setConfirmationRequested] = useState(false), [cooldown, setCooldown] = useState(0)
   useEffect(() => { if (cooldown <= 0) return; const timer = setTimeout(() => setCooldown(value => value - 1), 1000); return () => clearTimeout(timer) }, [cooldown])
   const confirmationNotice = 'Request accepted. If this address needs confirmation, check your inbox and spam folder. If you already used Google, sign in with Google; another signup email may not be sent.'
@@ -84,6 +86,16 @@ function Login({ authError }: { authError: string }) {
       setNotice(confirmationNotice); setCooldown(60)
     } catch (error) { setNotice(messageOf(error)) } finally { setBusy(false) }
   }
+  const verifySignupCode = async () => {
+    if (!supabase || busy || !/^[0-9]{6}$/.test(confirmationCode.trim())) { setNotice('Enter the six-digit code from your confirmation email.'); return }
+    setBusy(true); setNotice('')
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({ email: email.trim(), token: confirmationCode.trim(), type: 'signup' })
+      if (error) throw error
+      if (!data.session) throw new Error('Email confirmed. Sign in from the app to continue.')
+      setNotice('Email confirmed. Opening your account in the app.')
+    } catch (error) { setNotice(messageOf(error)) } finally { setBusy(false) }
+  }
   const google = async () => {
     if (!supabase || busy) return
     setBusy(true)
@@ -91,10 +103,10 @@ function Login({ authError }: { authError: string }) {
       const redirectTo = await startNativeAuth('oauth')
       const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo, skipBrowserRedirect: true } })
       if (error || !data.url) throw error || new Error('Google sign-in is unavailable.')
-      const result = await WebBrowser.openAuthSessionAsync(data.url, nativeAuthRedirect)
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
       if (result.type === 'success') {
         await completeNativeAuth(result.url)
-      } else setNotice('Google sign-in was closed. You can try again.')
+      } else if (result.type === 'cancel') setNotice('Google sign-in was closed. You can try again.')
     } catch (error) { setNotice(messageOf(error)) } finally { setBusy(false) }
   }
   return <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
@@ -106,6 +118,7 @@ function Login({ authError }: { authError: string }) {
       <Text style={s.label}>Email</Text><TextInput accessibilityLabel="Email" style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" editable={!busy} />
       <Text style={s.label}>Password{signup ? ' (at least 8 characters)' : ''}</Text><TextInput accessibilityLabel="Password" style={s.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete={signup ? 'new-password' : 'current-password'} editable={!busy} />
       {signup && <><Text style={s.label}>Confirm password</Text><TextInput accessibilityLabel="Confirm password" style={s.input} value={confirmation} onChangeText={setConfirmation} secureTextEntry autoComplete="new-password" editable={!busy} /><Pressable accessibilityRole="checkbox" accessibilityLabel="I agree to the Terms of Service" accessibilityState={{ checked: terms }} onPress={() => setTerms(value => !value)} style={[s.row,{minHeight:48}]}><Icon name={terms ? 'checkbox' : 'square-outline'} color="#c2410c" /><Text style={s.text}>I agree to the Terms of Service</Text></Pressable><Button secondary title="Read Terms of Service" onPress={() => void Linking.openURL('https://premiumverific.com/terms')} /></>}
+      {signup && confirmationRequested && <><Text style={s.label}>Six-digit email confirmation code</Text><TextInput accessibilityLabel="Email confirmation code" style={s.input} value={confirmationCode} onChangeText={setConfirmationCode} keyboardType="number-pad" autoComplete="one-time-code" maxLength={6} editable={!busy} /><Button title="Confirm email in this app" disabled={busy || !/^[0-9]{6}$/.test(confirmationCode.trim())} onPress={() => void verifySignupCode()} /></>}
       <Button title={busy ? 'Please wait…' : signup ? 'Create my account' : 'Sign in'} disabled={busy || (signup && cooldown > 0)} onPress={() => void submit()} />
       <Button secondary title={signup ? 'Already registered? Sign in' : 'Create an account'} disabled={busy} onPress={() => { setSignup(value => !value); setNotice('') }} />
       <Button title="Continue with Google" disabled={busy} onPress={() => void google()} />
@@ -201,7 +214,7 @@ function Panel({ userId }: { userId: string }) {
         {inbox.map(order => <View key={order.id} style={s.card}><View style={s.row}><Text style={[s.subtitle,{flex:1}]}>{order.service_name}</Text><View style={s.statusChip}><Text style={s.statusText}>{order.sms_code ? 'Code ready' : order.status === 'waiting_sms' ? 'Waiting' : order.status}</Text></View></View><Text style={s.text}>{order.country_name}</Text><Pressable accessibilityRole="button" accessibilityLabel={'Copy number ' + order.phone_number} onPress={() => void copy(order.phone_number)} style={s.copyRow}><Text selectable style={[s.number,{flex:1}]}>{order.phone_number}</Text><Icon name="copy-outline" size={20} /></Pressable><View style={s.otpBox}><Text style={s.label}>VERIFICATION CODE</Text><Text selectable style={s.code}>{order.sms_code || (order.status === 'waiting_sms' ? 'Waiting for SMS...' : 'No code received')}</Text>{order.sms_code && <Button secondary title="Copy code" onPress={() => void copy(order.sms_code!)} />}</View><Text style={s.caption}>Expires {new Date(order.expires_at).toLocaleTimeString()}</Text></View>)}
       </ScreenTransition>
       {visited.includes('Boost') && <ScreenTransition active={tab === 'Boost'}><Boost active={tab === 'Boost'} onOrdered={() => { navigate('Account'); void load() }} onSelect={() => scroll.current?.scrollTo({y:0,animated:!reduced})} /></ScreenTransition>}
-      {visited.includes('Wallet') && <ScreenTransition active={tab === 'Wallet'}><Wallet userId={userId} onCredit={load} /></ScreenTransition>}
+      {visited.includes('Wallet') && <ScreenTransition active={tab === 'Wallet'}><Wallet userId={userId} onCredit={load} active={tab === 'Wallet'} /></ScreenTransition>}
       <ScreenTransition active={tab === 'Account'}>
         <StepLabel title="Your account" detail={account?.profile.email || 'Loading your profile...'} />
         <View style={s.card}><Text style={s.subtitle}>Need a hand?</Text><Text style={s.text}>Get help with a payment or an order without leaving your details behind.</Text><Button secondary title="Message support" onPress={() => void Linking.openURL('https://wa.me/237677034736')} /></View>
@@ -276,7 +289,11 @@ function Boost({ onOrdered, onSelect, active }: { onOrdered: () => void; onSelec
     {!!notice && <Text accessibilityLiveRegion="polite" style={s.notice}>{notice}</Text>}
   </>
 }
-function Wallet({ userId, onCredit }: { userId: string; onCredit: () => void }) {
+function Wallet({ userId, onCredit, active }: { userId: string; onCredit: () => void; active: boolean }) {
+  const [channel, setChannel] = useState('mobile')
+  return <><StepLabel title="Add funds" detail="Choose how to pay. Your wallet updates only after the payment is confirmed." /><Choices items={[{ code: 'mobile', name: 'MTN MoMo / Orange Money' }, { code: 'crypto', name: 'Crypto' }]} selected={channel} onSelect={setChannel} />{channel === 'crypto' ? <CryptoTopup active={active} onCredit={onCredit} /> : <MobileMoneyWallet userId={userId} onCredit={onCredit} />}</>
+}
+function MobileMoneyWallet({ userId, onCredit }: { userId: string; onCredit: () => void }) {
   const [amount, setAmount] = useState('5000'), [phone, setPhone] = useState('')
   const [method, setMethod] = useState('mtn_momo')
   const [reference, setReference] = useState(''), [notice, setNotice] = useState(''), [status, setStatus] = useState('ready')

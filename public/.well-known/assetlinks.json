@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.premiumverify.app",
+      "sha256_cert_fingerprints": ["53:9D:A4:17:82:99:5E:D2:EE:22:20:5C:CE:9A:8E:C6:62:A6:47:C2:66:AB:3D:4D:CA:40:4F:F9:1B:7F:C4:25"]
+    }
+  }
+]

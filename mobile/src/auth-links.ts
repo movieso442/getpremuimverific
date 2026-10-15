@@ -3,9 +3,17 @@ export type PendingAuth = { state: string; createdAt: number; kind: 'oauth' | 's
 export function isNativeAuthUrl(value: string) {
   try { const u = new URL(value); return u.protocol === 'premiumverify:' && u.hostname === 'auth' && u.pathname === '/callback' && !u.username && !u.password && !u.port } catch { return false }
 }
+export function isMobileBridgeUrl(value: string) {
+  try { const u = new URL(value); return u.origin === 'https://premiumverific.com' && u.pathname === '/auth/mobile-callback' && !u.hash && !u.username && !u.password } catch { return false }
+}
+export function nativeCallbackUrl(value: string) {
+  if (!isMobileBridgeUrl(value)) return value
+  return nativeAuthRedirect + new URL(value).search
+}
 export function nativeAuthCode(value: string, pending: PendingAuth | null, now = Date.now()) {
-  if (!pending || !Number.isFinite(pending.createdAt) || !['oauth','signup'].includes(pending.kind) || !isNativeAuthUrl(value)) throw new Error('Start sign-in from this app and try again.')
-  const url = new URL(value), age = now - pending.createdAt
+  const callback = nativeCallbackUrl(value)
+  if (!pending || !Number.isFinite(pending.createdAt) || !['oauth','signup'].includes(pending.kind) || !isNativeAuthUrl(callback)) throw new Error('Start sign-in from this app and try again.')
+  const url = new URL(callback), age = now - pending.createdAt
   if (age < -60000 || age > (pending.kind === 'signup' ? 86400000 : 900000) || url.searchParams.get('app_state') !== pending.state || url.hash) throw new Error('This sign-in link expired or belongs to another request. Start again in the app.')
   if (url.searchParams.has('error')) throw new Error('Sign-in was not completed. Please try again.')
   const code = url.searchParams.get('code')

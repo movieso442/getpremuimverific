@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store'
 import * as Crypto from 'expo-crypto'
 import { apiUrl, supabase } from './client'
-import { nativeAuthCode, nativeBridgeUrl, type PendingAuth } from './auth-links'
+import { nativeAuthCode, nativeAuthRedirect, nativeBridgeUrl, type PendingAuth } from './auth-links'
 
 const pendingKey = 'pv-auth.pending'
 let completing: Promise<boolean> | null = null
@@ -10,7 +10,9 @@ let completed: { url: string; until: number } | null = null
 export async function startNativeAuth(kind: PendingAuth['kind']) {
   const pending: PendingAuth = { state: Crypto.randomUUID(), createdAt: Date.now(), kind }
   await SecureStore.setItemAsync(pendingKey, JSON.stringify(pending))
-  return nativeBridgeUrl(apiUrl, pending.state)
+  return kind === 'oauth'
+    ? nativeAuthRedirect + '?' + new URLSearchParams({ app_state: pending.state })
+    : nativeBridgeUrl(apiUrl, pending.state)
 }
 export async function signupRedirect() {
   const raw = await SecureStore.getItemAsync(pendingKey)

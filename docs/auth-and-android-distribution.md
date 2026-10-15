@@ -10,11 +10,11 @@ generic success message and optimistic unconfirmed profile were misleading.
 The website header's email login dialog also used a timeout instead of real
 authentication; it now uses Supabase password sign-in.
 
-The existing Resend account reports `premiumverific.com` as verified and recent
-platform mail as delivered. This does not prove Supabase Auth is configured to
-use Resend: inspecting/changing those project-level settings still requires the
-owner's private management token or dashboard action. No new real signup email
-has been sent as an implementation test.
+The existing Resend account reports `premiumverific.com` as verified. Supabase
+Auth now uses that Resend SMTP sender, while email confirmation remains required.
+The confirmation template retains its website link and now includes a six-digit
+code that the Android app verifies with `verifyOtp`. A real signup email to a
+new test address has not yet been confirmed on a device.
 
 The native Create account action now opens a full registration form. Confirmation
 requests have truthful messaging and a resend cooldown. Do not disable email
@@ -45,14 +45,19 @@ confirmation enabled. Do not expose management or SMTP keys in native/public env
 
 ## Google / confirmation return to Android
 
-Native PKCE starts in the app and stores its verifier in SecureStore. The redirect
-is the website's `/auth/mobile-callback?app_state=<nonce>` page, which relays only
-the one-use authorization code and nonce to `premiumverify://auth/callback`.
+Native PKCE starts in the app and stores its verifier in SecureStore. Google
+sign-in redirects directly to `premiumverify://auth/callback?app_state=<nonce>`.
+Email confirmation can be completed entirely in the app with the six-digit code.
+The existing website `/auth/mobile-callback?app_state=<nonce>` page is retained
+for confirmation-link fallback; it relays only the one-use authorization code
+and nonce to `premiumverify://auth/callback`.
 It never exchanges the native code on the server or copies access/refresh tokens
 into links. This page bypasses the website auth/analytics shell, strips the code
 from browser history and provides an explicit Open app fallback. The native app
 handles open-session results, warm links and cold-start links, checks nonce/age,
-and exchanges the code using its own PKCE verifier. It does not create a website
+and exchanges the code using its own PKCE verifier. Android App Links also bind
+the HTTPS mobile callback path to the signed APK using the site's
+`/.well-known/assetlinks.json`. It does not create a website
 session as a substitute. Website Google/email callbacks use `/auth/callback` and
 the website's own cookie-bound PKCE verifier.
 
@@ -60,7 +65,7 @@ Required Auth redirect entries:
 
 - `https://premiumverific.com/auth/callback*`
 - `https://premiumverific.com/auth/mobile-callback*`
-- `premiumverify://auth/callback`
+- `premiumverify://auth/callback*`
 
 Test a real Google flow on a device after installing the new signed build. Also
 test email confirmation, cancel/retry, app restart, duplicate callback delivery,

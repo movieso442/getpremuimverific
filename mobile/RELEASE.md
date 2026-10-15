@@ -1,5 +1,18 @@
 # Release and website downloads
 
+## Crypto top-up and app-only sign-in — 15 October 2026
+
+EAS build `018cf48b-186b-4805-8070-10e5b0a25c30` (versionCode 8) is queued.
+It adds in-app crypto top-ups using the existing verified manual-payment API,
+2% fee display, live server-provided addresses, USDT reference estimate and
+pending-payment tracking. Mobile registration now accepts a six-digit email
+confirmation code inside the app. Google uses a nonce-bound app redirect, while
+website Google login retains its website callback. Android App Links are limited
+to `/auth/mobile-callback` and signed by the existing build certificate.
+The production web API, Supabase email template/redirect allowlist and website
+asset association are deployed. Publish this APK only after EAS finishes and its
+package, version, signing certificate, size and checksum are verified.
+
 ## Account creation and card removal — 15 October 2026
 
 EAS build `6dbf8989-c2dc-430f-bf8e-0745139908b6` (versionCode 7) was submitted

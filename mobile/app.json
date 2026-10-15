@@ -14,6 +14,12 @@
     },
     "android": {
       "package": "com.premiumverify.app",
+      "intentFilters": [{
+        "action": "VIEW",
+        "autoVerify": true,
+        "data": [{ "scheme": "https", "host": "premiumverific.com", "path": "/auth/mobile-callback" }],
+        "category": ["BROWSABLE", "DEFAULT"]
+      }],
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { customerUser } from '@/lib/supabase/customer'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { CRYPTO_METHODS, isCryptoMethod, validCryptoAmount, validCryptoHash } from '@/lib/payments/manual-crypto'
 import { normalizeCryptoReference } from '@/lib/payments/crypto-reference'
 
-async function customer(token?: string) {
+async function customer(request: Request, token?: string) {
   const admin = createAdminClient()
   if (token) {
     if (token.length < 32 || token.length > 256) return null
@@ -14,15 +14,14 @@ async function customer(token?: string) {
     if (!link || new Date(link.expires_at).getTime() <= Date.now()) return null
     return { admin, profile: { id: link.profile_id }, link }
   }
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await customerUser(request)
   if (!user) return null
   const { data: profile } = await admin.from('profiles').select('id').eq('user_id', user.id).single()
   return profile ? { admin, profile, link: null } : null
 }
 
 export async function GET(request: Request) {
-  const access = await customer(new URL(request.url).searchParams.get('token') || undefined)
+  const access = await customer(request, new URL(request.url).searchParams.get('token') || undefined)
   if (!access) return NextResponse.json({ error: 'Sign in to view deposits.' }, { status: 401 })
   let query = access.admin.from('manual_payment_claims')
     .select('id, payment_method, crypto_amount, amount_xaf, approved_amount_xaf, transfer_reference, status, created_at, service_fee_xaf')
@@ -44,6 +43,7 @@ export async function GET(request: Request) {
   const receiptIds = new Set((receipts || []).filter(receipt => receipt.receipt_storage_path).map(receipt => receipt.id))
   return NextResponse.json({
     claims: (data || []).map(claim => ({ ...claim, receipt_attached: receiptIds.has(claim.id) })),
+    methods: CRYPTO_METHODS,
     pending_claim: pendingClaim ? { ...pendingClaim, receipt_attached: receiptIds.has(pendingClaim.id) } : null,
     pending_mobile: pendingMobile, receipt_upload_available: !receiptError,
     crypto_available: !error, mobile_available: !mobileSetupError,
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     if (body.accepted_fee_percent !== 2) return NextResponse.json({ error: 'Refresh checkout and review the 2% service fee before submitting.' }, { status: 409 })
-    const access = await customer(typeof body.token === 'string' ? body.token : undefined)
+    const access = await customer(request, typeof body.token === 'string' ? body.token : undefined)
     if (!access) return NextResponse.json({ error: 'Sign in before submitting a deposit.' }, { status: 401 })
     const { payment_method, transfer_reference, crypto_amount, amount_xaf } = body
     const normalized = typeof payment_method === 'string' && isCryptoMethod(payment_method) && typeof transfer_reference === 'string'
