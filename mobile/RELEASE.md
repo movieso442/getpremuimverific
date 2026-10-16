@@ -2,7 +2,7 @@
 
 ## Crypto top-up and app-only sign-in — 15 October 2026
 
-EAS build `018cf48b-186b-4805-8070-10e5b0a25c30` (versionCode 8) is queued.
+EAS build `018cf48b-186b-4805-8070-10e5b0a25c30` (versionCode 8) finished and was published as `android-v0.1.0-build8`.
 It adds in-app crypto top-ups using the existing verified manual-payment API,
 2% fee display, live server-provided addresses, USDT reference estimate and
 pending-payment tracking. Mobile registration now accepts a six-digit email
@@ -10,8 +10,12 @@ confirmation code inside the app. Google uses a nonce-bound app redirect, while
 website Google login retains its website callback. Android App Links are limited
 to `/auth/mobile-callback` and signed by the existing build certificate.
 The production web API, Supabase email template/redirect allowlist and website
-asset association are deployed. Publish this APK only after EAS finishes and its
-package, version, signing certificate, size and checksum are verified.
+asset association are deployed. The signed APK has package `com.premiumverify.app`,
+display name `premiumverific`, size 72,826,148 bytes and SHA-256
+`7ba72ab64c6d8add2728ab957d8f8ee90722dfd933319664509218994ab4820c`.
+APK v2 signature verification passed; the signing certificate matches build 7.
+The APK includes the custom-scheme callback and the verified Android App Link.
+Real-device email and Google sign-in remain to be tested by the owner.
 
 ## Account creation and card removal — 15 October 2026
 

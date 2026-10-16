@@ -1,12 +1,12 @@
 {
   "available": true,
   "url": "/downloads/premiumverific.apk",
-  "sourceUrl": "https://github.com/cybernurdin/getpremuimverific/releases/download/android-v0.1.0-build7/premiumverific.apk",
+  "sourceUrl": "https://github.com/cybernurdin/getpremuimverific/releases/download/android-v0.1.0-build8/premiumverific.apk",
   "filename": "premiumverific.apk",
   "version": "0.1.0",
-  "versionCode": 7,
-  "checksum": "f7fad61ea95c022428be439c3017673281875d0a914fdc2958a87e203666c56c",
-  "sizeBytes": 72811168,
+  "versionCode": 8,
+  "checksum": "7ba72ab64c6d8add2728ab957d8f8ee90722dfd933319664509218994ab4820c",
+  "sizeBytes": 72826148,
   "channel": "beta",
-  "buildId": "6dbf8989-c2dc-430f-bf8e-0745139908b6"
+  "buildId": "018cf48b-186b-4805-8070-10e5b0a25c30"
 }
