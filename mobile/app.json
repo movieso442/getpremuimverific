@@ -14,6 +14,7 @@
     },
     "android": {
       "package": "com.premiumverify.app",
+      "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
       "intentFilters": [{
         "action": "VIEW",
         "autoVerify": true,
@@ -29,8 +30,7 @@
         "android.permission.READ_CONTACTS",
         "android.permission.READ_SMS",
         "android.permission.RECEIVE_SMS",
-        "android.permission.SEND_SMS",
-        "android.permission.REQUEST_INSTALL_PACKAGES"
+        "android.permission.SEND_SMS"
       ],
       "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#ffffff" }
     },

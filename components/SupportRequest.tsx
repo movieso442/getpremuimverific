@@ -8,7 +8,7 @@ export default function SupportRequest({ recovery = false }: { recovery?: boolea
     const fields = new FormData(event.currentTarget)
     if (recovery && fields.get('ownership') !== 'on') { setError('Please confirm this is your account or page.'); return }
     const message = [recovery ? 'Facebook recovery enquiry' : 'Account store enquiry', ...Array.from(fields.entries()).filter(([key]) => key !== 'ownership').map(([key, value]) => `${key}: ${String(value).trim()}`)].join('\n')
-    window.location.assign(`https://wa.me/237677034736?text=${encodeURIComponent(message)}`)
+    window.location.assign(`https://wa.me/237640796062?text=${encodeURIComponent(message)}`)
   }
   return <section className="mx-auto max-w-2xl rounded-3xl border bg-white p-6 sm:p-8">
     <h1 className="text-3xl font-extrabold">{recovery ? 'Facebook recovery' : 'Account store'}</h1>

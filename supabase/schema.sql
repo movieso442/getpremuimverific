@@ -135,8 +135,8 @@ CREATE TABLE IF NOT EXISTS public.financial_entries (
 CREATE TABLE IF NOT EXISTS public.platform_settings (
   id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
   support_email TEXT NOT NULL DEFAULT 'hello@premiumverific.com',
-  support_phone TEXT NOT NULL DEFAULT '+237 680209047',
-  whatsapp_number TEXT NOT NULL DEFAULT '237680209047',
+  support_phone TEXT NOT NULL DEFAULT '+237 640 796 062',
+  whatsapp_number TEXT NOT NULL DEFAULT '237640796062',
   smm_markup_multiplier NUMERIC(5, 2) NOT NULL DEFAULT 3.00 CHECK (smm_markup_multiplier >= 1 AND smm_markup_multiplier <= 10),
   sms_markup_multiplier NUMERIC(5, 2) NOT NULL DEFAULT 3.00 CHECK (sms_markup_multiplier >= 1 AND sms_markup_multiplier <= 10),
   updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,

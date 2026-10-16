@@ -48,9 +48,9 @@ export interface AccountProductItem {
 export const PLATFORM_INFO = {
   name: 'Premium Verific',
   domain: 'premiumverific.com',
-  phone: '237680209047',
+  phone: '237640796062',
   email: 'hello@premiumverific.com',
-  whatsappUrl: 'https://wa.me/237680209047',
+  whatsappUrl: 'https://wa.me/237640796062',
   currency: 'XAF',
 }
 

@@ -1,7 +1,7 @@
 -- Run after all-platform-upgrades.sql. Safe to rerun for the crypto-only fee release.
 -- Historical payments keep a zero fee and are verified at their original amount.
 BEGIN;
-UPDATE public.platform_settings SET support_phone = '+237 677034736', whatsapp_number = '237677034736', updated_at = NOW() WHERE id = TRUE;
+UPDATE public.platform_settings SET support_phone = '+237 640 796 062', whatsapp_number = '237640796062', updated_at = NOW() WHERE id = TRUE;
 ALTER TABLE public.wallet_transactions ADD COLUMN IF NOT EXISTS service_fee_xaf NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (service_fee_xaf >= 0);
 ALTER TABLE public.manual_payment_claims ADD COLUMN IF NOT EXISTS service_fee_xaf NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (service_fee_xaf >= 0);
 -- The existing wallet trigger credits only `amount`, not this fee.

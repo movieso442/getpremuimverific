@@ -6,7 +6,7 @@ export function customerFollowupEmail(token: string) {
   return {
     subject: 'Need help with your Premium Verific top-up?',
     text: [
-      'Hi, did you run into an issue while topping up? Reply to this email or contact us on WhatsApp: https://wa.me/237677034736.',
+      'Hi, did you run into an issue while topping up? Reply to this email or contact us on WhatsApp: https://wa.me/237640796062.',
       'If you already approved a payment, please do not pay again while it is being checked.',
       'Premium Verific Support',
       `Stop these help emails: https://premiumverific.com/email-preferences?token=${token}`,

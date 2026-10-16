@@ -22,6 +22,6 @@ export function Sidebar({ onOpenDeposit, mobile = false }: { onOpenDeposit: () =
       {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? 'page' : undefined} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-base font-semibold ${pathname === href ? 'bg-orange-50 text-orange-700' : 'text-gray-700 hover:bg-gray-50'}`}><Icon size={20} /><span>{label}</span></Link>)}
     </nav>
     <button onClick={onOpenDeposit} className="flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 font-bold text-white"><Wallet size={20} />Add funds</button>
-    <a href="https://wa.me/237677034736" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-emerald-200 px-4 py-3 text-center font-semibold text-emerald-800">Contact customer support</a>
+    <a href="https://wa.me/237640796062" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-emerald-200 px-4 py-3 text-center font-semibold text-emerald-800">Contact customer support</a>
   </aside>
 }

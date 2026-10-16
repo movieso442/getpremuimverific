@@ -103,7 +103,7 @@ function ProfileForm() {
               onChange={(e) => setPhone(e.target.value)}
               className="w-full bg-white border border-gray-300 focus:border-[#ff6b00] rounded-xl py-3 px-4 text-gray-900 text-sm outline-none"
             />
-            {['237680209047', '237677034736'].includes(phone.replace(/\D/g, '')) && <p className="mt-2 text-base text-amber-800">This matches a platform contact number. Please enter or confirm your own personal contact before saving.</p>}
+            {['237640796062', '237680209047', '237677034736'].includes(phone.replace(/\D/g, '')) && <p className="mt-2 text-base text-amber-800">This matches a platform contact number. Please enter or confirm your own personal contact before saving.</p>}
           </div>
 
           <div>

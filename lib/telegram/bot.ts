@@ -269,7 +269,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
       return (
         `💳 <b>Your secure top-up link</b>\n\n` +
         `💰 <b>Deposit Amount:</b> ${amount.toLocaleString()} XAF\n` +
-        `📱 <b>Channels:</b> MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237677034736\n\n` +
+        `📱 <b>Channels:</b> MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237640796062\n\n` +
         `👉 <a href="${checkoutUrl}">Click here to complete payment</a>`
       )
     }
@@ -291,7 +291,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
       return (
         `💳 <b>Your secure top-up link</b>\n\n` +
         `💰 <b>Deposit Amount:</b> ${amount.toLocaleString()} XAF\n` +
-        `📱 <b>Channels:</b> MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237677034736\n\n` +
+        `📱 <b>Channels:</b> MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237640796062\n\n` +
         `👉 <a href="${checkoutUrl}">Click here to complete payment</a>`
       )
     }

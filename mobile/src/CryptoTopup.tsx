@@ -70,7 +70,7 @@ export default function CryptoTopup({ active, onCredit }: { active: boolean; onC
   const confirm = () => {
     if (!selected || !validCredit || blocked) return
     const text = `Hello, please confirm the ${selected.label} amount for ${credit} XAF wallet credit plus ${fee} XAF fee.`
-    void Linking.openURL('https://wa.me/237677034736?text=' + encodeURIComponent(text)).catch(() => setNotice('Contact support to confirm the exact crypto amount before sending.'))
+    void Linking.openURL('https://wa.me/237640796062?text=' + encodeURIComponent(text)).catch(() => setNotice('Contact support to confirm the exact crypto amount before sending.'))
   }
   return <View style={s.container}>
     <Text style={s.title}>Pay with crypto</Text>

@@ -65,7 +65,7 @@ try {
     await page.getByRole('button', { name: 'Waiting for phone approval' }).waitFor()
     assert.equal(phoneRequests, 1)
     assert.equal(await page.getByRole('button', { name: 'Back', exact: true }).count(), 0)
-    assert.ok((await page.getByRole('link', { name: 'Contact us on WhatsApp' }).getAttribute('href')).startsWith('https://wa.me/237677034736'))
+    assert.ok((await page.getByRole('link', { name: 'Contact us on WhatsApp' }).getAttribute('href')).startsWith('https://wa.me/237640796062'))
     await page.goto('http://localhost:3100/bot-topup?token=' + 'x'.repeat(43))
     await page.getByRole('button', { name: 'MTN MoMo Approve on your phone', exact: true }).click()
     await page.getByLabel('Your mobile-money number').waitFor()

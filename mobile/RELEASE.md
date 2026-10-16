@@ -1,5 +1,24 @@
 # Release and website downloads
 
+## In-app updates and customer-service number — 16 October 2026
+
+EAS build `908dc8cc-45f2-47c9-81d7-5b4868064ccc` finished and was published as
+`android-v0.1.0-build9` (versionCode 9). The signed APK is 72,948,924 bytes;
+SHA-256 is `d2d353d161331de044e324be4fd7e36e732404961f41deb0d39e6233ea6a81a8`.
+APK v2 signature verification passed and the signing certificate matches build 8.
+Build 9 adds an optional in-app APK update flow. It checks
+`/api/mobile/release`, accepts only the official HTTPS APK URL, downloads into
+the app cache, verifies exact size and SHA-256 in chunks, then passes the file to
+Android's installer. Android controls install permission and Play Protect; the
+app cannot bypass or silence those warnings. Existing builds lack the native
+installer dependencies, so they need one final website installation before
+future APK updates can start inside the app. App checks are non-blocking, and a
+failed download leaves the installed version usable. Android emulator install
+over build 8 passed and the app launched; a real-device installer and Play
+Protect outcome are still unverified. The app and website now
+use +237 640 796 062 for customer-service WhatsApp links. The automated bot's
+Cloud API credentials and phone-number ID are separate and unchanged.
+
 ## Crypto top-up and app-only sign-in — 15 October 2026
 
 EAS build `018cf48b-186b-4805-8070-10e5b0a25c30` (versionCode 8) finished and was published as `android-v0.1.0-build8`.

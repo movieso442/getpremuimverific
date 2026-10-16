@@ -288,7 +288,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
       return (
         `💳 *Your secure top-up link*\n\n` +
         `💰 *Deposit Amount:* ${amount.toLocaleString()} XAF\n` +
-        `📱 *Channels:* MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237677034736\n\n` +
+        `📱 *Channels:* MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237640796062\n\n` +
         `👉 *Click here to complete payment:* ${checkoutUrl}`
       )
     }
@@ -310,7 +310,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
       return (
         `💳 *Your secure top-up link*\n\n` +
         `💰 *Deposit Amount:* ${amount.toLocaleString()} XAF\n` +
-        `📱 *Channels:* MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237677034736\n\n` +
+        `📱 *Channels:* MTN MoMo, Orange Money; USDT (TRC20), BTC (Bitcoin), ETH (ERC20/BEP20) after manual verification.\nSupport: https://wa.me/237640796062\n\n` +
         `👉 *Click here to complete payment:* ${checkoutUrl}`
       )
     }
