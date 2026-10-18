@@ -3,11 +3,14 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { authErrorMessage, safeNextPath, signupNotice, webAuthCallback } from '@/lib/auth/flows'
+import { authErrorMessage, safeNextPath, webAuthCallback } from '@/lib/auth/flows'
 import { createClient } from '@/lib/supabase/client'
 import confetti from 'canvas-confetti'
+import {useTranslations} from 'next-intl'
 
 export default function SignupPage() {
+  const t = useTranslations('Auth')
+  const common = useTranslations('Common')
   const router = useRouter()
   const supabase = createClient()
   const requestedNext = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('next')
@@ -30,16 +33,16 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !password) {
-      setErrorMsg('Please enter email and password.')
+      setErrorMsg(t('signupMissing'))
       return
     }
     if (password !== confirmPassword) {
-      setErrorMsg('Passwords do not match.')
+      setErrorMsg(t('passwordMismatch'))
       return
     }
-    if (password.length < 8) { setErrorMsg('Use at least 8 characters for your password.'); return }
+    if (password.length < 8) { setErrorMsg(t('passwordLength')); return }
     if (!termsAgreed) {
-      setErrorMsg('You must agree to the Terms of Service.')
+      setErrorMsg(t('termsRequired'))
       return
     }
 
@@ -62,7 +65,7 @@ export default function SignupPage() {
 
       if (error) throw error
       if (!data.session) {
-        setNotice(signupNotice)
+        setNotice(t('confirmation'))
         setCooldown(60)
         return
       }
@@ -81,7 +84,7 @@ export default function SignupPage() {
     try {
       const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: webAuthCallback(window.location.origin, nextPath) } })
       if (error) throw error
-      setNotice(signupNotice); setCooldown(60)
+      setNotice(t('confirmation')); setCooldown(60)
     } catch (error) { setErrorMsg(authErrorMessage(error)) } finally { setLoading(false) }
   }
 
@@ -104,8 +107,8 @@ export default function SignupPage() {
           {/* Left Column: Sign Up Form Box */}
           <div className="lg:col-span-6 bg-white rounded-3xl border border-gray-200 p-8 md:p-10 shadow-sm space-y-6">
             <div>
-              <h1 className="text-2xl md:text-3xl font-black text-gray-900">Sign Up</h1>
-              <p className="text-xs text-gray-500 mt-1">Please enter your details to create your Premium Verific account.</p>
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900">{t('signupTitle')}</h1>
+              <p className="text-xs text-gray-500 mt-1">{t('signupHelp')}</p>
             </div>
 
             {errorMsg && (
@@ -113,7 +116,7 @@ export default function SignupPage() {
                 {errorMsg}
               </div>
             )}
-            {notice && <div role="status" className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><p>{notice}</p><button type="button" disabled={loading || cooldown > 0} onClick={() => void resend()} className="font-bold underline disabled:opacity-50">{cooldown > 0 ? `Request another confirmation in ${cooldown}s` : 'Request another confirmation'}</button><p><Link href="/login" className="font-bold underline">Already have an account? Sign in</Link></p></div>}
+            {notice && <div role="status" className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><p>{notice}</p><button type="button" disabled={loading || cooldown > 0} onClick={() => void resend()} className="font-bold underline disabled:opacity-50">{cooldown > 0 ? t('resendCountdown', {seconds: cooldown}) : t('resend')}</button><p><Link href="/login" className="font-bold underline">{t('haveAccount')} {t('loginButton')}</Link></p></div>}
 
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -122,7 +125,7 @@ export default function SignupPage() {
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Username"
+                    placeholder={t('username')}
                     className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                     required
                   />
@@ -132,7 +135,7 @@ export default function SignupPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email Address"
+                    placeholder={t('email')}
                     className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                     required
                   />
@@ -145,7 +148,7 @@ export default function SignupPage() {
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="First Name"
+                    placeholder={t('firstName')}
                     className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                   />
                 </div>
@@ -154,7 +157,7 @@ export default function SignupPage() {
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Last Name"
+                    placeholder={t('lastName')}
                     className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                   />
                 </div>
@@ -165,7 +168,7 @@ export default function SignupPage() {
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="WhatsApp / Phone Number (+237...)"
+                  placeholder={t('phone')}
                   className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                 />
               </div>
@@ -178,7 +181,7 @@ export default function SignupPage() {
                     autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Password"
+                    placeholder={t('password')}
                     className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                     required
                   />
@@ -188,7 +191,7 @@ export default function SignupPage() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm password"
+                    placeholder={t('confirmPassword')}
                     autoComplete="new-password"
                     className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-3.5 text-xs font-semibold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                     required
@@ -205,7 +208,7 @@ export default function SignupPage() {
                   className="rounded text-[#ff5722] focus:ring-[#ff5722]"
                 />
                 <label htmlFor="terms">
-                  I have read and agreed with <Link href="/terms" className="text-[#ff5722] underline font-bold">Terms of Service</Link>
+                  {t('termsAgree')} <Link href="/terms" className="text-[#ff5722] underline font-bold">{common('terms')}</Link>
                 </label>
               </div>
 
@@ -214,7 +217,7 @@ export default function SignupPage() {
                 disabled={loading}
                 className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-sm uppercase tracking-wider transition shadow-md flex items-center justify-center gap-2"
               >
-                <span>{loading ? 'Creating Account...' : 'Sign up'}</span>
+                <span>{loading ? t('creating') : t('signup')}</span>
               </button>
             </form>
 
@@ -229,60 +232,24 @@ export default function SignupPage() {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                 </svg>
-                <span>Continue with Google</span>
+                <span>{t('google')}</span>
               </button>
             </div>
 
             <div className="text-center text-xs text-gray-500">
-              Already have an account?{' '}
+              {t('haveAccount')}{' '}
               <Link href="/login" className="text-[#ff5722] font-bold underline">
-                Sign In
+                {t('loginButton')}
               </Link>
             </div>
           </div>
 
-          {/* Right Column: Customer Testimonials Chat Bubbles (Exact JAP layout from signup page) */}
-          <div className="lg:col-span-6 space-y-6">
-            <div className="space-y-4">
-              
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-2xs relative flex gap-4 items-start">
-                <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2563eb] font-extrabold flex items-center justify-center shrink-0">
-                  J
-                </div>
-                <div className="space-y-1 text-xs">
-                  <p className="text-gray-800 font-medium leading-relaxed">
-                    &quot;My business scaled up its operations faster than ever before using Premium Verific.&quot;
-                  </p>
-                  <span className="font-bold text-gray-400 text-[10px] uppercase">John K. — Verified Client</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-2xs relative flex gap-4 items-start">
-                <div className="w-10 h-10 rounded-full bg-orange-100 text-[#ff5722] font-extrabold flex items-center justify-center shrink-0">
-                  M
-                </div>
-                <div className="space-y-1 text-xs">
-                  <p className="text-gray-800 font-medium leading-relaxed">
-                    &quot;I have been using Premium Verific for a year now, I am very happy with their panel and instant virtual SMS numbers across 197 countries. Simply the best!&quot;
-                  </p>
-                  <span className="font-bold text-gray-400 text-[10px] uppercase">Michael D. — Agency Reseller</span>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-2xs relative flex gap-4 items-start">
-                <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 font-extrabold flex items-center justify-center shrink-0">
-                  T
-                </div>
-                <div className="space-y-1 text-xs">
-                  <p className="text-gray-800 font-medium leading-relaxed">
-                    &quot;I recently started using Premium Verific SMM reseller panel & UK phone activation. They have a great selection of packages available with automatic instant execution!&quot;
-                  </p>
-                  <span className="font-bold text-gray-400 text-[10px] uppercase">Thomas W. — Partner</span>
-                </div>
-              </div>
-
-            </div>
-          </div>
+          <aside className="lg:col-span-6 rounded-3xl border border-orange-100 bg-orange-50 p-8 md:p-10">
+            <h2 className="text-2xl font-black text-gray-900">{t('whatNext')}</h2>
+            <ol className="mt-6 space-y-5 text-base text-gray-700">
+              {[t('step1'), t('step2'), t('step3')].map((step, index) => <li key={step} className="flex gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-600 font-bold text-white">{index + 1}</span><span>{step}</span></li>)}
+            </ol>
+          </aside>
         </div>
     </div>
   )

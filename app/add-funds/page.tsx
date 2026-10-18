@@ -4,8 +4,10 @@ import { useSearchParams } from 'next/navigation'
 import { useAppState } from '@/lib/store'
 import TopupFlow from '@/components/TopupFlow'
 import LocalAmount from '@/components/LocalAmount'
+import {useTranslations} from 'next-intl'
 
 function AddFunds() {
+  const t = useTranslations('AddFundsPage')
   const params = useSearchParams()
   const { profile } = useAppState()
   const requested = Number(params.get('amount') || params.get('required'))
@@ -17,8 +19,8 @@ function AddFunds() {
   }, [requested])
   return <div className="mx-auto max-w-2xl space-y-6">
     <TopupFlow key={amount} profileId={profile.id} initialAmount={amount} initialReference={params.get('ref')} />
-    <p className="text-center text-base text-gray-600">Selected wallet credit: <LocalAmount amountXaf={amount} /> · settlement {amount.toLocaleString()} XAF. Crypto is paid in the selected asset.</p>
-    <p className="text-center text-xs text-gray-500">Wallet balance: {Number(profile.balance_xaf || 0).toLocaleString()} XAF. Payments are credited only after verification.</p>
+    <p className="text-center text-base text-gray-600">{t('selectedCredit')}: <LocalAmount amountXaf={amount} /> · {t('settlement')} {amount.toLocaleString()} XAF. {t('cryptoAsset')}</p>
+    <p className="text-center text-xs text-gray-500">{t('balance', {balance: Number(profile.balance_xaf || 0).toLocaleString()})}</p>
   </div>
 }
-export default function AddFundsPage() { return <Suspense fallback={<p>Loading checkout...</p>}><AddFunds /></Suspense> }
+export default function AddFundsPage() { return <Suspense fallback={<p>Loading checkout…</p>}><AddFunds /></Suspense> }

@@ -14,6 +14,7 @@ import { completeNativeAuth, signupRedirect, startNativeAuth } from './src/auth'
 import { isMobileBridgeUrl, isNativeAuthUrl } from './src/auth-links'
 import CryptoTopup from './src/CryptoTopup'
 import AppUpdate from './src/AppUpdate'
+import AccountServiceRequest from './src/AccountServiceRequest'
 WebBrowser.maybeCompleteAuthSession()
 
 type Account = { profile: { id: string; email: string; full_name: string; balance_xaf: number }; transactions: { id: string; amount: number; type: string; status: string; reference: string }[]; orders: { id: string; service_name: string; quantity: number; status: string }[] }
@@ -221,6 +222,7 @@ function Panel({ userId }: { userId: string }) {
       <ScreenTransition active={tab === 'Account'}>
         <StepLabel title="Your account" detail={account?.profile.email || 'Loading your profile...'} />
         <View style={s.card}><Text style={s.subtitle}>Need a hand?</Text><Text style={s.text}>Get help with a payment or an order without leaving your details behind.</Text><Button secondary title="Message support" onPress={() => void Linking.openURL('https://wa.me/237640796062')} /></View>
+        <AccountServiceRequest />
         <Text style={s.subtitle}>Recent payments</Text>{!account?.transactions.length && <Text style={s.text}>Your payment history will appear here.</Text>}
         {account?.transactions.map(transaction => <View style={s.card} key={transaction.id}><View style={s.row}><Icon name={transaction.type === 'deposit' ? 'arrow-down-circle-outline' : 'receipt-outline'} color="#c2410c" /><Text style={[s.subtitle,{flex:1}]}>{transaction.type.replace(/_/g,' ')}</Text><Text style={s.subtitle}>{money(transaction.amount)}</Text></View><Text style={s.text}>{transaction.status}</Text><Text selectable style={s.caption}>{transaction.reference}</Text></View>)}
         <Text style={s.subtitle}>Social orders</Text>{account?.orders.map(order => <View style={s.card} key={order.id}><Text style={s.subtitle}>{order.service_name}</Text><Text style={s.text}>{order.quantity.toLocaleString()} units - {order.status}</Text></View>)}

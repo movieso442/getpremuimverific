@@ -12,6 +12,7 @@ import { AlertTriangle, Banknote, ClipboardList, Loader2, RefreshCw, Users } fro
 type Overview = {
   generated_at: string
   schema_notice: string | null
+  followup_delivery?: { configured: boolean; queued: number | null; schema_available: boolean }
   metrics: Record<string, number>
   profiles: Array<{ id: string; email: string; full_name: string | null; phone_number: string | null; balance_xaf: number; role: 'client' | 'admin'; created_at: string }>
   transactions: Array<{ id: string; profile_id: string; amount: number; type: string; payment_method: string; reference: string; status: string; description?: string; created_at: string }>
@@ -163,11 +164,12 @@ export default function AdminPage() {
           <div><p className="text-orange-400 text-xs font-bold uppercase tracking-[0.2em]">Premium Verific</p><h1 className="text-3xl font-black mt-1">Administrator portal</h1><p className="text-slate-400 text-sm mt-1">Live platform financial, customer, payment, and fulfillment monitoring.</p></div>
           <div className="flex flex-wrap gap-2"><Link href="/admin/refunds" className="rounded-xl bg-orange-700 px-4 py-2.5 font-bold">Refund review</Link><Link href="/admin/pricing" className="inline-flex items-center justify-center rounded-xl bg-orange-600 hover:bg-orange-500 px-4 py-2.5 font-bold text-sm">Service prices</Link><button onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 font-bold text-sm"><RefreshCw className="w-4 h-4" />Refresh live data</button><button onClick={() => void signOut()} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-bold">Sign out</button></div>
         </header>
-        <Link href="/admin/sms-providers" className="inline-block rounded-xl border border-slate-700 px-4 py-3 font-bold">SMS suppliers and cost ledger</Link>
+        <div className="flex flex-wrap gap-3"><Link href="/admin/sms-providers" className="inline-block rounded-xl border border-slate-700 px-4 py-3 font-bold">SMS suppliers and cost ledger</Link><Link href="/admin/account-service-requests" className="inline-block rounded-xl border border-slate-700 px-4 py-3 font-bold">Account-service requests</Link></div>
 
         {error && <div className="rounded-xl border border-red-400/30 bg-red-500/10 text-red-100 p-4 text-sm">{error}</div>}
         <AdminNotificationPanel />
         {data.schema_notice && <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-100 p-4 text-sm flex gap-3"><AlertTriangle className="w-5 h-5 shrink-0" />{data.schema_notice}</div>}
+        {data.followup_delivery && <section className="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm" aria-label="Top-up follow-up emails"><h2 className="font-bold">Top-up help emails</h2><p className="mt-1 text-slate-300">{data.followup_delivery.configured ? 'Automatic delivery configured' : 'Automatic delivery is off or missing Resend/cron configuration'} · {data.followup_delivery.schema_available ? `${data.followup_delivery.queued ?? 0} unsent checkout events` : 'Run customer-followups-upgrade.sql'}</p><p className="mt-1 text-xs text-slate-400">Only eligible, confirmed-email customers are contacted after the grace period. A queued event is not proof of an unpaid charge.</p></section>}
 
         <section className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {cards.map(([label, value, description], index) => <div key={label as string} className={`rounded-2xl p-5 border ${index === 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-900 border-slate-800'}`}><p className="text-sm text-slate-400">{label}</p><p className="text-2xl font-black mt-2">{xaf(value as number)}</p><p className="text-xs text-slate-500 mt-2">{description}</p></div>)}

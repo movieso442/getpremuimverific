@@ -23,8 +23,10 @@ import {
 import { SMS_SERVICES, COUNTRIES, SMM_SERVICES, ACCOUNT_PRODUCTS, PLATFORM_INFO } from '@/lib/mockData'
 import { AuthModal } from '@/components/AuthModal'
 import OrderCalculator from '@/components/OrderCalculator'
+import {useTranslations} from 'next-intl'
 
 export default function LandingPage() {
+  const t = useTranslations('Landing')
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [authActionTitle, setAuthActionTitle] = useState('Sign In to Premium Verific')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
@@ -38,20 +40,20 @@ export default function LandingPage() {
 
   const faqs = [
     {
-      q: 'How fast are SMS verification codes delivered?',
-      a: 'SMS codes are delivered in real time (usually within 3 to 10 seconds) upon requesting a virtual number for WhatsApp, Telegram, TikTok, Facebook, or Google.'
+      q: t('faq1q'),
+      a: t('faq1a')
     },
     {
-      q: 'What is the SMM Panel and how does it work?',
-      a: 'Our SMM Panel connects directly to automated high speed servers (JustAnotherPanel API v2) to deliver organic Instagram followers, YouTube watch hours, TikTok viral views, and Facebook page likes.'
+      q: t('faq2q'),
+      a: t('faq2a')
     },
     {
-      q: 'Do you offer Facebook Account Rescue & Recovery?',
-      a: 'Yes! Our technical team specializes in restoring compromised, hacked, locked, or 2FA blocked Facebook profiles and business pages.'
+      q: t('faq3q'),
+      a: t('faq3a')
     },
     {
-      q: 'How do I top up my wallet balance?',
-      a: 'You can add funds through Payunit&apos;s hosted checkout using the payment methods it shows for your location. Your wallet is credited only after verified confirmation.'
+      q: t('faq4q'),
+      a: t('faq4a')
     }
   ]
 
@@ -66,17 +68,17 @@ export default function LandingPage() {
             {/* Top Badge */}
             <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-orange-100/80 text-[#ea580c] border border-orange-200 text-sm font-extrabold shadow-xs">
               <Sparkles className="w-4 h-4" />
-              <span>#1 Best & Cheapest SMM Panel & SMS Verification Platform</span>
+              <span>{t('badge')}</span>
             </div>
 
             {/* Main Headline */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-gray-900 leading-[1.1] tracking-tight">
-              Supercharge Your Social Media & Get <span className="text-[#ff5722]">Instant Virtual Numbers</span>
+              {t('headline')}
             </h1>
 
             {/* Subtitle */}
             <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl font-medium leading-relaxed">
-              Automated high speed SMM services for Instagram, YouTube, TikTok, Facebook & Telegram + instant virtual SMS numbers across 197 countries.
+              {t('subtitle')}
             </p>
 
             {/* CTA BUTTONS */}
@@ -88,7 +90,7 @@ export default function LandingPage() {
                 className="px-7 py-4.5 rounded-2xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-black text-base transition shadow-lg shadow-orange-500/25 flex items-center gap-3"
               >
                 <Smartphone className="w-5 h-5" />
-                <span>Get a UK Number</span>
+                <span>{t('ukNumber')}</span>
               </Link>
 
               {/* CTA 2: Boost Social Media */}
@@ -97,7 +99,7 @@ export default function LandingPage() {
                 className="px-7 py-4.5 rounded-2xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-black text-base transition shadow-lg shadow-blue-500/25 flex items-center gap-3"
               >
                 <Share2 className="w-5 h-5" />
-                <span>Boost Social Media</span>
+                <span>{t('boost')}</span>
               </Link>
 
               {/* CTA 3: Get Verified */}
@@ -106,7 +108,7 @@ export default function LandingPage() {
                 className="px-7 py-4.5 rounded-2xl bg-gray-900 hover:bg-black text-white font-black text-base transition shadow-lg flex items-center gap-3"
               >
                 <ShieldCheck className="w-5 h-5" />
-                <span>Get Verified</span>
+                <span>{t('verified')}</span>
               </button>
 
               {/* CTA 4: Sign in with Google */}
@@ -120,7 +122,7 @@ export default function LandingPage() {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                 </svg>
-                <span>Continue with Google</span>
+                <span>{t('google')}</span>
               </button>
 
             </div>
@@ -128,38 +130,16 @@ export default function LandingPage() {
             {/* Trust Signals */}
             <div className="pt-6 flex flex-wrap items-center justify-center gap-8 text-sm font-bold text-gray-600">
               <span className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-[#ff5722]" /> 100% Instant Delivery
+                <CheckCircle2 className="w-5 h-5 text-[#ff5722]" /> {t('trust1')}
               </span>
               <span className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-[#ff5722]" /> 197+ Countries Covered
+                <CheckCircle2 className="w-5 h-5 text-[#ff5722]" /> {t('trust2')}
               </span>
               <span className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-[#ff5722]" /> Mobile Money (MoMo/Orange) Supported
+                <CheckCircle2 className="w-5 h-5 text-[#ff5722]" /> {t('trust3')}
               </span>
             </div>
 
-          </div>
-        </div>
-      </section>
-
-      {/* STATS COUNTER BAR */}
-      <section className="bg-white border-y border-gray-100 py-12">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          <div>
-            <div className="text-3xl md:text-5xl font-black text-gray-900">10M+</div>
-            <div className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">SMM Orders Processed</div>
-          </div>
-          <div>
-            <div className="text-3xl md:text-5xl font-black text-[#ff5722]">197+</div>
-            <div className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">Countries Supported</div>
-          </div>
-          <div>
-            <div className="text-3xl md:text-5xl font-black text-gray-900">99.99%</div>
-            <div className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">SMS Delivery Uptime</div>
-          </div>
-          <div>
-            <div className="text-3xl md:text-5xl font-black text-[#2563eb]">24/7</div>
-            <div className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wider mt-2">Live WhatsApp Support</div>
           </div>
         </div>
       </section>
@@ -170,10 +150,10 @@ export default function LandingPage() {
           
           <div className="text-center max-w-2xl mx-auto space-y-4">
             <span className="text-xs font-black text-[#ea580c] uppercase tracking-widest bg-orange-50 px-4 py-1.5 rounded-full border border-orange-100">
-              Core Capabilities
+              {t('capabilities')}
             </span>
-            <h2 className="text-3xl md:text-5xl font-black text-gray-900">Comprehensive Social Media & Verification Platform</h2>
-            <p className="text-base text-gray-600">Everything you need to grow your digital presence and verify accounts effortlessly.</p>
+            <h2 className="text-3xl md:text-5xl font-black text-gray-900">{t('sectionTitle')}</h2>
+            <p className="text-base text-gray-600">{t('sectionIntro')}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -184,14 +164,14 @@ export default function LandingPage() {
                 <div className="w-14 h-14 rounded-2xl bg-orange-100 text-[#ff5722] flex items-center justify-center font-bold text-xl group-hover:bg-[#ff5722] group-hover:text-white transition">
                   <Share2 className="w-7 h-7" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">SMM Growth Panel</h3>
+                <h3 className="text-2xl font-bold text-gray-900">{t('smmTitle')}</h3>
                 <p className="text-sm text-gray-600 leading-relaxed">
-                  Instagram followers, YouTube 4,000 watch hours & subscribers monetization package, TikTok viral views, Facebook page likes, and Telegram members.
+                  {t('smmBody')}
                 </p>
                 <ul className="space-y-2.5 text-sm text-gray-700 font-medium pt-2">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#ea580c]" /> Instagram Real Followers & Likes</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#ea580c]" /> YouTube 4,000 Hours Monetization</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#ea580c]" /> TikTok FYP Viral View Speed</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#ea580c]" /> {t('smmPoint1')}</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#ea580c]" /> {t('smmPoint2')}</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#ea580c]" /> {t('smmPoint3')}</li>
                 </ul>
               </div>
 
@@ -199,7 +179,7 @@ export default function LandingPage() {
                 onClick={() => handleCtaClick('Access SMM Growth Panel')}
                 className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-sm transition shadow-sm flex items-center justify-center gap-2"
               >
-                <span>Order SMM Panel</span>
+                <span>{t('smmButton')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -210,14 +190,14 @@ export default function LandingPage() {
                 <div className="w-14 h-14 rounded-2xl bg-blue-100 text-[#2563eb] flex items-center justify-center font-bold text-xl group-hover:bg-[#2563eb] group-hover:text-white transition">
                   <Smartphone className="w-7 h-7" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">Virtual SMS Activation</h3>
+                <h3 className="text-2xl font-bold text-gray-900">{t('smsTitle')}</h3>
                 <p className="text-sm text-gray-600 leading-relaxed">
-                  Receive instant SMS codes for WhatsApp, Telegram, TikTok, Facebook, Google, OpenAI, and Netflix across 197 countries including USA, UK & Cameroon.
+                  {t('smsBody')}
                 </p>
                 <ul className="space-y-2.5 text-sm text-gray-700 font-medium pt-2">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#2563eb]" /> Dedicated UK & USA Phone Numbers</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#2563eb]" /> WhatsApp & Telegram Verification</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#2563eb]" /> Automatic Code Receiver Monitor</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#2563eb]" /> {t('smsPoint1')}</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#2563eb]" /> {t('smsPoint2')}</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-[#2563eb]" /> {t('smsPoint3')}</li>
                 </ul>
               </div>
 
@@ -225,7 +205,7 @@ export default function LandingPage() {
                 onClick={() => handleCtaClick('Get Virtual SMS Number')}
                 className="w-full py-4 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-extrabold text-sm transition shadow-sm flex items-center justify-center gap-2"
               >
-                <span>Get Virtual Number</span>
+                <span>{t('smsButton')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -236,14 +216,14 @@ export default function LandingPage() {
                 <div className="w-14 h-14 rounded-2xl bg-gray-100 text-gray-900 flex items-center justify-center font-bold text-xl group-hover:bg-gray-900 group-hover:text-white transition">
                   <UserCheck className="w-7 h-7" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">Accounts & Facebook Rescue</h3>
+                <h3 className="text-2xl font-bold text-gray-900">{t('accountsTitle')}</h3>
                 <p className="text-sm text-gray-600 leading-relaxed">
-                  Buy pre-verified USA/UK TikTok accounts (Creator Rewards ready), verified Facebook accounts with 2FA, and expert Facebook hacking recovery service.
+                  {t('accountsBody')}
                 </p>
                 <ul className="space-y-2.5 text-sm text-gray-700 font-medium pt-2">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-gray-900" /> USA & UK Monetized TikTok Accounts</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-gray-900" /> Facebook Hacking & Rescue Recovery</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-gray-900" /> Netflix 4K UHD & ExpressVPN</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-gray-900" /> {t('accountPoint1')}</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-gray-900" /> {t('accountPoint2')}</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4.5 h-4.5 text-gray-900" /> {t('accountPoint3')}</li>
                 </ul>
               </div>
 
@@ -251,7 +231,7 @@ export default function LandingPage() {
                 onClick={() => handleCtaClick('Browse Accounts Marketplace')}
                 className="w-full py-4 rounded-xl bg-gray-900 hover:bg-black text-white font-extrabold text-sm transition shadow-sm flex items-center justify-center gap-2"
               >
-                <span>Browse Store</span>
+                <span>{t('accountsButton')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -266,10 +246,10 @@ export default function LandingPage() {
           
           <div className="text-center space-y-3">
             <span className="text-xs font-black text-[#ea580c] uppercase tracking-widest bg-orange-50 px-4 py-1 rounded-full border border-orange-100">
-              Transparent Rates
+              {t('rates')}
             </span>
-            <h2 className="text-3xl md:text-5xl font-black text-gray-900">Calculate Your Instant Order Cost</h2>
-            <p className="text-base text-gray-600">Select platform and quantity to estimate price in XAF.</p>
+            <h2 className="text-3xl md:text-5xl font-black text-gray-900">{t('calculatorTitle')}</h2>
+            <p className="text-base text-gray-600">{t('calculatorIntro')}</p>
           </div>
 
           <OrderCalculator />
@@ -282,8 +262,8 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto px-6 space-y-8">
           
           <div className="text-center space-y-3">
-            <h2 className="text-3xl md:text-5xl font-black text-gray-900">Frequently Asked Questions</h2>
-            <p className="text-base text-gray-600">Everything you need to know about Premium Verific services.</p>
+            <h2 className="text-3xl md:text-5xl font-black text-gray-900">{t('faqTitle')}</h2>
+            <p className="text-base text-gray-600">{t('faqIntro')}</p>
           </div>
 
           <div className="space-y-4">
@@ -315,16 +295,16 @@ export default function LandingPage() {
       {/* CTA FOOTER BANNER */}
       <section className="mx-auto max-w-6xl px-5 py-16">
         <div className="flex flex-col items-start justify-between gap-6 rounded-3xl border border-orange-100 bg-orange-50 p-8 sm:flex-row sm:items-center">
-          <div><p className="text-xs font-bold uppercase tracking-widest text-orange-700">Premium Verific mobile</p><h2 className="mt-3 text-3xl font-black text-slate-950">Your panel. Now in your pocket.</h2><p className="mt-3 max-w-xl text-slate-600">Explore the Android and iPhone apps for numbers, your code inbox and your wallet.</p></div>
-          <Link href="/downloads" className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-orange-700 px-6 py-4 font-bold text-white">App downloads <ArrowRight className="h-5 w-5" /></Link>
+          <div><p className="text-xs font-bold uppercase tracking-widest text-orange-700">{t('mobile')}</p><h2 className="mt-3 text-3xl font-black text-slate-950">{t('mobileTitle')}</h2><p className="mt-3 max-w-xl text-slate-600">{t('mobileBody')}</p></div>
+          <Link href="/downloads" className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-orange-700 px-6 py-4 font-bold text-white">{t('downloads')} <ArrowRight className="h-5 w-5" /></Link>
         </div>
       </section>
 
       <section className="bg-gradient-to-r from-[#ff5722] to-[#ea580c] py-20 text-white text-center">
         <div className="max-w-4xl mx-auto px-6 space-y-6">
-          <h2 className="text-4xl md:text-5xl font-black">Ready to Grow Your Digital Accounts?</h2>
+          <h2 className="text-4xl md:text-5xl font-black">{t('finalTitle')}</h2>
           <p className="text-base md:text-lg text-white/90 max-w-xl mx-auto font-medium">
-            Join thousands of partners using Premium Verific for instant SMS activations and automated SMM panel growth.
+            {t('finalBody')}
           </p>
 
           <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
@@ -332,7 +312,7 @@ export default function LandingPage() {
               onClick={() => handleCtaClick('Get Started Free')}
               className="px-9 py-4.5 rounded-2xl bg-white text-gray-900 hover:bg-gray-100 font-black text-base transition shadow-lg"
             >
-              Get Started Free
+              {t('start')}
             </button>
             <a
               href="https://wa.me/237640796062"
@@ -340,7 +320,7 @@ export default function LandingPage() {
               rel="noreferrer"
               className="px-9 py-4.5 rounded-2xl bg-black/30 hover:bg-black/40 text-white font-black text-base transition border border-white/20"
             >
-              Contact Support WhatsApp
+              {t('support')}
             </a>
           </div>
         </div>

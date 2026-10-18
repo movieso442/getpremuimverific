@@ -37,6 +37,8 @@ export async function GET() {
     const totalExpenses = expenses.reduce((total, item) => total + Number(item.amount_xaf || 0), 0)
     const last24Hours = Date.now() - 24 * 60 * 60 * 1000
     const checkoutStarts = auditEvents.filter((event) => event.event_type === 'checkout_started')
+    const { count: followupQueue, error: followupError } = await access.admin.from('customer_checkout_followups')
+      .select('id', { count: 'exact', head: true }).neq('state', 'completed').is('sent_at', null)
 
     const dayKey = (date: string) => date.slice(0, 10)
     const analyticsMap = new Map<string, { date: string; deposits_xaf: number; sales_xaf: number; orders: number }>()
@@ -60,6 +62,11 @@ export async function GET() {
     return NextResponse.json({
       generated_at: new Date().toISOString(),
       schema_notice: entriesResult.error || claimsResult.error || auditEventsResult.error ? 'Run the latest Supabase SQL upgrades to enable all administrator accounting, pricing, payment-review, and visitor-analytics features.' : null,
+      followup_delivery: {
+        configured: process.env.CUSTOMER_FOLLOWUP_EMAILS_ENABLED === 'true' && Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && process.env.CRON_SECRET),
+        queued: followupError ? null : followupQueue,
+        schema_available: !followupError,
+      },
       metrics: {
         cash_received_xaf: sum(completedDeposits),
         service_sales_xaf: sum(customerSales),

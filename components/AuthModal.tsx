@@ -6,6 +6,7 @@ import { useAppState } from '@/lib/store'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { authErrorMessage } from '@/lib/auth/flows'
+import {useTranslations} from 'next-intl'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -13,6 +14,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+  const t = useTranslations('AuthModal')
   const { loginWithGoogle } = useAppState()
   const router = useRouter()
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
@@ -31,7 +33,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     e.preventDefault()
     setAuthMsg(null)
     if (!email || !password) {
-      setAuthMsg('Please fill in your email and password')
+      setAuthMsg(t('missing'))
       return
     }
 
@@ -57,7 +59,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">Premium Verific</h3>
-              <p className="text-[11px] text-gray-500">Sign in to manage your orders & wallet</p>
+              <p className="text-[11px] text-gray-500">{t('subtitle')}</p>
             </div>
           </div>
           <button
@@ -93,13 +95,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
             />
           </svg>
-          <span>Sign in with Google</span>
+          <span>{t('google')}</span>
         </button>
 
         <div className="relative flex items-center justify-center">
           <div className="border-t border-gray-200 w-full"></div>
           <span className="bg-white px-3 text-[10px] text-gray-400 font-bold uppercase tracking-wider absolute">
-            or continue with email
+            {t('orEmail')}
           </span>
         </div>
 
@@ -107,7 +109,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <form onSubmit={handleEmailSubmit} className="space-y-4">
           <div>
             <label className="text-xs font-semibold text-gray-700 block mb-1">
-              Email Address
+              {t('email')}
             </label>
             <div className="relative">
               <Mail className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
@@ -124,7 +126,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
           <div>
             <label className="text-xs font-semibold text-gray-700 block mb-1">
-              Password
+              {t('password')}
             </label>
             <div className="relative">
               <Lock className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
@@ -147,7 +149,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             {isSubmitting ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             ) : (
-              <span>{authMode === 'signin' ? 'Sign In to Account' : 'Create New Account'}</span>
+              <span>{authMode === 'signin' ? t('signIn') : t('create')}</span>
             )}
           </button>
         </form>
@@ -155,24 +157,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <div className="text-center text-xs text-gray-500">
           {authMode === 'signin' ? (
             <span>
-              Don&apos;t have an account?{' '}
+              {t('noAccount')}{' '}
               <button
                 type="button"
                 onClick={() => { onClose(); router.push('/signup') }}
                 className="text-[#ff6b00] font-bold hover:underline"
               >
-                Sign Up
+                {t('signUp')}
               </button>
             </span>
           ) : (
             <span>
-              Already have an account?{' '}
+              {t('haveAccount')}{' '}
               <button
                 type="button"
                 onClick={() => setAuthMode('signin')}
                 className="text-[#ff6b00] font-bold hover:underline"
               >
-                Sign In
+                {t('signInShort')}
               </button>
             </span>
           )}

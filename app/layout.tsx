@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import AppShell from '@/components/AppShell'
+import {NextIntlClientProvider} from 'next-intl'
+import {getLocale, getMessages} from 'next-intl/server'
 import './globals.css'
 export const metadata: Metadata = {
   metadataBase: new URL('https://premiumverific.com'),
@@ -21,6 +23,8 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   verification: { google: process.env.GOOGLE_SITE_VERIFICATION || undefined },
 }
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body className="bg-[#f8fafc] text-gray-900 min-h-screen font-sans antialiased"><AppShell>{children}</AppShell></body></html>
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale()
+  const messages = await getMessages()
+  return <html lang={locale}><body className="bg-[#f8fafc] text-gray-900 min-h-screen font-sans antialiased"><NextIntlClientProvider locale={locale} messages={messages}><AppShell>{children}</AppShell></NextIntlClientProvider></body></html>
 }

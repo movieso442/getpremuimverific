@@ -1,5 +1,5 @@
 import {requireAdmin} from '@/lib/admin/auth'
-import {readBeanSmsCatalogue} from '@/lib/providers/beansms'
+import {BeanSmsError,readBeanSmsCatalogue} from '@/lib/providers/beansms'
 export async function GET(){
  const access=await requireAdmin()
  if('error' in access)return Response.json({error:access.error},{status:access.status})
@@ -24,5 +24,8 @@ export async function POST(){
    return value
   }))
   return Response.json({catalogue:safeCatalogue,notice:'Inspect provider IDs, price currency and stock response before importing verified mappings. No orders were placed.'},{headers:{'Cache-Control':'private, no-store'}})
- } catch{return Response.json({error:'BeanSMS read-only check failed. Verify your server credentials and supplier availability. No order was placed.'},{status:503})}
+ } catch(error){
+  if(error instanceof BeanSmsError && error.status===401)return Response.json({error:'BeanSMS rejected the configured API key and secret. Replace both server-side credentials, then retry the read-only check. No order was placed.'},{status:503,headers:{'Cache-Control':'private, no-store'}})
+  return Response.json({error:'BeanSMS read-only check failed. Verify supplier availability and try again. No order was placed.'},{status:503,headers:{'Cache-Control':'private, no-store'}})
+ }
 }

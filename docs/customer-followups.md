@@ -1,10 +1,14 @@
 # Customer checkout help emails
 
 Run `supabase/customer-followups-upgrade.sql` after the platform/fee migrations.
+Then run `supabase/customer-followups-pending-upgrade.sql` to link new pending
+wallet deposits to follow-ups, including Android and bot payments. The pending
+upgrade does not backfill older transactions or send emails on its own.
 In Vercel, set `CUSTOMER_FOLLOWUP_EMAILS_ENABLED=true`, a verified
 `RESEND_FROM_EMAIL`, `RESEND_API_KEY`, `CUSTOMER_FOLLOWUP_REPLY_TO` (default
 `hello@premiumverific.com`) and a long random `CRON_SECRET`, then deploy.
-No live emails or database changes were performed during local checks.
+The upgrades are installed in the connected Supabase project, but delivery
+remains off until the required sender/API-key settings are configured.
 
 Website method selection records a server-authenticated checkout attempt.
 Cancel/Leave checkout records an exit, never a provider cancellation or refund.

@@ -9,11 +9,14 @@ import MobileMoneyCheckout from './MobileMoneyCheckout'
 import CryptoDepositPanel from './CryptoDepositPanel'
 import PaymentSupport from './PaymentSupport'
 import UsdtEstimate from './UsdtEstimate'
+import {useTranslations} from 'next-intl'
 
 type Method = MobileMoneyMethod | CryptoMethod
 export default function TopupFlow({ profileId, token, fixedAmount, initialAmount = 5000, initialReference }: {
   profileId: string; token?: string; fixedAmount?: number; initialAmount?: number; initialReference?: string | null
 }) {
+  const t = useTranslations('Topup')
+  const c = useTranslations('Common')
   const router = useRouter()
   const [method, setMethod] = useState<Method | null>(initialReference ? 'mtn_momo' : null)
   const [stage, setStage] = useState<'method' | 'amount' | 'pay'>(initialReference ? 'pay' : 'method')
@@ -33,7 +36,7 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
       body: JSON.stringify({ id: checkoutId.current, state, method: selected }) }).catch(() => undefined)
   }
   const leaveCheckout = () => {
-    if (started && !window.confirm('Leaving checkout cannot stop or reverse a payment already submitted. Reject an unapproved mobile-money prompt on your phone. If you already paid, do not pay again; your payment stays tracked. Leave checkout?')) return
+    if (started && !window.confirm(t('leaveWarning'))) return
     if (method) recordCheckout('cancelled', method)
     router.push('/')
   }
@@ -73,41 +76,41 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
   return <div className="mx-auto max-w-xl space-y-5">
     <section className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
       <header className="border-b border-gray-100 px-5 py-6 sm:px-8">
-        <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-orange-600"><Wallet size={16} />Premium Verific wallet</div>
-        <h1 className="text-2xl font-black text-gray-900">Add funds</h1>
-        <ol aria-label="Top-up steps" className="mt-4 flex flex-wrap gap-4 text-xs font-semibold">
-          {['method', 'amount', 'pay'].map((value, index) => <li key={value} aria-current={stage === value ? 'step' : undefined} className={stage === value ? 'text-orange-700' : 'text-gray-500'}>{index + 1}. {['Method', 'Amount', 'Payment'][index]}</li>)}
+        <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-orange-600"><Wallet size={16} />{t('wallet')}</div>
+        <h1 className="text-2xl font-black text-gray-900">{t('addFunds')}</h1>
+        <ol aria-label={t('steps')} className="mt-4 flex flex-wrap gap-4 text-xs font-semibold">
+          {['method', 'amount', 'pay'].map((value, index) => <li key={value} aria-current={stage === value ? 'step' : undefined} className={stage === value ? 'text-orange-700' : 'text-gray-500'}>{index + 1}. {[t('method'), t('amount'), t('payment')][index]}</li>)}
         </ol>
       </header>
       <div className="space-y-5 px-5 py-6 sm:px-8">
         {availabilityNotice && <p role="status" className="rounded-xl bg-amber-50 p-4 text-base text-amber-900">{availabilityNotice}</p>}
-        {stage !== 'method' && !started && <button type="button" onClick={() => setStage(stage === 'pay' && !fixedAmount ? 'amount' : 'method')} className="flex items-center gap-2 text-sm font-semibold text-gray-600"><ArrowLeft size={16} />Back</button>}
-        {checking ? <p className="text-sm text-gray-500">Checking your recent payments…</p> : error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : stage === 'method' ? <>
-          <h2 className="font-bold text-gray-900">How would you like to pay?</h2>
+        {stage !== 'method' && !started && <button type="button" onClick={() => setStage(stage === 'pay' && !fixedAmount ? 'amount' : 'method')} className="flex items-center gap-2 text-sm font-semibold text-gray-600"><ArrowLeft size={16} />{c('back')}</button>}
+        {checking ? <p className="text-sm text-gray-500">{t('checking')}</p> : error ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{error}</p> : stage === 'method' ? <>
+          <h2 className="font-bold text-gray-900">{t('chooseMethod')}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {(['mtn_momo', 'orange_money'] as const).map(value => <button key={value} type="button" disabled={!availability.mobile} onClick={() => choose(value)} className="flex min-h-20 items-center justify-between rounded-2xl border border-gray-200 p-4 text-left hover:border-orange-400 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-600 disabled:cursor-not-allowed disabled:opacity-60"><span><strong className="block text-gray-900">{value === 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}</strong><span className="text-xs text-gray-500">{availability.mobile ? 'Approve on your phone' : 'Temporarily unavailable'}</span></span><ArrowRight size={18} /></button>)}
+            {(['mtn_momo', 'orange_money'] as const).map(value => <button key={value} type="button" disabled={!availability.mobile} onClick={() => choose(value)} className="flex min-h-20 items-center justify-between rounded-2xl border border-gray-200 p-4 text-left hover:border-orange-400 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-600 disabled:cursor-not-allowed disabled:opacity-60"><span><strong className="block text-gray-900">{value === 'mtn_momo' ? 'MTN MoMo' : 'Orange Money'}</strong><span className="text-xs text-gray-500">{availability.mobile ? t('approvePhone') : t('unavailable')}</span></span><ArrowRight size={18} /></button>)}
           </div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Crypto</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">{t('crypto')}</h3>
           <div className="grid gap-3 sm:grid-cols-2">{Object.entries(CRYPTO_METHODS).map(([key, option]) => <button key={key} type="button" disabled={!availability.crypto} onClick={() => choose(key as CryptoMethod)} className="flex min-h-20 items-center justify-between rounded-2xl border border-gray-200 p-4 text-left hover:border-orange-400 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-600 disabled:cursor-not-allowed disabled:opacity-60"><span><strong className="block text-gray-900">{option.asset}</strong><span className="text-xs text-gray-500">{option.label.split(' · ')[1]}</span></span><ArrowRight size={18} /></button>)}</div>
         </> : stage === 'amount' ? <>
-          <h2 className="font-bold text-gray-900">Add funds with {name}</h2>
-          <label htmlFor="deposit-amount" className="block text-sm font-semibold">Amount to add to your wallet (XAF)</label>
+          <h2 className="font-bold text-gray-900">{t('addWith', {method: name})}</h2>
+          <label htmlFor="deposit-amount" className="block text-sm font-semibold">{t('walletAmount')}</label>
           <input id="deposit-amount" type="number" min={3000} max={10000000} step={1} value={amount || ''} onChange={event => setAmount(Number(event.target.value))} className="w-full rounded-xl border border-gray-300 p-4 text-xl font-bold" />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[3000, 5000, 10000, 25000].map(value => <button type="button" key={value} onClick={() => setAmount(value)} className="rounded-xl border border-gray-200 py-3 text-sm font-semibold">{value.toLocaleString()}</button>)}</div>
-          <p className="text-xs text-gray-500">Minimum: 3,000 XAF. {method === 'mtn_momo' || method === 'orange_money' ? 'No platform top-up fee. Operator fees are separate.' : 'Crypto top-up fee: 2% on top.'}</p>
+          <p className="text-xs text-gray-500">{method === 'mtn_momo' || method === 'orange_money' ? t('minimumMobile') : t('minimumCrypto')}</p>
           {quote && method === 'usdt_trc20' && <UsdtEstimate creditXaf={quote.creditXaf} feeXaf={quote.feeXaf} />}
-          {quote && <p className="rounded-xl bg-gray-50 p-4 text-sm">Wallet receives <strong>{quote.creditXaf.toLocaleString()} XAF</strong> · Fee <strong>{quote.feeXaf.toLocaleString()} XAF</strong></p>}
-          <button type="button" disabled={!valid} onClick={() => setStage('pay')} className="w-full rounded-xl bg-orange-600 p-4 font-bold text-white disabled:opacity-50">Continue</button>
+          {quote && <p className="rounded-xl bg-gray-50 p-4 text-sm">{t('walletReceives', {amount: quote.creditXaf.toLocaleString(), fee: quote.feeXaf.toLocaleString()})}</p>}
+          <button type="button" disabled={!valid} onClick={() => setStage('pay')} className="w-full rounded-xl bg-orange-600 p-4 font-bold text-white disabled:opacity-50">{c('continue')}</button>
         </> : method && <>
           <h2 className="font-bold text-gray-900">{name}</h2>
-          {!profileId ? <a href="/login?next=/add-funds" className="block rounded-xl bg-orange-600 p-4 text-center font-bold text-white">Sign in to continue</a> : (isCryptoMethod(method) ? !availability.crypto : !availability.mobile)
-            ? <p className="text-base text-amber-900">This payment method needs checking. Please do not send another payment; contact support for its status.</p> : method === 'mtn_momo' || method === 'orange_money'
+          {!profileId ? <a href="/login?next=/add-funds" className="block rounded-xl bg-orange-600 p-4 text-center font-bold text-white">{t('signInContinue')}</a> : (isCryptoMethod(method) ? !availability.crypto : !availability.mobile)
+            ? <p className="text-base text-amber-900">{t('methodChecking')}</p> : method === 'mtn_momo' || method === 'orange_money'
             ? <MobileMoneyCheckout amount={amount} token={token} initialReference={reference} selectedMethod={method} onStarted={() => setStarted(true)} />
             : <CryptoDepositPanel profileId={profileId} token={token} selectedMethod={method} walletAmount={amount} onStarted={() => setStarted(true)} />}
         </>}
       </div>
     </section>
-    {stage !== 'method' && <button type="button" onClick={leaveCheckout} className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-700">{started ? 'Leave checkout' : 'Cancel top-up'}</button>}
+    {stage !== 'method' && <button type="button" onClick={leaveCheckout} className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base font-semibold text-gray-700">{started ? t('leave') : t('cancel')}</button>}
     <PaymentSupport />
   </div>
 }

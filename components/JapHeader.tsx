@@ -6,6 +6,7 @@ import { useAppState } from '@/lib/store'
 import { createClient } from '@/lib/supabase/client'
 import { AuthModal } from '@/components/AuthModal'
 import LocalAmount from '@/components/LocalAmount'
+import LanguageSwitcher from './LanguageSwitcher'
 
 export function JapHeader({ onToggleSidebar, onOpenDeposit }: { onToggleSidebar?: () => void; onOpenDeposit: () => void }) {
   const { profile } = useAppState()
@@ -29,6 +30,7 @@ export function JapHeader({ onToggleSidebar, onOpenDeposit }: { onToggleSidebar?
         <button onClick={onOpenDeposit} aria-label="Balance — add funds" className="flex min-w-0 items-center gap-2 rounded-xl bg-blue-50 px-3 py-3 text-base font-bold text-blue-800"><LocalAmount amountXaf={profile.balance_xaf} /><Plus size={18} className="shrink-0" /></button>
       </div>
       <div className="flex items-center gap-1">
+        <LanguageSwitcher />
         <Link href="/profile" aria-label="Profile and currency settings" className="rounded-xl p-3 hover:bg-gray-50"><Settings size={22} /></Link>
         <button onClick={() => { void signOut() }} disabled={signingOut} aria-label={profile.id ? 'Sign out' : 'Sign in'} className="rounded-xl p-3 hover:bg-red-50"><LogOut size={22} /></button>
       </div>

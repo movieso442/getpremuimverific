@@ -25,8 +25,10 @@ import {
 import liveServices from '@/lib/liveServices.json'
 import { useAppState } from '@/lib/store'
 import confetti from 'canvas-confetti'
+import {useTranslations} from 'next-intl'
 
 export default function DashboardPage() {
+  const t = useTranslations('Dashboard')
   const { profile } = useAppState()
   const [allServices, setAllServices] = useState<Array<(typeof liveServices)[number] & { retail_rate_xaf?: number; avgTime?: string; usdRate?: number; rate?: number; startTime?: string; speed?: string; guaranteed?: string; description?: string }>>(liveServices)
   const allCategories = Array.from(new Set(allServices.map((s) => s.category)))
@@ -76,10 +78,10 @@ export default function DashboardPage() {
     { name: 'Discord', icon: MessageSquare, match: 'Discord' },
     { name: 'Snapchat', icon: Video, match: 'Snapchat' },
     { name: 'Twitch', icon: Music, match: 'Twitch' },
-    { name: 'Website Traffic', icon: Globe, match: 'Traffic' },
-    { name: 'Reviews', icon: Star, match: 'Reviews' },
-    { name: '+ Others', icon: Layers, match: 'CoinMarketCap' },
-    { name: 'Everything', icon: Zap, match: 'All' },
+    { name: t('websiteTraffic'), icon: Globe, match: 'Traffic' },
+    { name: t('reviews'), icon: Star, match: 'Reviews' },
+    { name: t('others'), icon: Layers, match: 'CoinMarketCap' },
+    { name: t('everything'), icon: Zap, match: 'All' },
   ]
 
   function CameraIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -93,7 +95,7 @@ export default function DashboardPage() {
   }
 
   // 1. Categories filtered by selected network
-  const availableCategories = selectedNetwork && selectedNetwork !== 'Everything'
+  const availableCategories = selectedNetwork && selectedNetwork !== t('everything')
     ? allCategories.filter((c) => {
         const netObj = networks.find(n => n.name === selectedNetwork)
         const matchKey = netObj ? netObj.match : selectedNetwork
@@ -158,11 +160,11 @@ export default function DashboardPage() {
     setOrderStatusMsg(null)
 
     if (!targetLink.trim()) {
-      setOrderStatusMsg({ type: 'error', text: 'Please enter a target link, username, or order detail keywords!' })
+      setOrderStatusMsg({ type: 'error', text: t('targetRequired') })
       return
     }
     if (quantity < currentService.min || quantity > currentService.max) {
-      setOrderStatusMsg({ type: 'error', text: `Quantity must be between ${currentService.min.toLocaleString()} and ${currentService.max.toLocaleString()}` })
+      setOrderStatusMsg({ type: 'error', text: t('quantityRange', {min: currentService.min.toLocaleString(), max: currentService.max.toLocaleString()}) })
       return
     }
 
@@ -186,19 +188,19 @@ export default function DashboardPage() {
       })
       const result = await response.json()
       if (!response.ok) {
-        setOrderStatusMsg({ type: 'error', text: result.error || 'Unable to place the live order.' })
+        setOrderStatusMsg({ type: 'error', text: result.error || t('orderFailed') })
         return
       }
 
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
       setOrderStatusMsg({
         type: 'success',
-        text: `Live order #${result.order.id} placed successfully. Provider reference: ${result.provider_order_id}.`,
+        text: t('orderSuccess', {id: result.order.id, reference: result.provider_order_id}),
         link: '/orders'
       })
       setTargetLink('')
     } catch {
-      setOrderStatusMsg({ type: 'error', text: 'Could not connect to the live order service. No funds were charged.' })
+      setOrderStatusMsg({ type: 'error', text: t('connection') })
     }
   }
 
@@ -218,13 +220,13 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-2xs">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs font-bold text-[#3b82f6] uppercase tracking-wider">
-              CHOOSE A SOCIAL NETWORK
+              {t('network')}
             </h2>
             <button
               onClick={() => setShowFilterGrid(false)}
               className="text-xs font-semibold text-gray-400 hover:text-gray-600 transition flex items-center gap-1"
             >
-              <span>Hide the filter</span>
+              <span>{t('hideFilter')}</span>
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -259,7 +261,7 @@ export default function DashboardPage() {
             onClick={() => setShowFilterGrid(true)}
             className="text-xs font-bold text-[#3b82f6] hover:underline flex items-center gap-1"
           >
-            <span>Show Social Network Filter Grid</span>
+            <span>{t('showFilter')}</span>
             <ChevronDown className="w-3.5 h-3.5 rotate-180" />
           </button>
         </div>
@@ -276,15 +278,15 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
                 <div className="text-xs">
-                  <span className="font-extrabold text-sm block">Insufficient Balance ({profile.balance_xaf.toLocaleString()} XAF)</span>
-                  <span>You need {chargeXaf.toLocaleString()} XAF to place this SMM order. Redirecting you to the Top Up page...</span>
+                  <span className="font-extrabold text-sm block">{t('insufficient', {balance: profile.balance_xaf.toLocaleString()})}</span>
+                  <span>{t('needTopup', {amount: chargeXaf.toLocaleString()})}</span>
                 </div>
               </div>
               <button
                 onClick={() => router.push(`/add-funds?amount=${chargeXaf}&reason=insufficient_balance`)}
                 className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shrink-0 flex items-center gap-1 transition"
               >
-                <span>Top Up Now</span>
+                <span>{t('topupNow')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -300,7 +302,7 @@ export default function DashboardPage() {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              NEW ORDER
+              {t('newOrder')}
             </button>
 
             <button
@@ -311,7 +313,7 @@ export default function DashboardPage() {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              MY FAVORITE ({favoriteServiceIds.length})
+              {t('favorite', {count: favoriteServiceIds.length})}
             </button>
 
             <button
@@ -322,7 +324,7 @@ export default function DashboardPage() {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              AUTO SUBSCRIPTION
+              {t('autoSubscription')}
             </button>
           </div>
 
@@ -336,7 +338,7 @@ export default function DashboardPage() {
                   type="text"
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
-                  placeholder="Search"
+                  placeholder={t('search')}
                   className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold text-gray-800 outline-none focus:border-[#ff5722] focus:bg-white transition"
                 />
               </div>
@@ -344,7 +346,7 @@ export default function DashboardPage() {
               {/* Category Select */}
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
-                  Category
+                  {t('category')}
                 </label>
                 <select
                   value={selectedCategory}
@@ -359,7 +361,7 @@ export default function DashboardPage() {
                   }}
                   className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition"
                 >
-                  <option value="All">All Categories ({availableCategories.length})</option>
+                  <option value="All">{t('allCategories', {count: availableCategories.length})}</option>
                   {availableCategories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
@@ -369,7 +371,7 @@ export default function DashboardPage() {
               {/* Service Select Dropdown (Exact JAP formatting from Screenshot 1, 2, 3) */}
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
-                  Service
+                  {t('service')}
                 </label>
                 <select
                   value={selectedServiceId}
@@ -392,18 +394,18 @@ export default function DashboardPage() {
               {/* Average time line (Exact match to JAP Screenshots 1, 3) */}
               <div className="bg-[#f8fafc] border border-gray-200/80 rounded-xl p-3 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-                  <span>Average time</span>
+                  <span>{t('averageTime')}</span>
                   <HelpCircle className="w-3.5 h-3.5 text-gray-400" />
                 </div>
                 <div className="text-xs font-extrabold text-gray-900">
-                  {currentService?.avgTime || 'Instant'}
+                  {currentService?.avgTime || t('instant')}
                 </div>
               </div>
 
               {/* Link / Target URL Input */}
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
-                  Link
+                  {t('link')}
                 </label>
                 <input
                   type="text"
@@ -417,7 +419,7 @@ export default function DashboardPage() {
               {/* Quantity Input */}
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">
-                  Quantity
+                  {t('quantity')}
                 </label>
                 <input
                   type="number"
@@ -428,14 +430,14 @@ export default function DashboardPage() {
                   className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-sm font-bold text-gray-900 outline-none focus:border-[#ff5722] focus:bg-white transition font-mono"
                 />
                 <div className="text-[11px] font-semibold text-gray-400 mt-1">
-                  Min: {currentService?.min.toLocaleString()} - Max: {currentService?.max.toLocaleString()}
+                  {t('range', {min: currentService?.min.toLocaleString() || '', max: currentService?.max.toLocaleString() || ''})}
                 </div>
               </div>
 
               {/* Calculated Charge */}
               <div className="bg-[#f8fafc] border border-gray-200 rounded-xl p-4 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Charge</div>
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('charge')}</div>
                   <div className="text-2xl font-black text-[#ff5722]">
                     {chargeXaf.toLocaleString()} XAF
                   </div>
@@ -449,7 +451,7 @@ export default function DashboardPage() {
                       ? 'bg-amber-50 border-amber-200 text-amber-500'
                       : 'bg-white border-gray-200 text-gray-400 hover:text-amber-500'
                   }`}
-                  title="Add to Favorites"
+                  title={t('addFavorite')}
                 >
                   <Star className="w-5 h-5 fill-current" />
                 </button>
@@ -462,7 +464,7 @@ export default function DashboardPage() {
                   <span>{orderStatusMsg.text}</span>
                   {orderStatusMsg.link && (
                     <Link href={orderStatusMsg.link} className="font-extrabold text-[#ff5722] hover:underline shrink-0">
-                      View Orders &rarr;
+                      {t('viewOrders')}
                     </Link>
                   )}
                 </div>
@@ -473,7 +475,7 @@ export default function DashboardPage() {
                 type="submit"
                 className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-sm uppercase tracking-wider transition shadow-md flex items-center justify-center gap-2"
               >
-                <span>SUBMIT</span>
+                <span>{t('submit')}</span>
               </button>
 
             </form>
@@ -481,7 +483,7 @@ export default function DashboardPage() {
 
           {activeTab === 'MY_FAVORITE' && (
             <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4 shadow-2xs">
-              <h3 className="text-sm font-bold text-gray-900">Your Favorite Services</h3>
+              <h3 className="text-sm font-bold text-gray-900">{t('favoritesTitle')}</h3>
               <div className="space-y-2">
                 {favoriteServiceIds.map((id: number) => {
                   const srv = allServices.find((s) => s.id === id)
@@ -490,7 +492,7 @@ export default function DashboardPage() {
                     <div key={id} className="p-3 rounded-xl border border-gray-200 flex items-center justify-between text-xs">
                       <div>
                         <div className="font-bold text-gray-900">#{srv.id} - {srv.name}</div>
-                        <div className="text-[10px] text-gray-500">From {Number(srv.retail_rate_xaf || 0).toLocaleString()} XAF / 1,000</div>
+                        <div className="text-[10px] text-gray-500">{t('from', {amount: Number(srv.retail_rate_xaf || 0).toLocaleString()})}</div>
                       </div>
                       <button
                         onClick={() => {
@@ -501,7 +503,7 @@ export default function DashboardPage() {
                         }}
                         className="px-3.5 py-1.5 rounded-lg bg-[#ff5722] text-white font-bold text-[11px]"
                       >
-                        Select
+                        {t('select')}
                       </button>
                     </div>
                   )
@@ -512,10 +514,10 @@ export default function DashboardPage() {
 
           {activeTab === 'AUTO_SUBSCRIPTION' && (
             <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4 text-xs text-gray-600 shadow-2xs">
-              <h3 className="text-sm font-bold text-gray-900">Auto Subscriptions</h3>
-              <p>Set up automated post likes, views, and comments for your account whenever you post content.</p>
+              <h3 className="text-sm font-bold text-gray-900">{t('subscriptionsTitle')}</h3>
+              <p>{t('subscriptionsBody')}</p>
               <Link href="/subscriptions" className="inline-block px-4 py-2 bg-[#2563eb] text-white font-bold rounded-xl text-xs">
-                Manage Subscriptions
+                {t('manageSubscriptions')}
               </Link>
             </div>
           )}
@@ -528,12 +530,12 @@ export default function DashboardPage() {
           {/* Top Search bar inside right card */}
           <div className="flex items-center gap-2">
             <button className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 font-bold text-xs uppercase shadow-2xs">
-              NEW ORDER
+              {t('newOrder')}
             </button>
             <div className="relative flex-1">
               <input
                 type="text"
-                placeholder="Search for your orders"
+                placeholder={t('searchOrders')}
                 className="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-xs text-gray-700 outline-none"
               />
             </div>
@@ -544,43 +546,43 @@ export default function DashboardPage() {
             
             {/* Service Title & Price */}
             <div className="text-xs font-extrabold text-gray-900 leading-relaxed font-mono">
-              {currentService?.id} - {currentService?.name} - {retailRateXaf.toLocaleString()} XAF per 1,000
+              {currentService?.id} - {currentService?.name} - {t('perThousand', {amount: retailRateXaf.toLocaleString()})}
             </div>
 
             {/* 4-Grid Specification Metrics (Exact match to Screenshots 1, 2, 4) */}
             <div className="grid grid-cols-2 gap-4 border-y border-gray-100 py-4">
               <div>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">START TIME</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('startTime')}</div>
                 <div className={`text-xs font-extrabold mt-0.5 ${currentService?.startTime === 'N/A' ? 'text-red-500' : 'text-[#ea580c]'}`}>
-                  {currentService?.startTime || 'See service description'}
+                  {currentService?.startTime || t('seeDescription')}
                 </div>
               </div>
 
               <div>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">SPEED</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('speed')}</div>
                 <div className={`text-xs font-extrabold mt-0.5 ${currentService?.speed === 'N/A' ? 'text-red-500' : 'text-[#ea580c]'}`}>
-                  {currentService?.speed || 'See service description'}
+                  {currentService?.speed || t('seeDescription')}
                 </div>
               </div>
 
               <div>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GUARANTEED</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('guarantee')}</div>
                 <div className={`text-xs font-extrabold mt-0.5 ${currentService?.guaranteed === 'N/A' ? 'text-red-500' : 'text-gray-800'}`}>
-                  {currentService?.guaranteed || (currentService?.refill ? 'Refill available — see terms' : 'No refill specified')}
+                  {currentService?.guaranteed || (currentService?.refill ? t('refillAvailable') : t('noRefill'))}
                 </div>
               </div>
 
               <div>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AVERAGE TIME</div>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('averageTime')}</div>
                 <div className="text-xs font-extrabold text-[#ea580c] mt-0.5">
-                  {currentService?.avgTime || 'Not specified'}
+                  {currentService?.avgTime || t('notSpecified')}
                 </div>
               </div>
             </div>
 
             {/* Description Details (Exact match to Screenshots 1, 2) */}
             <div className="space-y-2">
-              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">DESCRIPTION</div>
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('description')}</div>
               <div className="text-xs text-gray-700 leading-relaxed font-medium whitespace-pre-line bg-gray-50/70 p-3 rounded-xl border border-gray-100">
                 {currentService?.description}
               </div>
@@ -590,10 +592,10 @@ export default function DashboardPage() {
             <div className="bg-[#f0f7ff] border border-[#dbeafe] rounded-xl p-3.5 text-xs text-[#1e40af]">
               <div className="font-bold mb-1 flex items-center gap-1.5">
                 <Info className="w-4 h-4 text-[#2563eb]" />
-                <span>Quality & Guarantee</span>
+                <span>{t('quality')}</span>
               </div>
               <div className="text-[11px] leading-snug text-gray-700">
-                Automated high-speed server execution via JustAnotherPanel API v2.
+                {t('qualityBody')}
               </div>
             </div>
 
