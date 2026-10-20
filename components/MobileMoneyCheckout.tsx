@@ -5,9 +5,11 @@ import { cameroonPhone, depositXaf, type MobileMoneyMethod } from '@/lib/payment
 import { recordAnalytics } from './AnalyticsTracker'
 import { topupQuote } from '@/lib/payments/topup-fees'
 import {useTranslations} from 'next-intl'
+import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 export default function MobileMoneyCheckout({ amount, token, initialReference, selectedMethod = 'mtn_momo', onStarted }: { amount: number; token?: string; initialReference?: string | null; selectedMethod?: MobileMoneyMethod; onStarted?: () => void }) {
   const t = useTranslations('MobileMoney')
+  const minimumXaf = usePlatformSettings().minimum_topup_xaf
   const [method, setMethod] = useState<MobileMoneyMethod>(selectedMethod)
   const [phone, setPhone] = useState('')
   const [reference, setReference] = useState(initialReference || '')
@@ -52,12 +54,12 @@ export default function MobileMoneyCheckout({ amount, token, initialReference, s
   const pay = async (event: React.FormEvent) => {
     event.preventDefault()
     if (locked.current) return
-    if (!cameroonPhone(phone) || depositXaf(amount) === null) { setMessage(t('invalid')); return }
+    if (!cameroonPhone(phone) || depositXaf(amount, 'XAF', minimumXaf) === null) { setMessage(t('invalid')); return }
     locked.current = true
     onStarted?.()
     setBusy(true)
     setPaymentAmount(amount)
-    setVerifiedFee(topupQuote(amount, method).feeXaf)
+    setVerifiedFee(topupQuote(amount, method, minimumXaf).feeXaf)
     setMessage(t('sending'))
     requestId.current ||= crypto.randomUUID()
     if (!token) {
@@ -89,7 +91,7 @@ export default function MobileMoneyCheckout({ amount, token, initialReference, s
   }
   const pending = status === 'pending' || status === 'manual_pending'
   const credit = paymentAmount ?? amount
-  const fee = verifiedFee ?? (Number.isInteger(credit) && credit >= 3000 && credit <= 10000000 ? topupQuote(credit, method).feeXaf : 0)
+  const fee = verifiedFee ?? (Number.isInteger(credit) && credit >= minimumXaf && credit <= 10000000 ? topupQuote(credit, method, minimumXaf).feeXaf : 0)
   return <form onSubmit={pay} className="space-y-4 text-gray-900">
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm space-y-2">
       <p className="flex justify-between gap-3"><span>{t('walletCredit')}</span><strong>{(paymentAmount ?? amount).toLocaleString()} XAF</strong></p>

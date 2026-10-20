@@ -18,8 +18,8 @@ export async function PATCH(request: Request) {
     const { claim_id, action, approved_amount_xaf } = await request.json()
     if (typeof claim_id !== 'string' || !['confirm', 'reject'].includes(action))
       return NextResponse.json({ error: 'A claim and review action are required.' }, { status: 400 })
-    if (approved_amount_xaf != null && (!Number.isInteger(approved_amount_xaf) || approved_amount_xaf < 3000 || approved_amount_xaf > 10000000))
-      return NextResponse.json({ error: 'Enter a verified whole XAF credit between 3,000 and 10,000,000.' }, { status: 400 })
+    if (approved_amount_xaf != null && (!Number.isInteger(approved_amount_xaf) || approved_amount_xaf <= 0 || approved_amount_xaf > 10000000))
+      return NextResponse.json({ error: 'Enter a verified whole positive XAF credit up to 10,000,000.' }, { status: 400 })
     const { data, error } = await access.admin.rpc('review_manual_payment', {
       p_claim_id: claim_id, p_reviewer: access.profile.id, p_action: action, p_amount_xaf: approved_amount_xaf ?? null,
     })

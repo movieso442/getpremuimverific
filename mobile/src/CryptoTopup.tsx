@@ -20,6 +20,10 @@ export default function CryptoTopup({ active, onCredit }: { active: boolean; onC
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [usdRate, setUsdRate] = useState<{ rate: number; date: string } | null>(null)
+  const [minimumXaf, setMinimumXaf] = useState(3000)
+  useEffect(() => { if (!active) return; let mounted = true; void api<{ minimum_topup_xaf: number }>('/api/platform').then(result => {
+    if (mounted && Number.isInteger(result.minimum_topup_xaf)) setMinimumXaf(result.minimum_topup_xaf)
+  }).catch(() => undefined); return () => { mounted = false } }, [active])
   const locked = useRef(false)
   const previousClaim = useRef<string | null>(null)
   const load = useCallback(async () => {
@@ -50,7 +54,7 @@ export default function CryptoTopup({ active, onCredit }: { active: boolean; onC
   }, [active, method])
   const selected = status?.methods?.[method]
   const credit = Number(amount)
-  const validCredit = Number.isInteger(credit) && credit >= 3000 && credit <= 10000000
+  const validCredit = Number.isInteger(credit) && credit >= minimumXaf && credit <= 10000000
   const fee = validCredit ? Math.ceil(credit * 0.02) : 0
   const blocked = !status?.crypto_available || Boolean(status?.pending_claim || status?.pending_mobile)
   const submit = async () => {
@@ -83,7 +87,8 @@ export default function CryptoTopup({ active, onCredit }: { active: boolean; onC
       <View style={s.choices}>{Object.entries(status.methods).map(([key, option]) => <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: method === key, disabled: blocked }} disabled={blocked} onPress={() => { setMethod(key); setSent(false); setNotice('') }} style={[s.choice, method === key && s.selected]}><Text style={s.choiceText}>{option.label}</Text></Pressable>)}</View>
       <Text style={s.label}>Amount to add to your wallet (XAF)</Text>
       <TextInput accessibilityLabel="Wallet credit in XAF" style={s.input} value={amount} onChangeText={value => { setAmount(value); setSent(false) }} keyboardType="number-pad" editable={!blocked && !busy} />
-      <View style={s.choices}>{[3000,5000,10000,25000].map(value => <Pressable key={value} accessibilityRole="button" disabled={blocked} onPress={() => { setAmount(String(value)); setSent(false) }} style={s.choice}><Text style={s.choiceText}>{money(value)}</Text></Pressable>)}</View>
+      <Text style={s.small}>Minimum {money(minimumXaf)} (about US$3 at the daily reference rate).</Text>
+      <View style={s.choices}>{[minimumXaf,5000,10000,25000].map(value => <Pressable key={value} accessibilityRole="button" disabled={blocked} onPress={() => { setAmount(String(value)); setSent(false) }} style={s.choice}><Text style={s.choiceText}>{money(value)}</Text></Pressable>)}</View>
       {validCredit && <View style={s.quote}><Text style={s.text}>Wallet credit: {money(credit)}</Text><Text style={s.text}>2% fee: {money(fee)}</Text><Text style={s.strong}>Transfer value: {money(credit + fee)} plus network fees</Text>{method === 'usdt_trc20' && usdRate && <><Text style={s.text}>Estimated USDT: {(credit * usdRate.rate).toFixed(6)} credit + {(fee * usdRate.rate).toFixed(6)} fee = {((credit + fee) * usdRate.rate).toFixed(6)} total</Text><Text style={s.small}>USD reference dated {usdRate.date}; approximately 1 USD per USDT. Confirm the exact amount before sending.</Text></>}</View>}
       {selected && validCredit && !blocked && <><ActionButton secondary title="Confirm exact crypto amount with support" onPress={confirm} /><View style={s.card}><Text style={s.label}>{selected.label} receiving address</Text><Text selectable style={s.address}>{selected.address}</Text><ActionButton secondary title="Copy receiving address" onPress={() => void Clipboard.setStringAsync(selected.address).then(() => setNotice('Address copied.')).catch(() => setNotice('Press and hold the address to copy it.'))} /><Text style={s.small}>Send only {selected.asset} on this network. Confirm the exact amount with support first and pay network fees separately.</Text></View>
         {!sent ? <ActionButton title="I've paid" onPress={() => setSent(true)} /> : <View style={s.card}><Text style={s.title}>Find your payment</Text><Text style={s.text}>Paste the transaction ID or explorer link and enter the exact amount shown in your receipt.</Text><Text style={s.label}>Payment reference</Text><TextInput accessibilityLabel="Crypto transaction ID or explorer link" style={s.input} value={reference} onChangeText={setReference} autoCapitalize="none" editable={!busy} /><Text style={s.label}>Amount sent ({selected.asset})</Text><TextInput accessibilityLabel={`Amount sent in ${selected.asset}`} style={s.input} value={sentAmount} onChangeText={setSentAmount} keyboardType="decimal-pad" editable={!busy} /><ActionButton title={busy ? 'Submitting…' : 'Find my payment'} disabled={busy} onPress={() => void submit()} /></View>}</>}

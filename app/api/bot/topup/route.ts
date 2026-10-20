@@ -6,6 +6,7 @@ import { getPayunitConfig } from '@/lib/payments/payunit'
 import { cameroonPhone, mobileMoneyMethod, depositXaf } from '@/lib/payments/mobile-money'
 import { reconcilePayunit, requestMobileMoney } from '@/lib/payments/payunit-direct'
 import { topupQuote } from '@/lib/payments/topup-fees'
+import { getMinimumTopupXaf } from '@/lib/payments/minimum'
 
 export const dynamic = 'force-dynamic'
 type BotPaymentLink = { id: string; profile_id: string; amount_xaf: number | string; payment_reference: string | null; expires_at: string }
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
     const { data: claim } = await admin.from('manual_payment_claims').select('status').eq('bot_payment_link_id', link.id).maybeSingle()
     const status = transaction ? await reconcilePayunit(admin, transaction) : claim?.status === 'confirmed' ? 'completed' : claim?.status === 'pending' ? 'manual_pending' : claim?.status || 'ready'
     if (status === 'completed') scheduleAdminNotifications(admin)
-    return NextResponse.json({ amount_xaf: Number(link.amount_xaf), service_fee_xaf: transaction ? Number(transaction.service_fee_xaf) : (claim ? topupQuote(Number(link.amount_xaf)).feeXaf : 0), expires_at: link.expires_at, reference: link.payment_reference, status }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ amount_xaf: Number(link.amount_xaf), service_fee_xaf: transaction ? Number(transaction.service_fee_xaf) : (claim ? Math.ceil(Number(link.amount_xaf) * 0.02) : 0), expires_at: link.expires_at, reference: link.payment_reference, status }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return NextResponse.json({ error: 'Could not check this payment yet.' }, { status: 502 }) }
 }
 export async function POST(request: Request) {
@@ -38,18 +39,19 @@ export async function POST(request: Request) {
     if (!phone || !mobileMoneyMethod(body.payment_method)) return NextResponse.json({ error: 'Choose MTN or Orange and enter your Cameroon mobile number.' }, { status: 400 })
     const link = await loadLink(body.token)
     if (!link) return expired()
-    const amount = depositXaf(Number(link.amount_xaf))
-    if (!amount) return NextResponse.json({ error: 'Request a new link for at least 3,000 XAF.' }, { status: 400 })
+    const admin = createAdminClient()
+    const minimumXaf = await getMinimumTopupXaf(admin)
+    const amount = depositXaf(Number(link.amount_xaf), 'XAF', minimumXaf)
+    if (!amount) return NextResponse.json({ error: `Request a new link for at least ${minimumXaf.toLocaleString()} XAF.` }, { status: 400 })
     const config = getPayunitConfig()
     if (!config) return NextResponse.json({ error: 'Payments are temporarily unavailable.' }, { status: 503 })
-    const admin = createAdminClient()
     const { data: claim } = await admin.from('manual_payment_claims').select('id').eq('bot_payment_link_id', link.id).maybeSingle()
     if (claim) return NextResponse.json({ error: 'This payment is submitted for manual review. Request a new link for another payment.' }, { status: 409 })
     if (link.payment_reference) {
       const { data: existing } = await admin.from('wallet_transactions').select('status').eq('profile_id', link.profile_id).eq('reference', link.payment_reference).maybeSingle()
       return NextResponse.json({ reference: link.payment_reference, status: existing?.status || 'pending', credited: existing?.status === 'completed' })
     }
-    const quote = topupQuote(amount, body.payment_method)
+    const quote = topupQuote(amount, body.payment_method, minimumXaf)
     const reference = 'PVB' + randomUUID().replace(/-/g, '')
     const { data: reserved, error: reservationError } = await admin.rpc('start_wallet_topup', { p_profile: link.profile_id, p_reference: reference, p_credit: amount, p_method: body.payment_method, p_link: link.id })
     if (reservationError?.code === 'P0001') return NextResponse.json({ error: 'An existing payment is being checked. Contact support before paying again.' }, { status: 409 })

@@ -5,7 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { getOrCreateTelegramCustomer } from '@/lib/bots/customers'
-import { createBotCheckoutLink } from '@/lib/bots/checkout'
+import { createBotCheckoutLink, getBotTopupMinimumXaf } from '@/lib/bots/checkout'
 import { topupCommand } from '@/lib/bots/topup-command'
 import { fetchFiveSimCountries, fetchFiveSimProducts, fetchFiveSimQuote } from '@/lib/providers/fivesim'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
@@ -276,7 +276,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
 
     return (
       `💳 <b>Add funds</b>\n\n` +
-      `Reply with the amount in XAF you wish to deposit (Minimum: 3,000 XAF / about US$5).\n\n` +
+      `Reply with the amount in XAF you wish to deposit (minimum: about US$3 at the daily reference rate).\n\n` +
       `<i>Example:</i> <code>5000</code> or <code>10000</code>`
     )
   }
@@ -284,7 +284,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   // If in PAY step and user enters a number
   if (session.step === 'PAY' && !isNaN(Number(text))) {
     const amount = Number(text)
-    if (amount >= 3000) {
+    if (amount >= await getBotTopupMinimumXaf()) {
       userSessions[chatId] = { step: 'MAIN' }
       const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
       if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'

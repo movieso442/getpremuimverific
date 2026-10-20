@@ -8,7 +8,7 @@ export function DepositModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     <section role="dialog" aria-modal="true" aria-label="Add wallet funds" className="relative w-full max-w-md rounded-2xl bg-white p-6">
       <button onClick={onClose} aria-label="Close" className="absolute right-3 top-3 rounded-lg p-2"><X size={20} /></button>
       <Wallet className="mb-3 text-orange-600" /><h2 className="text-xl font-bold">Add wallet funds</h2>
-      <p className="my-4 text-sm text-gray-600">Choose MTN MoMo or Orange Money in your secure checkout, or submit a crypto deposit for verification. Minimum deposit: 3,000 XAF.</p>
+      <p className="my-4 text-sm text-gray-600">Choose MTN MoMo or Orange Money in secure checkout, or submit a crypto deposit for verification. Minimum deposit: approximately US$3 in XAF at the daily reference rate.</p>
       <Link href="/add-funds" onClick={onClose} className="block rounded-xl bg-orange-600 p-3 text-center font-bold text-white">Open wallet checkout</Link>
     </section>
   </div>

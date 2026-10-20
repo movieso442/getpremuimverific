@@ -63,5 +63,18 @@ try {
   assert.equal((await db.query("SELECT * FROM storage.objects WHERE bucket_id='other-bucket'")).rows.length, 1)
   await assert.rejects(db.query("INSERT INTO storage.objects(bucket_id) VALUES('payment-receipts')"), /row-level security/)
   await db.exec('RESET ROLE')
+  await db.exec('CREATE SCHEMA auth; CREATE TABLE auth.users(id UUID PRIMARY KEY,email TEXT,email_confirmed_at TIMESTAMPTZ,is_anonymous BOOLEAN)')
+  await db.exec(await readFile('supabase/daily-topup-minimum-upgrade.sql', 'utf8'))
+  const min = (await db.query('SELECT set_daily_topup_reference(1.1253,current_date) AS amount')).rows[0].amount
+  assert.equal(Number(min), Math.ceil(3 * 655.957 / 1.1253))
+  const newProfile = '66666666-6666-4666-8666-666666666666'
+  await db.query("INSERT INTO profiles(id,role) VALUES($1,'client')", [newProfile])
+  await assert.rejects(db.query("SELECT start_wallet_topup($1,'PV-under', $2,'mtn_momo',NULL)", [newProfile, Number(min)-1]), /Invalid top-up/)
+  const lower = (await db.query("SELECT start_wallet_topup($1,'PV-three-usd',$2,'mtn_momo',NULL) AS result", [newProfile, min])).rows[0].result
+  assert.equal(lower.created, true)
+  const cryptoProfile = '77777777-7777-4777-8777-777777777777'
+  await db.query("INSERT INTO profiles(id,role) VALUES($1,'client')", [cryptoProfile])
+  const lowerClaim = (await db.query("SELECT submit_crypto_payment($1,'usdt_trc20',$2,3,$3,'test-receiving-address',NULL) AS id", [cryptoProfile, 'd'.repeat(64), min])).rows[0].id
+  assert.ok(lowerClaim)
   console.log('PASS SQL: mobile fee zero, crypto fee 2%, exactly-once credit/retries, browser RPC denied, private receipt policy blocks broad browser grants without affecting other buckets')
 } finally { await db.close() }

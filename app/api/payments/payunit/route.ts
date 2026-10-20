@@ -7,24 +7,26 @@ import { getPayunitConfig } from '@/lib/payments/payunit'
 import { cameroonPhone, depositXaf, mobileMoneyMethod } from '@/lib/payments/mobile-money'
 import { reconcilePayunit, requestMobileMoney } from '@/lib/payments/payunit-direct'
 import { topupQuote } from '@/lib/payments/topup-fees'
+import { getTopupReference } from '@/lib/payments/minimum'
 
 export const dynamic = 'force-dynamic'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     if (body.accepted_fee_percent !== 0) return NextResponse.json({ error: 'Refresh checkout or update your Android app. MTN and Orange no longer have a platform top-up fee.' }, { status: 409 })
-    const amount = depositXaf(body.amount, body.currency || 'XAF')
-    const phone = cameroonPhone(body.phone_number)
-    if (!amount || !phone || !mobileMoneyMethod(body.payment_method)) return NextResponse.json({ error: 'Choose MTN or Orange, enter a Cameroon mobile number, and an amount between 3,000 and 10,000,000 XAF.' }, { status: 400 })
     const user = await customerUser(request)
     if (!user) return NextResponse.json({ error: 'Sign in before adding funds.' }, { status: 401 })
     const admin = createAdminClient()
+    const { minimumXaf, usdXafRate } = await getTopupReference(admin)
+    const amount = depositXaf(body.amount, body.currency || 'XAF', minimumXaf, usdXafRate)
+    const phone = cameroonPhone(body.phone_number)
+    if (!amount || !phone || !mobileMoneyMethod(body.payment_method)) return NextResponse.json({ error: `Choose MTN or Orange, enter a Cameroon mobile number, and an amount between ${minimumXaf.toLocaleString()} and 10,000,000 XAF.` }, { status: 400 })
     const { data: profile, error } = await admin.from('profiles').select('id').eq('user_id', user.id).single()
     if (error || !profile) return NextResponse.json({ error: 'Your wallet profile is unavailable.' }, { status: 409 })
     const config = getPayunitConfig()
     if (!config) return NextResponse.json({ error: 'Payments are temporarily unavailable.' }, { status: 503 })
     if (body.idempotency_key && (typeof body.idempotency_key !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.idempotency_key))) return NextResponse.json({ error: 'Invalid payment request ID.' }, { status: 400 })
-    const quote = topupQuote(amount, body.payment_method)
+    const quote = topupQuote(amount, body.payment_method, minimumXaf)
     const reference = `PV${(body.idempotency_key || randomUUID()).replace(/-/g, '')}`
     const { data: reserved, error: insertError } = await admin.rpc('start_wallet_topup', { p_profile: profile.id, p_reference: reference, p_credit: amount, p_method: body.payment_method, p_link: null })
     if (insertError?.code === 'P0001') return NextResponse.json({ error: 'An existing payment is being checked. Check your wallet or contact support before paying again.' }, { status: 409 })

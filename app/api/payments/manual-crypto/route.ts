@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { CRYPTO_METHODS, isCryptoMethod, validCryptoAmount, validCryptoHash } from '@/lib/payments/manual-crypto'
 import { normalizeCryptoReference } from '@/lib/payments/crypto-reference'
+import { getMinimumTopupXaf } from '@/lib/payments/minimum'
 
 async function customer(request: Request, token?: string) {
   const admin = createAdminClient()
@@ -61,14 +62,15 @@ export async function POST(request: Request) {
     if (body.accepted_fee_percent !== 2) return NextResponse.json({ error: 'Refresh checkout and review the 2% service fee before submitting.' }, { status: 409 })
     const access = await customer(request, typeof body.token === 'string' ? body.token : undefined)
     if (!access) return NextResponse.json({ error: 'Sign in before submitting a deposit.' }, { status: 401 })
+    const minimumXaf = await getMinimumTopupXaf(access.admin)
     const { payment_method, transfer_reference, crypto_amount, amount_xaf } = body
     const normalized = typeof payment_method === 'string' && isCryptoMethod(payment_method) && typeof transfer_reference === 'string'
       ? normalizeCryptoReference(payment_method, transfer_reference) : null
     if (typeof payment_method !== 'string' || !isCryptoMethod(payment_method)
       || !normalized || !validCryptoHash(payment_method, normalized)
       || typeof crypto_amount !== 'string' || !validCryptoAmount(payment_method, crypto_amount)
-      || !Number.isInteger(amount_xaf) || amount_xaf < 3000 || amount_xaf > 10000000) {
-      return NextResponse.json({ error: 'Enter the payment reference from your receipt, the crypto amount sent and at least 3,000 XAF wallet credit.' }, { status: 400 })
+      || !Number.isInteger(amount_xaf) || amount_xaf < minimumXaf || amount_xaf > 10000000) {
+      return NextResponse.json({ error: `Enter the payment reference from your receipt, the crypto amount sent and at least ${minimumXaf.toLocaleString()} XAF wallet credit.` }, { status: 400 })
     }
     const { data: claimId, error } = await access.admin.rpc('submit_crypto_payment', {
       p_profile: access.profile.id, p_method: payment_method, p_hash: normalized,

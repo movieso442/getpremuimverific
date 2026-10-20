@@ -23,6 +23,7 @@ export async function PATCH(request: Request) {
       || (body.state === 'quoted' && body.quote_xaf == null)
       || (body.supplier_cost_amount != null && (typeof body.supplier_cost_amount !== 'number' || !Number.isFinite(body.supplier_cost_amount) || body.supplier_cost_amount < 0 || body.supplier_cost_amount > 10000000))
       || (body.supplier_cost_currency != null && !['USD','XAF'].includes(body.supplier_cost_currency))
+      || ((body.supplier_cost_amount == null) !== (body.supplier_cost_currency == null))
       || (body.supplier_reference != null && (typeof body.supplier_reference !== 'string' || body.supplier_reference.length > 200)))
       return Response.json({ error: 'Provide a valid review state, reference and explanation.' }, { status: 400 })
     // Manual requests never debit a wallet or trigger an automatic supplier purchase.

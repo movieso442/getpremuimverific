@@ -4,6 +4,10 @@ BeanSMS publicly documents an SMS-number reseller API, not an API for its
 Facebook/Instagram account-store products. Do not invent an account purchase
 endpoint or promise instant account delivery. The agreed interim workflow is
 manual, admin-reviewed and does not charge the customer for an enquiry.
+The owner's marketplace screenshot confirms that its dashboard lists account
+categories including Facebook, Instagram and TikTok, but a dashboard catalogue
+is not proof that those products are exposed to reseller API keys. Do not copy
+stock figures into our public site: they are time-sensitive and unverified.
 
 The same request endpoint powers `/accounts` and the Android Account screen.
 Customers see their request status and an indicative XAF quote, never the

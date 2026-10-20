@@ -112,7 +112,7 @@ export default function AdminPage() {
     if (action === 'confirm' && claim) {
       if (isCryptoMethod(claim.payment_method)) {
         approvedAmount = Number(claim.amount_xaf)
-        if (!Number.isInteger(approvedAmount) || approvedAmount < 3000 || approvedAmount > 10000000) { setError('Enter a valid verified XAF credit.'); return }
+        if (!Number.isInteger(approvedAmount) || approvedAmount <= 0 || approvedAmount > 10000000) { setError('Enter a valid verified XAF credit.'); return }
       }
       if (!window.confirm(`Verify receipt, customer ownership and that the received payment matches the agreed ${xaf(approvedAmount ?? claim.amount_xaf)}. The top-up fee is ${xaf(claim.service_fee_xaf ?? 0)} extra; verify receipt of the agreed credit plus this fee. Approve this exact wallet credit? If the amount does not match, cancel and contact the customer.`)) return
     }

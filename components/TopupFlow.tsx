@@ -10,6 +10,7 @@ import CryptoDepositPanel from './CryptoDepositPanel'
 import PaymentSupport from './PaymentSupport'
 import UsdtEstimate from './UsdtEstimate'
 import {useTranslations} from 'next-intl'
+import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 type Method = MobileMoneyMethod | CryptoMethod
 export default function TopupFlow({ profileId, token, fixedAmount, initialAmount = 5000, initialReference }: {
@@ -17,6 +18,7 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
 }) {
   const t = useTranslations('Topup')
   const c = useTranslations('Common')
+  const minimumXaf = usePlatformSettings().minimum_topup_xaf
   const router = useRouter()
   const [method, setMethod] = useState<Method | null>(initialReference ? 'mtn_momo' : null)
   const [stage, setStage] = useState<'method' | 'amount' | 'pay'>(initialReference ? 'pay' : 'method')
@@ -65,8 +67,8 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
       .finally(() => { if (!controller.signal.aborted) setChecking(false) })
     return () => controller.abort()
   }, [profileId, token, initialReference])
-  const valid = depositXaf(amount) !== null
-  const quote = valid ? topupQuote(amount, method || 'usdt_trc20') : null
+  const valid = depositXaf(amount, 'XAF', minimumXaf) !== null
+  const quote = valid ? topupQuote(amount, method || 'usdt_trc20', minimumXaf) : null
   const choose = (value: Method) => {
     checkoutId.current ||= crypto.randomUUID()
     recordCheckout('started', value)
@@ -95,9 +97,9 @@ export default function TopupFlow({ profileId, token, fixedAmount, initialAmount
         </> : stage === 'amount' ? <>
           <h2 className="font-bold text-gray-900">{t('addWith', {method: name})}</h2>
           <label htmlFor="deposit-amount" className="block text-sm font-semibold">{t('walletAmount')}</label>
-          <input id="deposit-amount" type="number" min={3000} max={10000000} step={1} value={amount || ''} onChange={event => setAmount(Number(event.target.value))} className="w-full rounded-xl border border-gray-300 p-4 text-xl font-bold" />
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[3000, 5000, 10000, 25000].map(value => <button type="button" key={value} onClick={() => setAmount(value)} className="rounded-xl border border-gray-200 py-3 text-sm font-semibold">{value.toLocaleString()}</button>)}</div>
-          <p className="text-xs text-gray-500">{method === 'mtn_momo' || method === 'orange_money' ? t('minimumMobile') : t('minimumCrypto')}</p>
+          <input id="deposit-amount" type="number" min={minimumXaf} max={10000000} step={1} value={amount || ''} onChange={event => setAmount(Number(event.target.value))} className="w-full rounded-xl border border-gray-300 p-4 text-xl font-bold" />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[minimumXaf, 5000, 10000, 25000].map(value => <button type="button" key={value} onClick={() => setAmount(value)} className="rounded-xl border border-gray-200 py-3 text-sm font-semibold">{value.toLocaleString()}</button>)}</div>
+          <p className="text-xs text-gray-500">{method === 'mtn_momo' || method === 'orange_money' ? t('minimumMobile', {amount: minimumXaf.toLocaleString()}) : t('minimumCrypto', {amount: minimumXaf.toLocaleString()})}</p>
           {quote && method === 'usdt_trc20' && <UsdtEstimate creditXaf={quote.creditXaf} feeXaf={quote.feeXaf} />}
           {quote && <p className="rounded-xl bg-gray-50 p-4 text-sm">{t('walletReceives', {amount: quote.creditXaf.toLocaleString(), fee: quote.feeXaf.toLocaleString()})}</p>}
           <button type="button" disabled={!valid} onClick={() => setStage('pay')} className="w-full rounded-xl bg-orange-600 p-4 font-bold text-white disabled:opacity-50">{c('continue')}</button>

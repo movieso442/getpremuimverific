@@ -1,5 +1,6 @@
 # The website deployment does not need native mobile source or signing data.
 /mobile/**
+/supabase/**
 /public/downloads/*.apk
 /public/downloads/*.part
 node_modules/

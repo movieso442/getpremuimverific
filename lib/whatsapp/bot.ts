@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { fetchFiveSimCountries, fetchFiveSimProducts, fetchFiveSimQuote } from '@/lib/providers/fivesim'
 import { getOrCreateWhatsAppCustomer } from '@/lib/bots/customers'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
-import { createBotCheckoutLink } from '@/lib/bots/checkout'
+import { createBotCheckoutLink, getBotTopupMinimumXaf } from '@/lib/bots/checkout'
 import { topupCommand } from '@/lib/bots/topup-command'
 import { checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
 
@@ -295,7 +295,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
 
     return (
       `💳 *Add funds*\n\n` +
-      `Reply with the amount in XAF you wish to deposit (Minimum: 3,000 XAF / about US$5).\n\n` +
+      `Reply with the amount in XAF you wish to deposit (minimum: about US$3 at the daily reference rate).\n\n` +
       `*Example:* \`5000\` or \`10000\``
     )
   }
@@ -303,7 +303,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   // If in PAY step and user enters a number
   if (session.step === 'PAY' && !isNaN(Number(text))) {
     const amount = Number(text)
-    if (amount >= 3000) {
+    if (amount >= await getBotTopupMinimumXaf()) {
       userSessions[userPhone] = { step: 'MAIN' }
       const checkoutUrl = await getPayunitCheckoutUrl(userProfile?.id, amount)
       if (!checkoutUrl) return 'I could not create a secure top-up link. Please try again in a moment.'

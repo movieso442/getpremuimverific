@@ -1,0 +1,9 @@
+# USD 3-equivalent XAF wallet minimum
+
+For one paste covering the base schema and all current non-card upgrades, run `supabase/complete-current-upgrade.sql` in the Supabase SQL Editor. It includes this migration and a dated ECB reference seed. Alternatively, run `supabase/daily-topup-minimum-upgrade.sql` after `topup-fees-upgrade.sql`. Do not run both or an older combined upgrade afterward. These changes do not revalue balances, edit historical payments, or change the crypto-only 2% fee. MTN MoMo and Orange Money still have no platform top-up fee.
+
+The existing 08:15 UTC Vercel cron fetches the latest daily USD-per-EUR observation from the ECB and stores `ceil(3 × 655.957 / USD-per-EUR)` as the whole-XAF minimum. The fixed EUR/XAF parity is from BEAC. The latest available business-day rate is used on weekends and holidays; the observation must be no older than seven days. Failed refreshes leave the prior minimum intact and are logged. The cron must have `CRON_SECRET` set in Vercel; it also handles customer follow-ups.
+
+After the SQL upgrade, call the protected cron endpoint once with the configured bearer secret (or wait for its next scheduled run) and check `/api/platform`: `minimum_topup_xaf`, `usd_per_eur_reference`, and `usd_reference_date` should be populated. The one-paste file seeds the current dated ECB observation only while it is seven days old or less; otherwise the safe legacy minimum remains 3,000 XAF until cron refreshes. The wallet, payment requests, receipt verification, and balances remain XAF; the reference rate only sets the minimum.
+
+The operator or payment aggregator may enforce an independent minimum. Test MTN and Orange sandbox/live-approved flows at the new threshold before announcing it publicly. Never credit a wallet from a browser redirect or an unverified status.

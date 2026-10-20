@@ -9,6 +9,7 @@ import { RECEIPT_MAX_BYTES } from '@/lib/payments/receipt-image'
 import UsdtEstimate from './UsdtEstimate'
 import LocalAmount from './LocalAmount'
 import {useTranslations} from 'next-intl'
+import { usePlatformSettings } from '@/lib/platform/usePlatformSettings'
 
 type Claim = { id: string; payment_method: CryptoMethod; crypto_amount: string; amount_xaf: number; approved_amount_xaf: number | null; status: string; receipt_attached?: boolean }
 export default function CryptoDepositPanel({ profileId, token, selectedMethod = 'usdt_trc20', walletAmount = 3000, onStarted }: {
@@ -16,6 +17,7 @@ export default function CryptoDepositPanel({ profileId, token, selectedMethod = 
 }) {
   const t = useTranslations('Crypto')
   const topup = useTranslations('Topup')
+  const minimumXaf = usePlatformSettings().minimum_topup_xaf
   const option = CRYPTO_METHODS[selectedMethod]
   const endpoint = `/api/payments/manual-crypto${token ? `?token=${encodeURIComponent(token)}` : ''}`
   const [cryptoAmount, setCryptoAmount] = useState('')
@@ -28,7 +30,7 @@ export default function CryptoDepositPanel({ profileId, token, selectedMethod = 
   const [receipt, setReceipt] = useState<File | null>(null)
   const [receiptAvailable, setReceiptAvailable] = useState(false)
   const locked = useRef(false)
-  const quote = walletAmount >= 3000 ? topupQuote(walletAmount, selectedMethod) : { creditXaf: walletAmount, feeXaf: 0, totalXaf: walletAmount }
+  const quote = walletAmount >= minimumXaf ? topupQuote(walletAmount, selectedMethod, minimumXaf) : { creditXaf: walletAmount, feeXaf: 0, totalXaf: walletAmount }
   useEffect(() => {
     if (!profileId) return
     let disposed = false

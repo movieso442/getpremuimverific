@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {collectCataloguePages} from '@/lib/smm/catalogue'
+import { FALLBACK_MINIMUM_TOPUP_XAF } from '@/lib/payments/minimum'
 
 export type PlatformSettings = {
   support_email: string
@@ -7,6 +8,9 @@ export type PlatformSettings = {
   whatsapp_number: string
   smm_markup_multiplier: number
   sms_markup_multiplier: number
+  minimum_topup_xaf: number
+  usd_per_eur_reference: number | null
+  usd_reference_date: string | null
 }
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
@@ -15,6 +19,9 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   whatsapp_number: '237640796062',
   smm_markup_multiplier: 3,
   sms_markup_multiplier: 3,
+  minimum_topup_xaf: FALLBACK_MINIMUM_TOPUP_XAF,
+  usd_per_eur_reference: null,
+  usd_reference_date: null,
 }
 
 export function retailPrice(providerCostXaf: number, multiplier = 3) {
@@ -61,7 +68,7 @@ export function smmRetailRateXaf(providerRateUsd: number, multiplier: number, ov
 
 export async function getPlatformSettings(admin: SupabaseClient): Promise<PlatformSettings> {
   const { data, error } = await admin.from('platform_settings')
-    .select('support_email, support_phone, whatsapp_number, smm_markup_multiplier, sms_markup_multiplier')
+    .select('support_email, support_phone, whatsapp_number, smm_markup_multiplier, sms_markup_multiplier, minimum_topup_xaf, usd_per_eur_reference, usd_reference_date')
     .eq('id', true)
     .maybeSingle()
   if (error || !data) return DEFAULT_PLATFORM_SETTINGS
@@ -71,5 +78,8 @@ export async function getPlatformSettings(admin: SupabaseClient): Promise<Platfo
     whatsapp_number: data.whatsapp_number || DEFAULT_PLATFORM_SETTINGS.whatsapp_number,
     smm_markup_multiplier: Number(data.smm_markup_multiplier) || DEFAULT_PLATFORM_SETTINGS.smm_markup_multiplier,
     sms_markup_multiplier: Number(data.sms_markup_multiplier) || DEFAULT_PLATFORM_SETTINGS.sms_markup_multiplier,
+    minimum_topup_xaf: Number(data.minimum_topup_xaf) || FALLBACK_MINIMUM_TOPUP_XAF,
+    usd_per_eur_reference: data.usd_per_eur_reference == null ? null : Number(data.usd_per_eur_reference),
+    usd_reference_date: data.usd_reference_date || null,
   }
 }
