@@ -14,7 +14,8 @@ test('daily ECB USD/EUR observation sets a whole-XAF USD 3 threshold', () => {
   assert.equal(depositXaf(3, 'USD', result.minimumTopupXaf, 655.957 / 1.1253), result.minimumTopupXaf)
   assert.equal(depositXaf(2.99, 'USD', result.minimumTopupXaf, 655.957 / 1.1253), null)
   assert.deepEqual(topupQuote(result.minimumTopupXaf, 'mtn_momo', result.minimumTopupXaf), {
-    creditXaf: result.minimumTopupXaf, feeXaf: 0, totalXaf: result.minimumTopupXaf,
+    creditXaf: result.minimumTopupXaf, feeXaf: Math.ceil(result.minimumTopupXaf * 0.02),
+    totalXaf: result.minimumTopupXaf + Math.ceil(result.minimumTopupXaf * 0.02),
   })
   assert.equal(topupQuote(result.minimumTopupXaf, 'usdt_trc20', result.minimumTopupXaf).feeXaf,
     Math.ceil(result.minimumTopupXaf * 0.02))

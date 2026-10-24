@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/admin/auth'
 import { syncSmmOrder } from '@/lib/smm/sync'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
+import { syncSmsOrder } from '@/lib/sms/sync'
 export async function GET() {
   const access=await requireAdmin()
   if('error' in access)return Response.json({error:access.error},{status:access.status})
@@ -9,7 +10,10 @@ export async function GET() {
   const ids=(requests||[]).map(request=>request.transaction_id)
   const transactions=ids.length ? await access.admin.from('wallet_transactions').select('id,reference,amount,type,payment_method,status,created_at').in('id',ids) : {data:[],error:null}
   if(transactions.error)return Response.json({error:'Could not load the original ledger records.'},{status:503})
-  return Response.json({requests:(requests||[]).map(request=>({...request,transaction:transactions.data?.find(tx=>tx.id===request.transaction_id)}))},{headers:{'Cache-Control':'private, no-store'}})
+  const profileIds=[...new Set((requests||[]).map(request=>request.profile_id))]
+  const profiles=profileIds.length ? await access.admin.from('profiles').select('id,email,full_name,balance_xaf').in('id',profileIds) : {data:[],error:null}
+  if(profiles.error)return Response.json({error:'Could not load customer details.'},{status:503})
+  return Response.json({requests:(requests||[]).map(request=>({...request,transaction:transactions.data?.find(tx=>tx.id===request.transaction_id),customer:profiles.data?.find(profile=>profile.id===request.profile_id)}))},{headers:{'Cache-Control':'private, no-store'}})
 }
 export async function POST(request:Request) {
   const access=await requireAdmin()
@@ -28,12 +32,14 @@ export async function POST(request:Request) {
         if(!order||(await syncSmmOrder(access.admin,order)).updated!==true)return Response.json({error:'Live provider status could not be verified. Keep the request pending.'},{status:409})
       }
       if(source.type==='sms_purchase') {
-        const {data:order}=await access.admin.from('sms_orders').select('id,provider_order_id').eq('id',source.reference.replace(/^(BOT-)?SMS-/, '')).eq('profile_id',source.profile_id).single()
-        const token=process.env.SMS_PROVIDER_API_KEY
-        if(!order?.provider_order_id||!token)return Response.json({error:'SMS provider verification unavailable.'},{status:409})
-        const response=await fetch(`https://5sim.net/v1/user/check/${encodeURIComponent(order.provider_order_id)}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/json'},signal:AbortSignal.timeout(10000)})
-        const live=await response.json().catch(()=>({}))
-        if(!response.ok||!['CANCELED','BANNED','TIMEOUT'].includes(live.status)||!Array.isArray(live.sms)||live.sms.length>0)return Response.json({error:'Provider has not confirmed a closed, undelivered activation.'},{status:409})
+        const {data:order}=await access.admin.from('sms_orders').select('id,provider_order_id,phone_number,service_name,profile_id,status,sms_code').eq('id',source.reference.replace(/^(BOT-)?SMS-/, '')).eq('profile_id',source.profile_id).single()
+        if(!order?.provider_order_id||order.sms_code)return Response.json({error:'SMS order is missing or a code was already delivered.'},{status:409})
+        let providerOutcome: string
+        try { providerOutcome=(await syncSmsOrder(access.admin,order)).status }
+        catch { return Response.json({error:'Live provider verification failed. Keep this request pending and investigate the supplier account before refunding.'},{status:409}) }
+        if(!['canceled','expired'].includes(providerOutcome))return Response.json({error:'The supplier has not confirmed an undelivered, closed activation.'},{status:409})
+        const {data:verified}=await access.admin.from('sms_orders').select('status,sms_code').eq('id',order.id).single()
+        if(!verified||verified.sms_code||!['canceled','expired'].includes(verified.status))return Response.json({error:'Provider has not confirmed a closed, undelivered activation.'},{status:409})
       }
     }
     if(body.action==='mark_paid'&&(body.verified!==true||typeof body.payout_reference!=='string'||body.payout_reference.length>200))return Response.json({error:'Verify the original-source payout and provide its settlement reference.'},{status:400})

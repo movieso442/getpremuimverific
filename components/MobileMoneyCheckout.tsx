@@ -74,7 +74,7 @@ export default function MobileMoneyCheckout({ amount, token, initialReference, s
     try { recordAnalytics('checkout_started', token ? '/bot-topup' : '/add-funds', { amount_xaf: amount, method }) } catch {}
     try {
       const response = await fetch(token ? '/api/bot/topup' : '/api/payments/payunit', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, amount, currency: 'XAF', phone_number: phone, payment_method: method, idempotency_key: requestId.current, accepted_fee_percent: 0 }) })
+        body: JSON.stringify({ token, amount, currency: 'XAF', phone_number: phone, payment_method: method, idempotency_key: requestId.current, accepted_fee_percent: 2 }) })
       const result = await response.json()
       if (result.reference) {
         setReference(result.reference)

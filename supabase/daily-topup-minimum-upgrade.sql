@@ -97,7 +97,7 @@ BEGIN
   END IF;
   IF EXISTS(SELECT 1 FROM public.manual_payment_claims WHERE profile_id=p_profile AND status='pending') THEN RAISE EXCEPTION 'Another payment is being checked'; END IF;
   INSERT INTO public.wallet_transactions(profile_id,amount,type,payment_method,reference,status,service_fee_xaf,description)
-    VALUES(p_profile,p_credit,'deposit',p_method,p_reference,'pending',0,'Mobile-money wallet top-up; no platform top-up fee');
+    VALUES(p_profile,p_credit,'deposit',p_method,p_reference,'pending',CEIL(p_credit*0.02),'Mobile-money wallet top-up; 2% platform fee added on top');
   IF p_link IS NOT NULL THEN UPDATE public.bot_payment_links SET payment_reference=p_reference WHERE id=link.id; END IF;
   RETURN jsonb_build_object('created',TRUE,'reference',p_reference,'status','pending');
 END; $$;

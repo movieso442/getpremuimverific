@@ -11,11 +11,14 @@ import { PublicFooter } from '@/components/PublicFooter'
 import MobileNavigationDrawer from '@/components/MobileNavigationDrawer'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import { AnalyticsTracker } from '@/components/AnalyticsTracker'
+import SmsInboxWatcher from '@/components/SmsInboxWatcher'
 
 export default function AppShell({
   children,
+  adminHost = false,
 }: {
   children: React.ReactNode
+  adminHost?: boolean
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -27,7 +30,7 @@ export default function AppShell({
   // Public pages that should render with PublicHeader & PublicFooter instead of Dashboard Sidebar
   const privateRoutes = ['/dashboard','/add-funds','/sms-verification','/profile','/orders','/accounts','/fb-recovery','/services','/tickets','/massorder','/subscriptions','/updates','/vip-updates','/rent-number','/developer','/ai-assistant','/refund-request']
   const isPublicPage = !privateRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
-  const isAdminPage = pathname.startsWith('/admin')
+  const isAdminPage = adminHost || pathname.startsWith('/admin')
 
   return (
     <>
@@ -45,6 +48,7 @@ export default function AppShell({
           ) : (
             /* Authenticated Portal View (Left Sidebar & Top Header) */
             <div className="flex min-h-screen">
+              <SmsInboxWatcher />
               {/* Left Sidebar Navigation */}
               <div className="hidden md:block sticky top-0 h-screen z-30">
                 <Sidebar onOpenDeposit={openDeposit} />

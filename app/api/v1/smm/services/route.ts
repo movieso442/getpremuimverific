@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     const pricedServices = services.map((service) => ({
       ...service,
       platform: smmPlatform(service),
-      retail_rate_xaf: smmRetailRateXaf(Number(service.rate_usd), settings.smm_markup_multiplier, priceOverrides.get(Number(service.service_id || service.id))),
+      retail_rate_xaf: smmRetailRateXaf(Number(service.rate_usd), settings.smm_markup_multiplier, priceOverrides.get(Number(service.service_id || service.id)), settings.extra_service_markup_percent),
     }))
 
     return NextResponse.json({

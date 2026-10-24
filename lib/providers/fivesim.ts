@@ -42,6 +42,8 @@ export async function fetchFiveSimQuote(baseUrl: string, country: string, produc
   const candidates = Object.entries(operators)
     .map(([operator, value]) => ({ operator, costUsd: Number(value.cost), available: Number(value.count || 0), deliveryRate: value.rate == null ? undefined : Number(value.rate) }))
     .filter((quote) => quote.available > 0 && Number.isFinite(quote.costUsd) && quote.costUsd > 0)
-    .sort((a, b) => a.costUsd - b.costUsd)
+    // Supplier statistics are a better first-use signal than the cheapest
+    // number. The final customer price is recalculated from this choice.
+    .sort((a, b) => (b.deliveryRate ?? -1) - (a.deliveryRate ?? -1) || b.available - a.available || a.costUsd - b.costUsd)
   return candidates[0] || null
 }

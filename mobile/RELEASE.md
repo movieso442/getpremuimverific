@@ -1,5 +1,17 @@
 # Release and website downloads
 
+## Daily minimum and account-service enquiries — 20 October 2026
+
+EAS build `39432cc3-0161-47f4-94f3-a8700c636d08` finished as Android
+versionCode 10 and was published as `android-v0.1.0-build10`.
+The signed APK is 72,955,396 bytes, SHA-256
+`b5d9fd0c3ec21f4516e02b96d60ab06cbe8887b88bfc0d47752297d325620ed5`.
+APK signature verification passed; the signing certificate matches build 9.
+Android reports package `com.premiumverify.app`, display name `premiumverific`,
+and no debuggable flag. It includes the account-service enquiry and daily
+USD $3-equivalent XAF minimum UI. Real-device update, payment and email-flow
+acceptance still need to be checked by the owner.
+
 ## In-app updates and customer-service number — 16 October 2026
 
 EAS build `908dc8cc-45f2-47c9-81d7-5b4868064ccc` finished and was published as

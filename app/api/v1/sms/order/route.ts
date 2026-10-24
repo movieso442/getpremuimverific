@@ -6,6 +6,8 @@ import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { fetchFiveSimQuote } from '@/lib/providers/fivesim'
 import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { recordFiveSimCost } from '@/lib/providers/sms-accounting'
+import { markWalletPurchaseSubmitted, PurchaseReservationError, releaseWalletPurchase, reserveWalletPurchase } from '@/lib/wallet/purchase-reservation'
+import { syncSmsOrder } from '@/lib/sms/sync'
 
 const FIVE_SIM_BASE_URL = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
 const COUNTRY_SLUGS: Record<string, string> = {
@@ -58,34 +60,22 @@ export async function POST(request: Request) {
       if (!id) return NextResponse.json({ error: '5SIM order ID is required.' }, { status: 400 })
       const providerOrderId = String(id)
       const { data: localOrder } = await admin.from('sms_orders')
-        .select('id, status, sms_code').eq('profile_id', profile.id).eq('provider_order_id', providerOrderId).maybeSingle()
+        .select('id, status, sms_code, provider_order_id, phone_number, service_name, profile_id').eq('profile_id', profile.id).eq('provider_order_id', providerOrderId).maybeSingle()
       if (!localOrder) return NextResponse.json({ error: 'SMS order not found.' }, { status: 404 })
       if (localOrder.sms_code) return NextResponse.json({ status: 'RECEIVED', code: localOrder.sms_code })
       if (localOrder.status === 'canceled' || localOrder.status === 'expired')
         return NextResponse.json({ status: localOrder.status.toUpperCase() })
 
-      const providerRes = await fetch(`${FIVE_SIM_BASE_URL}/user/check/${encodeURIComponent(providerOrderId)}`, {
-        headers: fiveSimHeaders(token), signal: AbortSignal.timeout(15_000),
-      })
-      const providerOrder = await providerRes.json().catch(() => ({})) as FiveSimOrder & { error?: string }
-      if (!providerRes.ok) return NextResponse.json({ error: providerOrder.error || '5SIM could not check this order.' }, { status: 502 })
-
-      const code = providerOrder.sms?.find((sms) => sms.code)?.code
-      if (code) {
-        const { error: saveError } = await admin.from('sms_orders').update({ sms_code: code, status: 'received' }).eq('id', localOrder.id)
-        if (saveError) return NextResponse.json({ error: 'Could not save your code. Please retry.' }, { status: 503 })
-        // Mark the activation complete at 5SIM after we safely record the code.
-        await fetch(`${FIVE_SIM_BASE_URL}/user/finish/${encodeURIComponent(providerOrderId)}`, {
-          headers: fiveSimHeaders(token), signal: AbortSignal.timeout(15_000),
-        }).catch(() => undefined)
-        return NextResponse.json({ status: 'RECEIVED', code })
+      try {
+        await syncSmsOrder(admin, localOrder)
+      } catch (error) {
+        console.error('[SMS status check failed]', localOrder.id, error)
+        return NextResponse.json({ error: 'Supplier status is temporarily unavailable. Your order remains visible and support can investigate.' }, { status: 502 })
       }
-
-      if (providerOrder.status === 'CANCELED' || providerOrder.status === 'BANNED') {
-        await admin.from('sms_orders').update({ status: 'canceled' }).eq('id', localOrder.id)
-        return NextResponse.json({ status: 'CANCELED' })
-      }
-      return NextResponse.json({ status: 'WAITING_SMS', expires_at: providerOrder.expires })
+      const { data: refreshed, error: refreshError } = await admin.from('sms_orders')
+        .select('status,sms_code,expires_at').eq('id', localOrder.id).single()
+      if (refreshError || !refreshed) return NextResponse.json({ error: 'Could not reload your SMS order.' }, { status: 503 })
+      return NextResponse.json({ status: refreshed.status.toUpperCase(), code: refreshed.sms_code, expires_at: refreshed.expires_at })
     }
 
     const catalogService = SMS_SERVICES.find((item) => item.code === service)
@@ -102,39 +92,61 @@ export async function POST(request: Request) {
 
     const settings = await getPlatformSettings(admin)
     const providerCostXaf = quote.costUsd * 600
-    const priceXaf = retailPrice(providerCostXaf, settings.sms_markup_multiplier)
+    const priceXaf = retailPrice(providerCostXaf, settings.sms_markup_multiplier, settings.extra_service_markup_percent)
     if (action === 'quote') return NextResponse.json({ price_xaf: priceXaf, available: quote.available }, { headers: { 'Cache-Control': 'private, no-store' } })
     if (action !== 'getNumber') return NextResponse.json({ error: 'Unknown SMS action.' }, { status: 400 })
     if (body.max_price_xaf!==undefined && (!Number.isFinite(body.max_price_xaf)||body.max_price_xaf<=0))return NextResponse.json({error:'Invalid confirmed price.'},{status:400})
     if (body.max_price_xaf!==undefined && priceXaf>body.max_price_xaf)return NextResponse.json({error:'The live price changed. Review the new price and confirm again.',required_xaf:priceXaf},{status:409})
-    if (Number(profile.balance_xaf) < priceXaf)
-      return NextResponse.json({ error: 'Insufficient wallet balance.', required_xaf: priceXaf }, { status: 402 })
-
-    const providerRes = await fetch(
-      `${FIVE_SIM_BASE_URL}/user/buy/activation/${encodeURIComponent(providerCountry)}/${encodeURIComponent(quote.operator)}/${encodeURIComponent(providerProduct)}`,
-      { headers: fiveSimHeaders(token), signal: AbortSignal.timeout(20_000) },
-    )
+    const reservationId = await reserveWalletPurchase(admin, profile.id, 'sms_purchase', 'web', priceXaf)
+    let providerRes: Response
+    try {
+      providerRes = await fetch(
+        `${FIVE_SIM_BASE_URL}/user/buy/activation/${encodeURIComponent(providerCountry)}/${encodeURIComponent(quote.operator)}/${encodeURIComponent(providerProduct)}`,
+        { headers: fiveSimHeaders(token), signal: AbortSignal.timeout(20_000) },
+      )
+    } catch (error) {
+      console.error('[SMS supplier outcome unknown]', reservationId, error)
+      return NextResponse.json({ error: 'Supplier response is uncertain. Your funds are reserved; contact support before retrying.', reservation_id: reservationId }, { status: 503 })
+    }
     const providerOrder = await providerRes.json().catch(() => ({})) as FiveSimOrder & { error?: string }
-    if (!providerRes.ok || !providerOrder.id || !providerOrder.phone)
-      return NextResponse.json({ error: providerOrder.error || '5SIM has no number available. No funds were charged.' }, { status: 502 })
+    if (providerOrder.id) {
+      try { await markWalletPurchaseSubmitted(admin, reservationId, String(providerOrder.id)) }
+      catch (error) {
+        console.error('[SMS supplier accepted but reservation update failed]', reservationId, providerOrder.id, error)
+        return NextResponse.json({ error: 'Supplier accepted the number but recording it needs support review. Your funds are reserved; do not retry.', reservation_id: reservationId }, { status: 503 })
+      }
+    }
+    if (!providerOrder.id || !providerOrder.phone) {
+      if (!providerOrder.id && providerOrder.error) {
+        try { await releaseWalletPurchase(admin, reservationId) }
+        catch (error) {
+          console.error('[SMS supplier declined but release failed]', reservationId, error)
+          return NextResponse.json({ error: 'Supplier declined, but releasing reserved funds needs support review.', reservation_id: reservationId }, { status: 503 })
+        }
+        return NextResponse.json({ error: providerOrder.error, charge_xaf: 0 }, { status: 502 })
+      }
+      console.error('[SMS supplier response without order]', reservationId, providerRes.status)
+      return NextResponse.json({ error: 'Supplier response is uncertain. Your funds are reserved; contact support before retrying.', reservation_id: reservationId }, { status: 503 })
+    }
 
     const { data: order, error: orderError } = await admin.from('sms_orders').insert({
+      id: reservationId,
       profile_id: profile.id, provider_order_id: String(providerOrder.id), service_name: catalogService.name,
       service_code: service, country_name: country, country_code: country, phone_number: providerOrder.phone,
       price_xaf: priceXaf, status: 'waiting_sms', expires_at: providerOrder.expires || new Date(Date.now() + 20 * 60 * 1000).toISOString(),
     }).select().single()
-    if (orderError) throw orderError
+    if (orderError) {
+      console.error('[SMS supplier accepted, local order save failed]', reservationId, orderError)
+      return NextResponse.json({ error: 'Supplier accepted the order but saving it needs support review. Your funds are reserved; do not retry.', reservation_id: reservationId }, { status: 503 })
+    }
     await recordFiveSimCost(admin,{orderId:order.id,quoteUsd:quote.costUsd,actualUsd:providerOrder.price,operator:quote.operator,service:providerProduct,country:providerCountry})
-
-    const { error: transactionError } = await admin.from('wallet_transactions').insert({
-      profile_id: profile.id, amount: priceXaf, type: 'sms_purchase', payment_method: 'mtn_momo',
-      reference: `SMS-${order.id}`, status: 'completed', description: `5SIM ${catalogService.name} activation via ${quote.operator}`,
-    })
-    if (transactionError) throw transactionError
     scheduleAdminNotifications(admin)
 
     return NextResponse.json({ id: String(providerOrder.id), order, phone: providerOrder.phone, status: 'WAITING_SMS' }, { status: 201 })
   } catch (error: unknown) {
+    if (error instanceof PurchaseReservationError)
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    console.error('[SMS order failed]', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

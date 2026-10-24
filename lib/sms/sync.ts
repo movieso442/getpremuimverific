@@ -54,11 +54,13 @@ export async function syncSmsOrder(admin: SupabaseClient, order: SmsOrderForSync
     return { updated: true, notified, status: 'received' }
   }
 
-  if (['CANCELED', 'BANNED', 'FINISHED'].includes(String(provider.status || '').toUpperCase())) {
-    const { error } = await admin.from('sms_orders').update({ status: 'canceled' })
+  const providerStatus = String(provider.status || '').toUpperCase()
+  if (['CANCELED', 'BANNED', 'TIMEOUT'].includes(providerStatus) && Array.isArray(provider.sms) && provider.sms.length === 0) {
+    const status = providerStatus === 'TIMEOUT' ? 'expired' : 'canceled'
+    const { error } = await admin.from('sms_orders').update({ status })
       .eq('id', order.id).eq('status', 'waiting_sms')
     if (error) throw error
-    return { updated: true, notified: false, status: 'canceled' }
+    return { updated: true, notified: false, status }
   }
   return { updated: false, notified: false, status: 'waiting' }
 }

@@ -1,12 +1,12 @@
 {
   "available": true,
   "url": "/downloads/premiumverific.apk",
-  "sourceUrl": "https://github.com/cybernurdin/getpremuimverific/releases/download/android-v0.1.0-build9/premiumverific.apk",
+  "sourceUrl": "https://github.com/cybernurdin/getpremuimverific/releases/download/android-v0.1.0-build10/premiumverific.apk",
   "filename": "premiumverific.apk",
   "version": "0.1.0",
-  "versionCode": 9,
-  "checksum": "d2d353d161331de044e324be4fd7e36e732404961f41deb0d39e6233ea6a81a8",
-  "sizeBytes": 72948924,
+  "versionCode": 10,
+  "checksum": "b5d9fd0c3ec21f4516e02b96d60ab06cbe8887b88bfc0d47752297d325620ed5",
+  "sizeBytes": 72955396,
   "channel": "beta",
-  "buildId": "908dc8cc-45f2-47c9-81d7-5b4868064ccc"
+  "buildId": "39432cc3-0161-47f4-94f3-a8700c636d08"
 }

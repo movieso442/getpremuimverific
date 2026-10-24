@@ -682,7 +682,7 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM public.manual_payment_claims WHERE profile_id = p_profile AND status = 'pending') THEN RAISE EXCEPTION 'Another payment is being checked'; END IF;
   INSERT INTO public.wallet_transactions(profile_id, amount, type, payment_method, reference, status, service_fee_xaf, description)
-    VALUES (p_profile, p_credit, 'deposit', p_method, p_reference, 'pending', 0, 'Mobile-money wallet top-up; no platform top-up fee');
+    VALUES (p_profile, p_credit, 'deposit', p_method, p_reference, 'pending', CEIL(p_credit * 0.02), 'Mobile-money wallet top-up; 2% platform fee added on top');
   IF p_link IS NOT NULL THEN UPDATE public.bot_payment_links SET payment_reference = p_reference WHERE id = link.id; END IF;
   RETURN jsonb_build_object('created', TRUE, 'reference', p_reference, 'status', 'pending');
 END;
@@ -1216,7 +1216,7 @@ BEGIN
   END IF;
   IF EXISTS(SELECT 1 FROM public.manual_payment_claims WHERE profile_id=p_profile AND status='pending') THEN RAISE EXCEPTION 'Another payment is being checked'; END IF;
   INSERT INTO public.wallet_transactions(profile_id,amount,type,payment_method,reference,status,service_fee_xaf,description)
-    VALUES(p_profile,p_credit,'deposit',p_method,p_reference,'pending',0,'Mobile-money wallet top-up; no platform top-up fee');
+    VALUES(p_profile,p_credit,'deposit',p_method,p_reference,'pending',CEIL(p_credit*0.02),'Mobile-money wallet top-up; 2% platform fee added on top');
   IF p_link IS NOT NULL THEN UPDATE public.bot_payment_links SET payment_reference=p_reference WHERE id=link.id; END IF;
   RETURN jsonb_build_object('created',TRUE,'reference',p_reference,'status','pending');
 END; $$;
@@ -1264,11 +1264,209 @@ SET support_phone = '+237 640 796 062',
     updated_at = NOW()
 WHERE id = TRUE;
 
--- ECB USD per EUR observation on 2026-10-19: 1.1225.
+-- ================================================================
+-- wallet-purchase-safety-upgrade.sql
+-- ================================================================
+-- Reserve wallet funds before any paid supplier request. Safe to rerun.
+-- Existing orders and balances are deliberately not modified.
+CREATE TABLE IF NOT EXISTS public.wallet_purchase_reservations (
+  id UUID PRIMARY KEY,
+  profile_id UUID NOT NULL REFERENCES public.profiles(id),
+  purchase_type TEXT NOT NULL CHECK (purchase_type IN ('smm_order', 'sms_purchase')),
+  source TEXT NOT NULL CHECK (source IN ('web', 'bot')),
+  amount_xaf NUMERIC(12,2) NOT NULL CHECK (amount_xaf > 0 AND amount_xaf = ROUND(amount_xaf)),
+  state TEXT NOT NULL DEFAULT 'reserved' CHECK (state IN ('reserved', 'submitted', 'released')),
+  provider_order_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.wallet_purchase_reservations ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.wallet_purchase_reservations FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.wallet_purchase_reservations TO service_role;
+
+-- A completed purchase ledger debit must fail if the wallet cannot cover it.
+-- The conditional UPDATE takes a row lock, so concurrent debits serialize.
+CREATE OR REPLACE FUNCTION public.update_user_balance()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  IF (TG_OP = 'INSERT' AND NEW.status = 'completed')
+     OR (TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM 'completed' AND NEW.status = 'completed') THEN
+    IF NEW.type IN ('deposit', 'refund') THEN
+      UPDATE public.profiles SET balance_xaf = balance_xaf + NEW.amount WHERE id = NEW.profile_id;
+    ELSIF NEW.type IN ('sms_purchase', 'smm_order', 'account_purchase') THEN
+      UPDATE public.profiles SET balance_xaf = balance_xaf - NEW.amount
+        WHERE id = NEW.profile_id AND balance_xaf >= NEW.amount;
+      IF NOT FOUND THEN RAISE EXCEPTION 'Insufficient wallet balance'; END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END; $$;
+REVOKE ALL ON FUNCTION public.update_user_balance() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.reserve_wallet_purchase(
+  p_id UUID, p_profile UUID, p_type TEXT, p_source TEXT, p_amount NUMERIC
+) RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE wallet public.profiles%ROWTYPE; reference TEXT;
+BEGIN
+  IF p_id IS NULL OR p_profile IS NULL OR p_type NOT IN ('smm_order','sms_purchase')
+     OR p_source NOT IN ('web','bot') OR p_amount IS NULL OR p_amount <= 0
+     OR p_amount <> ROUND(p_amount) THEN RAISE EXCEPTION 'Invalid purchase reservation'; END IF;
+  SELECT * INTO wallet FROM public.profiles WHERE id = p_profile FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Wallet unavailable'; END IF;
+  IF wallet.refund_hold THEN RAISE EXCEPTION 'Purchases paused during refund review'; END IF;
+  IF COALESCE(wallet.balance_xaf, 0) < p_amount THEN RAISE EXCEPTION 'Insufficient wallet balance'; END IF;
+  reference := CASE WHEN p_type = 'smm_order' THEN 'SMM-'
+    WHEN p_source = 'bot' THEN 'BOT-SMS-' ELSE 'SMS-' END || p_id;
+  INSERT INTO public.wallet_purchase_reservations(id,profile_id,purchase_type,source,amount_xaf)
+    VALUES(p_id,p_profile,p_type,p_source,p_amount);
+  INSERT INTO public.wallet_transactions(profile_id,amount,type,payment_method,reference,status,description)
+    VALUES(p_profile,p_amount,p_type,'wallet',reference,'completed','Wallet funds reserved before supplier request');
+  RETURN p_id;
+END; $$;
+REVOKE ALL ON FUNCTION public.reserve_wallet_purchase(UUID,UUID,TEXT,TEXT,NUMERIC) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.reserve_wallet_purchase(UUID,UUID,TEXT,TEXT,NUMERIC) TO service_role;
+
+-- Record supplier acceptance before saving the customer-facing order. If that
+-- save fails, the reservation and supplier ID remain available for reconciliation.
+CREATE OR REPLACE FUNCTION public.mark_wallet_purchase_submitted(p_id UUID,p_provider_order_id TEXT)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF p_provider_order_id IS NULL OR length(trim(p_provider_order_id)) = 0 THEN RAISE EXCEPTION 'Supplier order ID required'; END IF;
+  UPDATE public.wallet_purchase_reservations SET state='submitted',provider_order_id=trim(p_provider_order_id),updated_at=NOW()
+    WHERE id=p_id AND (state='reserved' OR (state='submitted' AND provider_order_id=trim(p_provider_order_id)));
+  IF NOT FOUND THEN RAISE EXCEPTION 'Purchase reservation unavailable'; END IF;
+END; $$;
+REVOKE ALL ON FUNCTION public.mark_wallet_purchase_submitted(UUID,TEXT) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.mark_wallet_purchase_submitted(UUID,TEXT) TO service_role;
+
+-- Only a definite supplier rejection can release a still-unsubmitted purchase.
+-- Network timeouts and unknown supplier outcomes require manual reconciliation.
+CREATE OR REPLACE FUNCTION public.release_wallet_purchase(p_id UUID)
+RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE reservation public.wallet_purchase_reservations%ROWTYPE;
+BEGIN
+  SELECT * INTO reservation FROM public.wallet_purchase_reservations WHERE id=p_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Purchase reservation unavailable'; END IF;
+  IF reservation.state='released' THEN RETURN FALSE; END IF;
+  IF reservation.state<>'reserved' OR reservation.provider_order_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Accepted supplier purchase cannot be automatically released';
+  END IF;
+  INSERT INTO public.wallet_transactions(profile_id,amount,type,payment_method,reference,status,description)
+    VALUES(reservation.profile_id,reservation.amount_xaf,'refund','wallet','PURCHASE-RELEASE-'||p_id,'completed',
+      'Supplier declined purchase before creating an order');
+  UPDATE public.wallet_purchase_reservations SET state='released',updated_at=NOW() WHERE id=p_id;
+  RETURN TRUE;
+END; $$;
+REVOKE ALL ON FUNCTION public.release_wallet_purchase(UUID) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.release_wallet_purchase(UUID) TO service_role;
+
+-- Browser roles may read their own orders, but only trusted server code may
+-- create or change supplier-backed orders.
+REVOKE INSERT,UPDATE,DELETE ON public.smm_orders,public.sms_orders FROM anon,authenticated;
+
+-- ================================================================
+-- admin-wallet-credit-upgrade.sql
+-- ================================================================
+-- Owner-only goodwill or exceptional wallet credit. This is not a provider refund.
+-- Apply after wallet-purchase-safety-upgrade.sql. Existing balances are unchanged.
+CREATE TABLE IF NOT EXISTS public.admin_wallet_credits (
+  id UUID PRIMARY KEY,
+  profile_id UUID NOT NULL REFERENCES public.profiles(id),
+  amount_xaf NUMERIC(12,2) NOT NULL CHECK (amount_xaf > 0 AND amount_xaf <= 1000000 AND amount_xaf = ROUND(amount_xaf)),
+  reason TEXT NOT NULL CHECK (length(reason) BETWEEN 20 AND 2000),
+  reviewer_id UUID NOT NULL REFERENCES public.profiles(id),
+  transaction_id UUID UNIQUE REFERENCES public.wallet_transactions(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.admin_wallet_credits ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.admin_wallet_credits FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.admin_wallet_credits TO service_role;
+
+ALTER TABLE public.wallet_transactions DROP CONSTRAINT IF EXISTS wallet_transactions_type_check;
+ALTER TABLE public.wallet_transactions ADD CONSTRAINT wallet_transactions_type_check
+  CHECK (type IN ('deposit','sms_purchase','smm_order','account_purchase','refund','refund_hold','admin_credit'));
+
+CREATE OR REPLACE FUNCTION public.update_user_balance()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  IF (TG_OP = 'INSERT' AND NEW.status = 'completed')
+     OR (TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM 'completed' AND NEW.status = 'completed') THEN
+    IF NEW.type IN ('deposit', 'refund', 'admin_credit') THEN
+      UPDATE public.profiles SET balance_xaf = balance_xaf + NEW.amount WHERE id = NEW.profile_id;
+    ELSIF NEW.type IN ('sms_purchase', 'smm_order', 'account_purchase') THEN
+      UPDATE public.profiles SET balance_xaf = balance_xaf - NEW.amount
+        WHERE id = NEW.profile_id AND balance_xaf >= NEW.amount;
+      IF NOT FOUND THEN RAISE EXCEPTION 'Insufficient wallet balance'; END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END; $$;
+REVOKE ALL ON FUNCTION public.update_user_balance() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.issue_admin_wallet_credit(
+  p_id UUID, p_profile UUID, p_reviewer UUID, p_amount NUMERIC, p_reason TEXT
+) RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE existing public.admin_wallet_credits%ROWTYPE; credit_transaction_id UUID;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.profiles p JOIN auth.users u ON u.id = p.user_id
+      WHERE p.id = p_reviewer AND p.role = 'admin'
+        AND lower(u.email) = 'mohammednurdine6@gmail.com'
+        AND u.email_confirmed_at IS NOT NULL AND NOT COALESCE(u.is_anonymous,FALSE))
+    THEN RAISE EXCEPTION 'Verified owner required'; END IF;
+  IF p_id IS NULL OR p_profile IS NULL OR p_amount IS NULL OR p_amount <= 0
+     OR p_amount > 1000000 OR p_amount <> ROUND(p_amount)
+     OR p_reason IS NULL OR length(trim(p_reason)) NOT BETWEEN 20 AND 2000
+    THEN RAISE EXCEPTION 'Invalid wallet credit'; END IF;
+  SELECT * INTO existing FROM public.admin_wallet_credits WHERE id = p_id;
+  IF FOUND THEN
+    IF existing.profile_id = p_profile AND existing.reviewer_id = p_reviewer
+       AND existing.amount_xaf = p_amount AND existing.reason = trim(p_reason)
+      THEN RETURN existing.transaction_id; END IF;
+    RAISE EXCEPTION 'Credit request ID already used';
+  END IF;
+  PERFORM 1 FROM public.profiles WHERE id = p_profile FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Customer wallet unavailable'; END IF;
+  SELECT * INTO existing FROM public.admin_wallet_credits WHERE id = p_id;
+  IF FOUND THEN
+    IF existing.profile_id = p_profile AND existing.reviewer_id = p_reviewer
+       AND existing.amount_xaf = p_amount AND existing.reason = trim(p_reason)
+      THEN RETURN existing.transaction_id; END IF;
+    RAISE EXCEPTION 'Credit request ID already used';
+  END IF;
+  INSERT INTO public.admin_wallet_credits(id,profile_id,amount_xaf,reason,reviewer_id)
+    VALUES(p_id,p_profile,p_amount,trim(p_reason),p_reviewer);
+  INSERT INTO public.wallet_transactions(profile_id,amount,type,payment_method,reference,status,description)
+    VALUES(p_profile,p_amount,'admin_credit','admin_adjustment','ADMIN-CREDIT-'||p_id,'completed',trim(p_reason))
+    RETURNING id INTO credit_transaction_id;
+  UPDATE public.admin_wallet_credits SET transaction_id = credit_transaction_id WHERE id = p_id;
+  RETURN credit_transaction_id;
+END; $$;
+REVOKE ALL ON FUNCTION public.issue_admin_wallet_credit(UUID,UUID,UUID,NUMERIC,TEXT) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.issue_admin_wallet_credit(UUID,UUID,UUID,NUMERIC,TEXT) TO service_role;
+
+-- ================================================================
+-- service-markup-upgrade.sql
+-- ================================================================
+-- Add the remaining 1 percentage point to provider-backed SMS and SMM prices.
+-- Existing retail prices already include a 2% uplift in application logic;
+-- the resulting total service uplift is 3% above the configured base price.
+-- This setting applies to new quotes/orders only. Existing balances and orders
+-- are not changed. Safe to rerun; a previously configured value is preserved.
+
+ALTER TABLE public.platform_settings
+  ADD COLUMN IF NOT EXISTS extra_service_markup_percent NUMERIC(5,2) NOT NULL DEFAULT 1.00;
+
+ALTER TABLE public.platform_settings
+  DROP CONSTRAINT IF EXISTS platform_settings_extra_service_markup_percent_check;
+ALTER TABLE public.platform_settings
+  ADD CONSTRAINT platform_settings_extra_service_markup_percent_check
+  CHECK (extra_service_markup_percent BETWEEN 0 AND 10);
+
+-- ECB USD per EUR observation on 2026-10-23: 1.1193.
 -- Skip this seed if the SQL is run more than seven days after observation.
 DO $$ BEGIN
-  IF CURRENT_DATE BETWEEN DATE '2026-10-19' AND DATE '2026-10-19' + 7 THEN
-    PERFORM public.set_daily_topup_reference(1.1225, DATE '2026-10-19');
+  IF CURRENT_DATE BETWEEN DATE '2026-10-23' AND DATE '2026-10-23' + 7 THEN
+    PERFORM public.set_daily_topup_reference(1.1193, DATE '2026-10-23');
   END IF;
 END $$;
 

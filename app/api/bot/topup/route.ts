@@ -28,13 +28,13 @@ export async function GET(request: Request) {
     const { data: claim } = await admin.from('manual_payment_claims').select('status').eq('bot_payment_link_id', link.id).maybeSingle()
     const status = transaction ? await reconcilePayunit(admin, transaction) : claim?.status === 'confirmed' ? 'completed' : claim?.status === 'pending' ? 'manual_pending' : claim?.status || 'ready'
     if (status === 'completed') scheduleAdminNotifications(admin)
-    return NextResponse.json({ amount_xaf: Number(link.amount_xaf), service_fee_xaf: transaction ? Number(transaction.service_fee_xaf) : (claim ? Math.ceil(Number(link.amount_xaf) * 0.02) : 0), expires_at: link.expires_at, reference: link.payment_reference, status }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ amount_xaf: Number(link.amount_xaf), service_fee_xaf: transaction ? Number(transaction.service_fee_xaf) : Math.ceil(Number(link.amount_xaf) * 0.02), expires_at: link.expires_at, reference: link.payment_reference, status }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return NextResponse.json({ error: 'Could not check this payment yet.' }, { status: 502 }) }
 }
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    if (body.accepted_fee_percent !== 0) return NextResponse.json({ error: 'Refresh checkout. MTN and Orange no longer have a platform top-up fee.' }, { status: 409 })
+    if (body.accepted_fee_percent !== 2) return NextResponse.json({ error: 'Please review and accept the 2% mobile-money top-up fee before continuing.' }, { status: 409 })
     const phone = cameroonPhone(body.phone_number)
     if (!phone || !mobileMoneyMethod(body.payment_method)) return NextResponse.json({ error: 'Choose MTN or Orange and enter your Cameroon mobile number.' }, { status: 400 })
     const link = await loadLink(body.token)

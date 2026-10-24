@@ -107,8 +107,8 @@ async function liveProductQuote(countryInput: string, productInput: string) {
   if (!quote) return `${friendlyProductName(product)} is not available in ${country.label} right now. Please choose another service or country.`
   const adminUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const settings = adminUrl && adminKey ? await getPlatformSettings(createClient(adminUrl, adminKey)) : { sms_markup_multiplier: 3 }
-  const price = retailPrice(quote.costUsd * 600, settings.sms_markup_multiplier)
+  const settings = adminUrl && adminKey ? await getPlatformSettings(createClient(adminUrl, adminKey)) : { sms_markup_multiplier: 3, extra_service_markup_percent: 1 }
+  const price = retailPrice(quote.costUsd * 600, settings.sms_markup_multiplier, settings.extra_service_markup_percent)
   return `<b>${friendlyProductName(product)} verification number</b>\n\nCountry: ${country.label}\nCurrent price: <b>${price.toLocaleString()} XAF</b>\nAvailable now: ${quote.available.toLocaleString()}\n\nTap Reserve number to use your wallet.` + inlineMarker([{ id: `reserve:${country.slug}:${encodeURIComponent(product)}`, label: 'Reserve number' }])
 }
 

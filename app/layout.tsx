@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import AppShell from '@/components/AppShell'
 import {NextIntlClientProvider} from 'next-intl'
 import {getLocale, getMessages} from 'next-intl/server'
+import {headers} from 'next/headers'
 import './globals.css'
 export const metadata: Metadata = {
   metadataBase: new URL('https://premiumverific.com'),
@@ -26,5 +27,6 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale()
   const messages = await getMessages()
-  return <html lang={locale}><body className="bg-[#f8fafc] text-gray-900 min-h-screen font-sans antialiased"><NextIntlClientProvider locale={locale} messages={messages}><AppShell>{children}</AppShell></NextIntlClientProvider></body></html>
+  const adminHost = (await headers()).get('host')?.split(':')[0].toLowerCase() === 'admin.premiumverific.com'
+  return <html lang={locale}><body className="bg-[#f8fafc] text-gray-900 min-h-screen font-sans antialiased"><NextIntlClientProvider locale={locale} messages={messages}><AppShell adminHost={adminHost}>{children}</AppShell></NextIntlClientProvider></body></html>
 }

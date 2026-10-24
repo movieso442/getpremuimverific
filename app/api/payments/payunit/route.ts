@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    if (body.accepted_fee_percent !== 0) return NextResponse.json({ error: 'Refresh checkout or update your Android app. MTN and Orange no longer have a platform top-up fee.' }, { status: 409 })
+    if (body.accepted_fee_percent !== 2) return NextResponse.json({ error: 'Please review and accept the 2% mobile-money top-up fee before continuing.' }, { status: 409 })
     const user = await customerUser(request)
     if (!user) return NextResponse.json({ error: 'Sign in before adding funds.' }, { status: 401 })
     const admin = createAdminClient()

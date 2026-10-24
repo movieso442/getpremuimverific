@@ -9,7 +9,6 @@ interface DisplayOrder {
   created_at: string
   target_link: string
   charge_xaf: number
-  charge_usd?: number
   start_count: number
   quantity: number
   service_name: string
@@ -146,7 +145,7 @@ export default function OrdersPage() {
 
                   {/* Charge */}
                   <td className="p-3.5 font-bold font-mono text-gray-900">
-                    {order.charge_usd !== undefined ? order.charge_usd : (order.charge_xaf / 600).toFixed(4)}
+                    {new Intl.NumberFormat('fr-CM', { maximumFractionDigits: 0 }).format(order.charge_xaf)} XAF
                   </td>
 
                   {/* Start count */}

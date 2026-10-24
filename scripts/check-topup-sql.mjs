@@ -25,7 +25,7 @@ try {
   for (const [i, id] of ids.entries()) await db.query('INSERT INTO profiles(id,role) VALUES($1,$2)', [id, i === 3 ? 'admin' : 'client'])
   const start = async (id, reference, link = null) => (await db.query('SELECT start_wallet_topup($1,$2,5000,$3,$4) AS result', [id, reference, 'mtn_momo', link])).rows[0].result
   assert.equal((await start(ids[0], 'PV-first')).created, true)
-  assert.equal(Number((await db.query("SELECT service_fee_xaf FROM wallet_transactions WHERE reference='PV-first'")).rows[0].service_fee_xaf), 0)
+  assert.equal(Number((await db.query("SELECT service_fee_xaf FROM wallet_transactions WHERE reference='PV-first'")).rows[0].service_fee_xaf), 100)
   assert.equal((await start(ids[0], 'PV-first')).created, false)
   assert.equal((await start(ids[0], 'PV-other-tab')).reference, 'PV-first')
   const submit = async (id, hash, link = null) => (await db.query('SELECT submit_crypto_payment($1,$2,$3,8.5,5000,$4,$5) AS id', [id, 'usdt_trc20', hash, 'test-receiving-address', link])).rows[0].id
@@ -76,5 +76,5 @@ try {
   await db.query("INSERT INTO profiles(id,role) VALUES($1,'client')", [cryptoProfile])
   const lowerClaim = (await db.query("SELECT submit_crypto_payment($1,'usdt_trc20',$2,3,$3,'test-receiving-address',NULL) AS id", [cryptoProfile, 'd'.repeat(64), min])).rows[0].id
   assert.ok(lowerClaim)
-  console.log('PASS SQL: mobile fee zero, crypto fee 2%, exactly-once credit/retries, browser RPC denied, private receipt policy blocks broad browser grants without affecting other buckets')
+  console.log('PASS SQL: mobile and crypto fee 2%, exactly-once credit/retries, browser RPC denied, private receipt policy blocks broad browser grants without affecting other buckets')
 } finally { await db.close() }

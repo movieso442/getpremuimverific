@@ -25,8 +25,8 @@ try {
         return route.fulfill({ json: { claims, pending_claim: claims.find(claim => claim.status === 'pending') || null, receipt_upload_available: true } })
       }
       if (path === '/api/payments/payunit') {
-        if (post) { phoneRequests++; assert.equal(route.request().postDataJSON().accepted_fee_percent, 0); return route.fulfill({ status: 202, json: { reference: 'PV' + 'a'.repeat(32), status: 'pending' } }) }
-        return route.fulfill({ json: { amount_xaf: 5000, service_fee_xaf: 0, status: 'pending' } })
+        if (post) { phoneRequests++; assert.equal(route.request().postDataJSON().accepted_fee_percent, 2); return route.fulfill({ status: 202, json: { reference: 'PV' + 'a'.repeat(32), status: 'pending' } }) }
+        return route.fulfill({ json: { amount_xaf: 5000, service_fee_xaf: 100, status: 'pending' } })
       }
       if (path === '/api/bot/topup') return route.fulfill({ json: { amount_xaf: 5000, status: 'ready' } })
       return route.fulfill({ json: {} })
