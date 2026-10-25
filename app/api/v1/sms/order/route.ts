@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     .select('id').eq('user_id', user.id).single()
   if (profileError || !profile) return NextResponse.json({ error: 'Your profile is unavailable.' }, { status: 409 })
   const { data: orders, error } = await admin.from('sms_orders')
-    .select('id, provider_order_id, service_name, country_name, phone_number, sms_code, status, expires_at, created_at')
+    .select('id, provider_order_id, service_name, country_name, phone_number, sms_code, status, expires_at, created_at, price_xaf')
     .eq('profile_id', profile.id).order('created_at', { ascending: false }).limit(50)
   if (error) return NextResponse.json({ error: 'Your SMS inbox could not be loaded.' }, { status: 503 })
   return NextResponse.json({ orders }, { headers: { 'Cache-Control': 'private, no-store' } })
@@ -54,7 +54,49 @@ export async function POST(request: Request) {
     const admin = createAdminClient()
     const { data: profile, error: profileError } = await admin.from('profiles').select('*').eq('user_id', user.id).single()
     if (profileError || !profile) return NextResponse.json({ error: 'Your wallet profile is unavailable. Please sign in again.' }, { status: 409 })
-    if (profile.refund_hold && !['getStatus','getSms'].includes(action)) return NextResponse.json({ error: 'Purchases are paused during an unused-deposit return. Contact support.' }, { status: 409 })
+    if (profile.refund_hold && !['getStatus','getSms','cancel'].includes(action)) return NextResponse.json({ error: 'Purchases are paused during an unused-deposit return. Contact support.' }, { status: 409 })
+
+    if (action === 'cancel') {
+      if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id))
+        return NextResponse.json({ error: 'A valid SMS order is required.' }, { status: 400 })
+      const { data: order } = await admin.from('sms_orders')
+        .select('id,provider_order_id,status,sms_code,profile_id,phone_number,service_name,price_xaf')
+        .eq('id', id).eq('profile_id', profile.id).maybeSingle()
+      if (!order) return NextResponse.json({ error: 'SMS order not found.' }, { status: 404 })
+      if (order.sms_code || order.status === 'received')
+        return NextResponse.json({ error: 'A code has arrived, so this number can no longer be canceled or refunded.' }, { status: 409 })
+      if (order.status !== 'waiting_sms') {
+        const { data: priorRefund } = await admin.from('wallet_transactions')
+          .select('amount').eq('profile_id', profile.id).eq('reference', `SMS-END-REFUND-${order.id}`).maybeSingle()
+        if (priorRefund) return NextResponse.json({ status: order.status.toUpperCase(), refunded_xaf: priorRefund.amount, already_refunded: true })
+        return NextResponse.json({ error: 'This number is no longer active.' }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } })
+      }
+      if (!order.provider_order_id) return NextResponse.json({ error: 'Supplier order is unavailable. Contact support before retrying.' }, { status: 409 })
+
+      const providerResponse = await fetch(`${FIVE_SIM_BASE_URL}/user/cancel/${encodeURIComponent(order.provider_order_id)}`, {
+        headers: fiveSimHeaders(token), signal: AbortSignal.timeout(15_000),
+      })
+      const providerOrder = await providerResponse.json().catch(() => ({})) as FiveSimOrder & { error?: string }
+      if (!providerResponse.ok)
+        return NextResponse.json({ error: providerOrder.error || 'The provider could not confirm cancellation. Your wallet has not been refunded; refresh and try again.' }, { status: 409 })
+      const providerStatus = String(providerOrder.status || '').toUpperCase()
+      if (providerOrder.sms?.some(message => message.code)) {
+        await syncSmsOrder(admin, order)
+        return NextResponse.json({ error: 'A code arrived while cancellation was processing. The order was not refunded.' }, { status: 409 })
+      }
+      if (!['CANCELED', 'TIMEOUT'].includes(providerStatus) || !Array.isArray(providerOrder.sms) || providerOrder.sms.length > 0)
+        return NextResponse.json({ error: 'The provider has not confirmed an unused cancellation. Your wallet was not refunded.' }, { status: 409 })
+
+      const finalStatus = providerStatus === 'TIMEOUT' ? 'expired' : 'canceled'
+      const { data: result, error: refundError } = await admin.rpc('refund_ended_sms_order', {
+        p_order_id: order.id, p_provider_order_id: order.provider_order_id, p_final_status: finalStatus,
+      })
+      if (refundError) {
+        console.error('[SMS cancellation wallet refund failed]', order.id, refundError)
+        return NextResponse.json({ error: 'The provider canceled the number, but wallet reconciliation needs support. Please do not repurchase yet.' }, { status: 503 })
+      }
+      return NextResponse.json({ status: finalStatus.toUpperCase(), refunded_xaf: result?.refunded_xaf ?? order.price_xaf })
+    }
 
     if (action === 'getStatus' || action === 'getSms') {
       if (!id) return NextResponse.json({ error: '5SIM order ID is required.' }, { status: 400 })

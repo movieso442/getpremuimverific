@@ -11,16 +11,16 @@ import {SMS_COUNTRY_CODES} from '@/lib/providers/sms-catalogue'
 
 type SmsInboxOrder = {
   id: string; provider_order_id: string | null; service_name: string; country_name: string;
-  phone_number: string; sms_code: string | null; status: string; created_at: string;
+  phone_number: string; sms_code: string | null; status: string; created_at: string; expires_at: string; price_xaf: number;
 }
 
 export default function SmsVerificationPage() {
   const router = useRouter()
-  const { profile } = useAppState()
+  const { profile, setProfile } = useAppState()
 
   const [selectedService, setSelectedService] = useState(SMS_SERVICES[0])
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
-  const [activeNumber, setActiveNumber] = useState<{ number: string; code: string; status: string } | null>(null)
+  const [activeNumber, setActiveNumber] = useState<{ number: string; code: string; status: string; expiresAt: string } | null>(null)
   const [providerOrderId, setProviderOrderId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [showInsufficientBanner, setShowInsufficientBanner] = useState(false)
@@ -31,6 +31,7 @@ export default function SmsVerificationPage() {
   const [priceXaf,setPriceXaf]=useState<number | null>(null)
   const [quoteError,setQuoteError]=useState<string | null>(null)
   const [quoteRetry,setQuoteRetry]=useState(0)
+  const [cancelingOrderId,setCancelingOrderId]=useState<string|null>(null)
   useEffect(()=>{
     let active=true
     if(!profile.id)return
@@ -73,7 +74,8 @@ export default function SmsVerificationPage() {
       setActiveNumber({
         number: result.phone,
         code: 'Waiting for SMS...',
-        status: 'RECEIVING'
+        status: 'RECEIVING',
+        expiresAt: result.order.expires_at,
       })
       setProviderOrderId(result.id)
       confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } })
@@ -116,6 +118,7 @@ export default function SmsVerificationPage() {
           number: currentOrder.phone_number,
           code: currentOrder.sms_code || (currentOrder.status === 'waiting_sms' ? 'Waiting for SMS...' : currentOrder.status),
           status: currentOrder.sms_code ? 'RECEIVED' : currentOrder.status === 'waiting_sms' ? 'RECEIVING' : currentOrder.status.toUpperCase(),
+          expiresAt: currentOrder.expires_at,
         })
       } catch {
         if (!disposed) setInboxError('Could not refresh your SMS inbox. Retrying shortly.')
@@ -134,6 +137,28 @@ export default function SmsVerificationPage() {
       navigator.clipboard.writeText(activeNumber.number)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  const handleCancelOrder = async (order: SmsInboxOrder) => {
+    if (cancelingOrderId) return
+    setCancelingOrderId(order.id)
+    setInboxError(null)
+    try {
+      const response = await fetch('/api/v1/sms/order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel', id: order.id }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Could not cancel this number yet.')
+      const refund = Number(result.refunded_xaf || order.price_xaf)
+      setInboxOrders(current => current.map(item => item.id === order.id ? { ...item, status: 'canceled' } : item))
+      setProfile({ balance_xaf: profile.balance_xaf + refund })
+      setRequestError(`${refund.toLocaleString()} XAF returned to your wallet. You can request another number now.`)
+    } catch (error) {
+      setInboxError(error instanceof Error ? error.message : 'Cancellation is still being checked. Refresh before trying again.')
+    } finally {
+      setCancelingOrderId(null)
     }
   }
 
@@ -227,6 +252,9 @@ export default function SmsVerificationPage() {
       {profile.id && activeNumber && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 space-y-4 shadow-2xs">
           <h3 className="text-sm font-bold text-gray-900">Active Virtual Number Session</h3>
+          <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+            Use this number immediately and request the SMS in the target app. You can cancel and get the wallet charge back while the provider still accepts cancellation, before a code arrives and before {new Date(activeNumber.expiresAt).toLocaleTimeString()}. If it expires without a code, the charge is returned after the provider confirms the timeout. The provider controls the timer; we cannot extend it.
+          </div>
 
           <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
@@ -275,6 +303,12 @@ export default function SmsVerificationPage() {
                 <div className="text-right">
                   <p className="text-xs text-gray-500 capitalize">{order.status.replaceAll('_', ' ')}</p>
                   <p className="font-mono font-bold text-green-700">{order.sms_code || (order.status === 'waiting_sms' ? 'Waiting for SMS…' : 'No code received')}</p>
+                  <p className="text-xs text-gray-500">Expires {new Date(order.expires_at).toLocaleTimeString()}</p>
+                  {order.status === 'waiting_sms' && !order.sms_code && (
+                    <button disabled={cancelingOrderId !== null} onClick={() => void handleCancelOrder(order)} className="mt-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
+                      {cancelingOrderId === order.id ? 'Canceling…' : `Cancel · return ${order.price_xaf.toLocaleString()} XAF`}
+                    </button>
+                  )}
                 </div>
               </article>
             ))}

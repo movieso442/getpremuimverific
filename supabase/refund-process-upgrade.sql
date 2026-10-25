@@ -28,7 +28,10 @@ ALTER TABLE public.wallet_transactions ADD COLUMN IF NOT EXISTS refund_for_trans
 ALTER TABLE public.wallet_transactions ADD COLUMN IF NOT EXISTS refund_request_id UUID REFERENCES public.refund_requests(id);
 CREATE UNIQUE INDEX IF NOT EXISTS wallet_refund_source_once ON public.wallet_transactions(refund_for_transaction_id) WHERE type='refund' AND refund_for_transaction_id IS NOT NULL;
 ALTER TABLE public.wallet_transactions DROP CONSTRAINT IF EXISTS wallet_transactions_type_check;
-ALTER TABLE public.wallet_transactions ADD CONSTRAINT wallet_transactions_type_check CHECK(type IN ('deposit','sms_purchase','smm_order','account_purchase','refund','refund_hold'));
+-- Preserve admin credits created by admin-wallet-credit-upgrade.sql on projects
+-- that already have them; otherwise rebuilding this check rejects existing rows.
+ALTER TABLE public.wallet_transactions ADD CONSTRAINT wallet_transactions_type_check
+  CHECK(type IN ('deposit','sms_purchase','smm_order','account_purchase','refund','refund_hold','admin_credit'));
 
 CREATE OR REPLACE FUNCTION public.submit_refund_request(p_profile UUID,p_transaction UUID,p_reason TEXT)
 RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$

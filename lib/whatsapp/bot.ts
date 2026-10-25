@@ -9,7 +9,7 @@ import { getOrCreateWhatsAppCustomer } from '@/lib/bots/customers'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { createBotCheckoutLink, getBotTopupMinimumXaf } from '@/lib/bots/checkout'
 import { topupCommand } from '@/lib/bots/topup-command'
-import { checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
+import { cancelLatestBotSms, checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
 
 export interface WhatsAppMessagePayload {
   from: string
@@ -231,11 +231,20 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   const userProfile = await getOrCreateWhatsAppCustomer(userPhone, payload.name)
   const currentBalance = userProfile ? Number(userProfile.balance_xaf) || 0 : 0
 
+  if (['cancel number', 'cancel sms', '/cancel-number'].includes(lowerText)) {
+    if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
+    const status = await cancelLatestBotSms(userProfile.id)
+    if (status.kind === 'canceled') return `Number canceled. ${status.refundedXaf.toLocaleString()} XAF has been returned to your wallet. You can request another number now.`
+    if (status.kind === 'received') return `A code arrived before cancellation: *${status.code}*. The number was not refunded.`
+    return status.kind === 'waiting' ? 'The number is still active; try cancel number again.' : status.kind === 'ended' ? status.message : status.message
+  }
+
   if (lowerText === 'check code' || lowerText === 'sms status' || lowerText === 'check sms') {
     if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
     const status = await checkLatestBotSms(userProfile.id)
     if (status.kind === 'received') return `*Your verification code:* \`${status.code}\``
     if (status.kind === 'waiting') return `Your number is still waiting for the SMS code. Please try \`check code\` again shortly.${status.expiresAt ? ` It expires at ${new Date(status.expiresAt).toLocaleTimeString()}.` : ''}`
+    if (status.kind === 'canceled') return `The number ended without a code. ${status.refundedXaf.toLocaleString()} XAF was returned to your wallet.`
     return status.message
   }
 
@@ -327,7 +336,7 @@ export async function processWhatsAppMessage(payload: WhatsAppMessagePayload): P
   if (reserveReply) {
     if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
     const reservation = await reserveLiveBotSms(userProfile.id, reserveReply[1], reserveReply[2])
-    if (reservation.kind === 'success') return `*Verification number reserved*\n\nNumber: \`${reservation.phone}\`\nService: ${friendlyProductName(reservation.service)}\nCountry: ${reservation.country}\nCharged: ${reservation.priceXaf.toLocaleString()} XAF\n\nWhen the SMS arrives, reply \`check code\`.`
+    if (reservation.kind === 'success') return `*Verification number reserved*\n\nNumber: \`${reservation.phone}\`\nService: ${friendlyProductName(reservation.service)}\nCountry: ${reservation.country}\nCharged: ${reservation.priceXaf.toLocaleString()} XAF\n\nUse it now. Before a code arrives and before expiry, reply *cancel number* to cancel if 5SIM still accepts it and return the charge to your wallet. Reply *check code* to check.`
     if (reservation.kind === 'insufficient') {
       const topupUrl = await getPayunitCheckoutUrl(userProfile.id, reservation.requiredXaf - reservation.balanceXaf)
       return `Your wallet needs ${reservation.requiredXaf.toLocaleString()} XAF; current balance is ${reservation.balanceXaf.toLocaleString()} XAF.${topupUrl ? `\n\nTop up securely: ${topupUrl}` : ''}`

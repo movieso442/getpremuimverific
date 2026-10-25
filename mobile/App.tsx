@@ -18,7 +18,7 @@ import AccountServiceRequest from './src/AccountServiceRequest'
 WebBrowser.maybeCompleteAuthSession()
 
 type Account = { profile: { id: string; email: string; full_name: string; balance_xaf: number }; transactions: { id: string; amount: number; type: string; status: string; reference: string }[]; orders: { id: string; service_name: string; quantity: number; status: string }[] }
-type SmsOrder = { id: string; provider_order_id: string; service_name: string; country_name: string; phone_number: string; sms_code: string | null; status: string; expires_at: string }
+type SmsOrder = { id: string; provider_order_id: string; service_name: string; country_name: string; phone_number: string; sms_code: string | null; status: string; expires_at: string; price_xaf: number }
 type Choice = { code: string; name: string }
 type Service = { service_id: number; id: number; name: string; category: string; retail_rate_xaf: number; min: number; max: number }
 type Tab = 'Numbers' | 'Inbox' | 'Boost' | 'Wallet' | 'Account'
@@ -192,6 +192,7 @@ function Panel({ userId }: { userId: string }) {
   const waiting = inbox.filter(order => order.status === 'waiting_sms' && !order.sms_code).length
   const tabIcons = { Numbers: 'keypad-outline', Inbox: 'chatbox-ellipses-outline', Boost: 'trending-up-outline', Wallet: 'wallet-outline', Account: 'person-circle-outline' } as const
   const [copyNotice, setCopyNotice] = useState('')
+  const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current) }, [])
   const copy = async (value: string) => {
@@ -203,6 +204,25 @@ function Panel({ userId }: { userId: string }) {
       copyTimer.current = setTimeout(() => setCopyNotice(''), 2500)
     } catch { setCopyNotice('Could not copy. Press and hold the code to select it.') }
   }
+  const cancelSmsOrder = (order: SmsOrder) => Alert.alert(
+    'Cancel this number?',
+    `If 5SIM still accepts cancellation and no code has arrived, ${money(order.price_xaf)} will be returned to your wallet and you can buy another number. The provider may refuse after an SMS or expiry.`,
+    [
+      { text: 'Keep number', style: 'cancel' },
+      { text: 'Cancel and refund', style: 'destructive', onPress: () => {
+        setCancelingOrderId(order.id)
+        void api<{ status: string; refunded_xaf: number }>('/api/v1/sms/order', { action: 'cancel', id: order.id })
+          .then(result => {
+            setInbox(current => current.map(item => item.id === order.id ? { ...item, status: 'canceled' } : item))
+            setAccount(current => current ? { ...current, profile: { ...current.profile, balance_xaf: current.profile.balance_xaf + result.refunded_xaf } } : current)
+            setNotice(`${money(result.refunded_xaf)} returned to your wallet. You can buy another number now.`)
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined)
+          })
+          .catch(error => setNotice(messageOf(error)))
+          .finally(() => setCancelingOrderId(null))
+      } },
+    ],
+  )
   return <View style={s.fill}>
     <View style={s.header}>
       <Image source={require('./assets/app-icon.png')} accessibilityLabel="premiumverific logo" style={{width:36,height:36}} /><View style={{ flex: 1, minWidth: 0 }}><Text numberOfLines={1} style={s.brand}>premiumverific</Text><Text numberOfLines={1} style={s.greeting}>{account?.profile.full_name ? 'Hi, ' + account.profile.full_name.split(' ')[0] : 'Welcome back'}</Text></View>
@@ -214,8 +234,9 @@ function Panel({ userId }: { userId: string }) {
       {visited.includes('Numbers') && <ScreenTransition active={tab === 'Numbers'}><Numbers onPurchased={() => { navigate('Inbox'); void load() }} /></ScreenTransition>}
       <ScreenTransition active={tab === 'Inbox'}>
         <StepLabel title="Your codes, right here" detail="Updates while the app is open. Tap to copy a number or code." />
+        <Text style={s.caption}>Use each number immediately and request the SMS in the target app. You can cancel while the provider accepts it, before a code arrives and before its expiry. If it expires without a code, the charge is returned after the provider confirms the timeout. The provider controls the timer, which we cannot extend.</Text>
         {!inbox.length && <View style={s.empty}><Icon name="chatbox-ellipses-outline" size={38} color="#c2410c" /><Text style={s.subtitle}>Your inbox is ready</Text><Text style={s.text}>Get a number and its code will appear here.</Text><Button title="Get a number" onPress={() => navigate('Numbers')} /></View>}
-        {inbox.map(order => <View key={order.id} style={s.card}><View style={s.row}><Text style={[s.subtitle,{flex:1}]}>{order.service_name}</Text><View style={s.statusChip}><Text style={s.statusText}>{order.sms_code ? 'Code ready' : order.status === 'waiting_sms' ? 'Waiting' : order.status}</Text></View></View><Text style={s.text}>{order.country_name}</Text><Pressable accessibilityRole="button" accessibilityLabel={'Copy number ' + order.phone_number} onPress={() => void copy(order.phone_number)} style={s.copyRow}><Text selectable style={[s.number,{flex:1}]}>{order.phone_number}</Text><Icon name="copy-outline" size={20} /></Pressable><View style={s.otpBox}><Text style={s.label}>VERIFICATION CODE</Text><Text selectable style={s.code}>{order.sms_code || (order.status === 'waiting_sms' ? 'Waiting for SMS...' : 'No code received')}</Text>{order.sms_code && <Button secondary title="Copy code" onPress={() => void copy(order.sms_code!)} />}</View><Text style={s.caption}>Expires {new Date(order.expires_at).toLocaleTimeString()}</Text></View>)}
+        {inbox.map(order => <View key={order.id} style={s.card}><View style={s.row}><Text style={[s.subtitle,{flex:1}]}>{order.service_name}</Text><View style={s.statusChip}><Text style={s.statusText}>{order.sms_code ? 'Code ready' : order.status === 'waiting_sms' ? 'Waiting' : order.status}</Text></View></View><Text style={s.text}>{order.country_name}</Text><Pressable accessibilityRole="button" accessibilityLabel={'Copy number ' + order.phone_number} onPress={() => void copy(order.phone_number)} style={s.copyRow}><Text selectable style={[s.number,{flex:1}]}>{order.phone_number}</Text><Icon name="copy-outline" size={20} /></Pressable><View style={s.otpBox}><Text style={s.label}>VERIFICATION CODE</Text><Text selectable style={s.code}>{order.sms_code || (order.status === 'waiting_sms' ? 'Waiting for SMS...' : 'No code received')}</Text>{order.sms_code && <Button secondary title="Copy code" onPress={() => void copy(order.sms_code!)} />}</View><Text style={s.caption}>Expires {new Date(order.expires_at).toLocaleTimeString()}</Text>{order.status === 'waiting_sms' && !order.sms_code && <Button secondary title={cancelingOrderId === order.id ? 'Canceling…' : `Cancel and return ${money(order.price_xaf)}`} disabled={cancelingOrderId !== null} onPress={() => cancelSmsOrder(order)} />}</View>)}
       </ScreenTransition>
       {visited.includes('Boost') && <ScreenTransition active={tab === 'Boost'}><Boost active={tab === 'Boost'} onOrdered={() => { navigate('Account'); void load() }} onSelect={() => scroll.current?.scrollTo({y:0,animated:!reduced})} /></ScreenTransition>}
       {visited.includes('Wallet') && <ScreenTransition active={tab === 'Wallet'}><Wallet userId={userId} onCredit={load} active={tab === 'Wallet'} /></ScreenTransition>}

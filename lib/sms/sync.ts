@@ -57,9 +57,18 @@ export async function syncSmsOrder(admin: SupabaseClient, order: SmsOrderForSync
   const providerStatus = String(provider.status || '').toUpperCase()
   if (['CANCELED', 'BANNED', 'TIMEOUT'].includes(providerStatus) && Array.isArray(provider.sms) && provider.sms.length === 0) {
     const status = providerStatus === 'TIMEOUT' ? 'expired' : 'canceled'
-    const { error } = await admin.from('sms_orders').update({ status })
-      .eq('id', order.id).eq('status', 'waiting_sms')
-    if (error) throw error
+    if (providerStatus === 'BANNED') {
+      const { error } = await admin.from('sms_orders').update({ status })
+        .eq('id', order.id).eq('status', 'waiting_sms').is('sms_code', null)
+      if (error) throw error
+    } else {
+      const { error } = await admin.rpc('refund_ended_sms_order', {
+        p_order_id: order.id,
+        p_provider_order_id: order.provider_order_id,
+        p_final_status: status,
+      })
+      if (error) throw error
+    }
     return { updated: true, notified: false, status }
   }
   return { updated: false, notified: false, status: 'waiting' }

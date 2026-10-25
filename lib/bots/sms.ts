@@ -18,6 +18,7 @@ export type BotSmsStatus =
   | { kind: 'received'; code: string }
   | { kind: 'waiting'; expiresAt?: string }
   | { kind: 'ended'; message: string }
+  | { kind: 'canceled'; refundedXaf: number }
   | { kind: 'error'; message: string }
 
 function countryForInput(input: string, countries: Awaited<ReturnType<typeof fetchFiveSimCountries>>) {
@@ -136,13 +137,57 @@ export async function checkLatestBotSms(profileId: string): Promise<BotSmsStatus
     }
     const supplierStatus = String(provider.status || '').toUpperCase()
     if (['CANCELED', 'BANNED', 'TIMEOUT'].includes(supplierStatus) && Array.isArray(provider.sms) && provider.sms.length === 0) {
-      const { error: closeError } = await admin.from('sms_orders').update({ status: supplierStatus === 'TIMEOUT' ? 'expired' : 'canceled' }).eq('id', order.id).eq('status', 'waiting_sms')
-      if (closeError) return { kind: 'error', message: 'Could not update this number’s status. Please retry shortly.' }
+      if (supplierStatus === 'BANNED') {
+        const { error: closeError } = await admin.from('sms_orders').update({ status: 'canceled' }).eq('id', order.id).eq('status', 'waiting_sms').is('sms_code', null)
+        if (closeError) return { kind: 'error', message: 'Could not update this number’s status. Please retry shortly.' }
+      } else {
+        const { error: refundError } = await admin.rpc('refund_ended_sms_order', {
+          p_order_id: order.id, p_provider_order_id: order.provider_order_id,
+          p_final_status: supplierStatus === 'TIMEOUT' ? 'expired' : 'canceled',
+        })
+        if (refundError) return { kind: 'error', message: 'This number ended, but wallet reconciliation is still in progress. Please retry shortly.' }
+        return { kind: 'canceled', refundedXaf: Number((await admin.from('sms_orders').select('price_xaf').eq('id', order.id).single()).data?.price_xaf || 0) }
+      }
       return { kind: 'ended', message: 'This verification-number request has ended without a code.' }
     }
     return { kind: 'waiting', expiresAt: provider.expires || order.expires_at }
   } catch (error) {
     console.error('[Bot SMS status check failed]', error)
     return { kind: 'error', message: 'Could not check the SMS code right now.' }
+  }
+}
+
+export async function cancelLatestBotSms(profileId: string): Promise<BotSmsStatus> {
+  const token = process.env.SMS_PROVIDER_API_KEY
+  if (!token) return { kind: 'error', message: 'Temporary-number ordering is not configured yet.' }
+  try {
+    const admin = createAdminClient()
+    const { data: order } = await admin.from('sms_orders')
+      .select('id,provider_order_id,status,expires_at,sms_code,price_xaf')
+      .eq('profile_id', profileId).eq('status', 'waiting_sms').order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (!order?.provider_order_id) return { kind: 'ended', message: 'You have no active verification-number request to cancel.' }
+    if (order.sms_code) return { kind: 'received', code: order.sms_code }
+    const response = await fetch(`${baseUrl}/user/cancel/${encodeURIComponent(order.provider_order_id)}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: AbortSignal.timeout(15_000),
+    })
+    const provider = await response.json().catch(() => ({})) as { status?: string; sms?: Array<{ code?: string }>; error?: string }
+    if (!response.ok) return { kind: 'error', message: provider.error || 'The provider could not confirm cancellation. Your wallet has not been refunded.' }
+    const code = provider.sms?.find(sms => sms.code)?.code
+    if (code) {
+      const { error } = await admin.from('sms_orders').update({ sms_code: code, status: 'received' }).eq('id', order.id).eq('status', 'waiting_sms')
+      if (error) return { kind: 'error', message: 'A code arrived during cancellation. Please retry the status check; no refund was issued.' }
+      return { kind: 'received', code }
+    }
+    if (String(provider.status || '').toUpperCase() !== 'CANCELED' || !Array.isArray(provider.sms) || provider.sms.length) {
+      return { kind: 'error', message: 'The provider has not confirmed an unused cancellation. Your wallet was not refunded.' }
+    }
+    const { error } = await admin.rpc('refund_ended_sms_order', {
+      p_order_id: order.id, p_provider_order_id: order.provider_order_id, p_final_status: 'canceled',
+    })
+    if (error) return { kind: 'error', message: 'The provider canceled the number, but wallet reconciliation needs support.' }
+    return { kind: 'canceled', refundedXaf: Number(order.price_xaf) }
+  } catch (error) {
+    console.error('[Bot SMS cancellation failed]', error)
+    return { kind: 'error', message: 'Cancellation could not be confirmed. Your wallet has not been refunded yet.' }
   }
 }

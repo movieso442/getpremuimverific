@@ -9,7 +9,7 @@ import { createBotCheckoutLink, getBotTopupMinimumXaf } from '@/lib/bots/checkou
 import { topupCommand } from '@/lib/bots/topup-command'
 import { fetchFiveSimCountries, fetchFiveSimProducts, fetchFiveSimQuote } from '@/lib/providers/fivesim'
 import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
-import { checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
+import { cancelLatestBotSms, checkLatestBotSms, reserveLiveBotSms } from '@/lib/bots/sms'
 
 export interface TelegramMessagePayload {
   chatId: number | string
@@ -212,11 +212,20 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   const userProfile = await getOrCreateTelegramCustomer(chatId, payload.fromName)
   const currentBalance = userProfile ? Number(userProfile.balance_xaf) || 0 : 0
 
+  if (['cancel number', 'cancel sms', '/cancel-number'].includes(lowerText)) {
+    if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
+    const status = await cancelLatestBotSms(userProfile.id)
+    if (status.kind === 'canceled') return `Number canceled. ${status.refundedXaf.toLocaleString()} XAF has been returned to your wallet. You can request another number now.`
+    if (status.kind === 'received') return `A code arrived before cancellation: <code>${status.code}</code>. The number was not refunded.`
+    return status.kind === 'waiting' ? 'The number is still active; try cancel number again.' : status.kind === 'ended' ? status.message : status.message
+  }
+
   if (lowerText === 'check code' || lowerText === 'sms status' || lowerText === 'check sms') {
     if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
     const status = await checkLatestBotSms(userProfile.id)
     if (status.kind === 'received') return `<b>Your verification code:</b> <code>${status.code}</code>`
     if (status.kind === 'waiting') return `Your number is still waiting for the SMS code. Please try <code>check code</code> again shortly.${status.expiresAt ? ` It expires at ${new Date(status.expiresAt).toLocaleTimeString()}.` : ''}`
+    if (status.kind === 'canceled') return `The number ended without a code. ${status.refundedXaf.toLocaleString()} XAF was returned to your wallet.`
     return status.message
   }
 
@@ -307,7 +316,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   if (reserveReply) {
     if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
     const reservation = await reserveLiveBotSms(userProfile.id, reserveReply[1], reserveReply[2])
-    if (reservation.kind === 'success') return `<b>Verification number reserved</b>\n\nNumber: <code>${reservation.phone}</code>\nService: ${friendlyProductName(reservation.service)}\nCountry: ${reservation.country}\nCharged: ${reservation.priceXaf.toLocaleString()} XAF\n\nWhen the SMS arrives, send <code>check code</code>.`
+    if (reservation.kind === 'success') return `<b>Verification number reserved</b>\n\nNumber: <code>${reservation.phone}</code>\nService: ${friendlyProductName(reservation.service)}\nCountry: ${reservation.country}\nCharged: ${reservation.priceXaf.toLocaleString()} XAF\n\nUse it now. Before a code arrives and before expiry, send <code>cancel number</code> to cancel if 5SIM still accepts it and return the charge to your wallet. Check with <code>check code</code>.`
     if (reservation.kind === 'insufficient') {
       const topupUrl = await getPayunitCheckoutUrl(userProfile.id, reservation.requiredXaf - reservation.balanceXaf)
       return `Your wallet needs ${reservation.requiredXaf.toLocaleString()} XAF; current balance is ${reservation.balanceXaf.toLocaleString()} XAF.${topupUrl ? `\n\n<a href="${topupUrl}">Top up securely</a>` : ''}`
