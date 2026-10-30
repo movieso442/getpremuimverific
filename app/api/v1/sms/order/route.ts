@@ -73,9 +73,15 @@ export async function POST(request: Request) {
       }
       if (!order.provider_order_id) return NextResponse.json({ error: 'Supplier order is unavailable. Contact support before retrying.' }, { status: 409 })
 
-      const providerResponse = await fetch(`${FIVE_SIM_BASE_URL}/user/cancel/${encodeURIComponent(order.provider_order_id)}`, {
-        headers: fiveSimHeaders(token), signal: AbortSignal.timeout(15_000),
-      })
+      let providerResponse: Response
+      try {
+        providerResponse = await fetch(`${FIVE_SIM_BASE_URL}/user/cancel/${encodeURIComponent(order.provider_order_id)}`, {
+          headers: fiveSimHeaders(token), signal: AbortSignal.timeout(15_000),
+        })
+      } catch (error) {
+        console.error('[SMS cancellation outcome unknown]', order.id, error)
+        return NextResponse.json({ error: 'The supplier did not confirm cancellation. Your wallet has not been refunded yet. Refresh your inbox before retrying and do not repurchase until the order status is clear.' }, { status: 503 })
+      }
       const providerOrder = await providerResponse.json().catch(() => ({})) as FiveSimOrder & { error?: string }
       if (!providerResponse.ok)
         return NextResponse.json({ error: providerOrder.error || 'The provider could not confirm cancellation. Your wallet has not been refunded; refresh and try again.' }, { status: 409 })
@@ -84,7 +90,7 @@ export async function POST(request: Request) {
         await syncSmsOrder(admin, order)
         return NextResponse.json({ error: 'A code arrived while cancellation was processing. The order was not refunded.' }, { status: 409 })
       }
-      if (!['CANCELED', 'TIMEOUT'].includes(providerStatus) || !Array.isArray(providerOrder.sms) || providerOrder.sms.length > 0)
+      if (!['CANCELED', 'BANNED', 'TIMEOUT'].includes(providerStatus) || !Array.isArray(providerOrder.sms) || providerOrder.sms.length > 0)
         return NextResponse.json({ error: 'The provider has not confirmed an unused cancellation. Your wallet was not refunded.' }, { status: 409 })
 
       const finalStatus = providerStatus === 'TIMEOUT' ? 'expired' : 'canceled'
@@ -128,7 +134,13 @@ export async function POST(request: Request) {
     // 5SIM's public catalogue provides the current cost and available quantity for
     // each country/product/operator. Select the cheapest available live operator;
     // the browser's displayed price is never used for charging.
-    const quote = await fetchFiveSimQuote(FIVE_SIM_BASE_URL, providerCountry, providerProduct)
+    let quote
+    try {
+      quote = await fetchFiveSimQuote(FIVE_SIM_BASE_URL, providerCountry, providerProduct)
+    } catch (error) {
+      console.error('[SMS quote unavailable]', { service, country, error })
+      return NextResponse.json({ error: 'The live provider could not return a price right now. No funds were charged. Please retry shortly or choose another service or country.' }, { status: 503 })
+    }
     if (!quote)
       return NextResponse.json({ error: '5SIM has no number available for this service and country. No funds were charged.' }, { status: 409 })
 

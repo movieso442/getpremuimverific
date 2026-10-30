@@ -24,6 +24,7 @@ import { SMS_SERVICES, COUNTRIES, SMM_SERVICES, ACCOUNT_PRODUCTS, PLATFORM_INFO 
 import { AuthModal } from '@/components/AuthModal'
 import OrderCalculator from '@/components/OrderCalculator'
 import {useTranslations} from 'next-intl'
+import { PublicProofStats } from '@/components/PublicProofStats'
 
 export default function LandingPage() {
   const t = useTranslations('Landing')
@@ -54,6 +55,22 @@ export default function LandingPage() {
     {
       q: t('faq4q'),
       a: t('faq4a')
+    },
+    {
+      q: t('faq5q'),
+      a: t('faq5a')
+    },
+    {
+      q: t('faq6q'),
+      a: t('faq6a')
+    },
+    {
+      q: t('faq7q'),
+      a: t('faq7a')
+    },
+    {
+      q: t('faq8q'),
+      a: t('faq8a')
     }
   ]
 
@@ -143,6 +160,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      <PublicProofStats />
 
       {/* CORE SERVICES SECTION */}
       <section id="services" className="py-24 bg-white">

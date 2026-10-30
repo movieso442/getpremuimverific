@@ -30,6 +30,7 @@ export const PublicFooter: React.FC = () => {
             <ul className="space-y-2 text-xs">
               <li><Link href="/virtual-numbers" className="hover:text-[#ff5722] transition">{t('smsNumbers')}</Link></li>
               <li><Link href="/sms-verification-guide" className="hover:text-[#ff5722] transition">{t('smsGuide')}</Link></li>
+              <li><Link href="/faq" className="hover:text-[#ff5722] transition">SMS questions and answers</Link></li>
               <li><Link href="/social-media-growth" className="hover:text-[#ff5722] transition">{c('socialServices')}</Link></li>
               <li><Link href="/whatsapp" className="hover:text-[#ff5722] transition">{t('assistant')}</Link></li>
               <li><Link href="/downloads" className="hover:text-[#ff5722] transition">{t('download')}</Link></li>

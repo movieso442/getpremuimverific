@@ -80,7 +80,7 @@ export default function SmsVerificationPage() {
       setProviderOrderId(result.id)
       confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } })
     } catch {
-      setRequestError('Could not contact the live SMS service. No funds were charged.')
+      setRequestError('We could not confirm the number request. Refresh your SMS inbox and wallet before retrying. If no order appears, contact support with the time of your request.')
     } finally {
       setIsRequesting(false)
     }

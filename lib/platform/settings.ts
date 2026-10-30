@@ -26,11 +26,19 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   usd_reference_date: null,
 }
 
+// Minimum gross markup over provider acquisition cost, before fees/refunds.
+export const MIN_PROVIDER_COST_MARKUP_PERCENT = 25
+
+function enforceProviderCostFloor(retailXaf: number, providerCostXaf: number) {
+  const minimumSale = Math.ceil(providerCostXaf * (1 + MIN_PROVIDER_COST_MARKUP_PERCENT / 100))
+  return Math.max(Math.ceil(retailXaf), minimumSale)
+}
+
 export function retailPrice(providerCostXaf: number, multiplier = 3, extraMarkupPercent = 1) {
   // Always round up to the nearest 5 XAF so provider cost is never undercharged.
   const basePrice = Math.ceil((Number(providerCostXaf) * Math.max(1, multiplier)) / 5) * 5
   const totalMarkupPercent = 2 + Math.max(0, Math.min(10, Number(extraMarkupPercent) || 0))
-  return Math.ceil(basePrice * (100 + totalMarkupPercent) / 100)
+  return enforceProviderCostFloor(Math.ceil(basePrice * (100 + totalMarkupPercent) / 100), Number(providerCostXaf))
 }
 
 export type SmmPriceOverride = {
@@ -65,7 +73,8 @@ export async function getSmmPriceOverrides(admin: SupabaseClient, serviceIds?: n
 export function smmRetailRateXaf(providerRateUsd: number, multiplier: number, override?: SmmPriceOverride, extraMarkupPercent = 1) {
   const totalMarkupPercent = 2 + Math.max(0, Math.min(10, Number(extraMarkupPercent) || 0))
   if (override?.is_active && Number.isFinite(override.retail_rate_xaf) && override.retail_rate_xaf > 0) {
-    return Math.ceil((Math.ceil(override.retail_rate_xaf / 5) * 5) * (100 + totalMarkupPercent) / 100)
+    const providerCostXaf = Number(providerRateUsd) * 600
+    return enforceProviderCostFloor(Math.ceil((Math.ceil(override.retail_rate_xaf / 5) * 5) * (100 + totalMarkupPercent) / 100), providerCostXaf)
   }
   return retailPrice(Number(providerRateUsd) * 600, multiplier, extraMarkupPercent)
 }

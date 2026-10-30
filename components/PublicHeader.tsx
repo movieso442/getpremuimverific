@@ -21,6 +21,7 @@ export const PublicHeader: React.FC = () => {
           <Link href="/virtual-numbers" className="hover:text-[#ff5722] transition-colors">{t('virtualNumbers')}</Link>
           <Link href="/social-media-growth" className="hover:text-[#ff5722] transition-colors">{t('socialServices')}</Link>
           <Link href="/downloads" className="hover:text-[#ff5722] transition-colors">{t('app')}</Link>
+          <Link href="/faq" className="hover:text-[#ff5722] transition-colors">FAQ</Link>
           <Link href="/privacy" className="hover:text-[#ff5722] transition-colors">{t('privacy')}</Link>
           <Link href="/terms" className="hover:text-[#ff5722] transition-colors">{t('terms')}</Link>
           <Link href="/refunds" className="hover:text-[#ff5722] transition-colors">{t('refunds')}</Link>

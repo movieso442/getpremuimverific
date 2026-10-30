@@ -1,6 +1,6 @@
 import LandingPage from '@/components/LandingPage'
 import { publicMetadata, SITE_URL } from '@/lib/seo'
-export const metadata = publicMetadata('/', 'Virtual SMS Numbers & Social Media Services', 'Buy temporary virtual numbers for SMS verification, compare social media services and get clear wallet pricing with Premium Verific.')
+export const metadata = publicMetadata('/', 'Virtual SMS Numbers & Social Media Services', 'Buy temporary SMS verification numbers, compare live prices by country, and order social media services with clear XAF wallet pricing from Premium Verific.')
 export default function HomePage() {
   const schema = { '@context': 'https://schema.org', '@graph': [
     { '@type': 'WebSite', '@id': SITE_URL + '/#website', url: SITE_URL, name: 'Premium Verific' },
