@@ -215,7 +215,7 @@ export async function processTelegramMessage(payload: TelegramMessagePayload): P
   if (['cancel number', 'cancel sms', '/cancel-number'].includes(lowerText)) {
     if (!userProfile) return 'Your customer wallet is unavailable. Please try again in a moment.'
     const status = await cancelLatestBotSms(userProfile.id)
-    if (status.kind === 'canceled') return `Number canceled. ${status.refundedXaf.toLocaleString()} XAF has been returned to your wallet. You can request another number now.`
+    if (status.kind === 'canceled') return `Number canceled. ${status.refundedXaf.toLocaleString()} XAF has been returned to your wallet after a ${status.cancellationFeeXaf || 0} XAF cancellation fee. You can request another number now.`
     if (status.kind === 'received') return `A code arrived before cancellation: <code>${status.code}</code>. The number was not refunded.`
     return status.kind === 'waiting' ? 'The number is still active; try cancel number again.' : status.kind === 'ended' ? status.message : status.message
   }

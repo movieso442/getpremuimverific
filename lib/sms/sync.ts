@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendTelegramMessage } from '@/lib/telegram/bot'
 import { sendWhatsAppMessage } from '@/lib/whatsapp/bot'
+import { unusedActivationFinalStatus } from '@/lib/sms/provider-terminal'
 
 const baseUrl = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
 
@@ -54,13 +55,13 @@ export async function syncSmsOrder(admin: SupabaseClient, order: SmsOrderForSync
     return { updated: true, notified, status: 'received' }
   }
 
-  const providerStatus = String(provider.status || '').toUpperCase()
-  if (['CANCELED', 'BANNED', 'TIMEOUT'].includes(providerStatus) && Array.isArray(provider.sms) && provider.sms.length === 0) {
-    const status = providerStatus === 'TIMEOUT' ? 'expired' : 'canceled'
+  const status = unusedActivationFinalStatus(provider.status, provider.sms)
+  if (status) {
     const { error } = await admin.rpc('refund_ended_sms_order', {
       p_order_id: order.id,
       p_provider_order_id: order.provider_order_id,
       p_final_status: status,
+      p_customer_cancel: false,
     })
     if (error) throw error
     return { updated: true, notified: false, status }

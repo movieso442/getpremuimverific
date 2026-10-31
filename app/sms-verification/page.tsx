@@ -151,10 +151,11 @@ export default function SmsVerificationPage() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Could not cancel this number yet.')
-      const refund = Number(result.refunded_xaf || order.price_xaf)
+      const refund = Number(result.refunded_xaf ?? order.price_xaf)
       setInboxOrders(current => current.map(item => item.id === order.id ? { ...item, status: 'canceled' } : item))
       setProfile({ balance_xaf: profile.balance_xaf + refund })
-      setRequestError(`${refund.toLocaleString()} XAF returned to your wallet. You can request another number now.`)
+      const fee = Number(result.cancellation_fee_xaf ?? 50)
+      setRequestError(`${refund.toLocaleString()} XAF returned to your wallet${fee ? ` after a ${fee.toLocaleString()} XAF cancellation fee` : ''}. You can request another number now.`)
     } catch (error) {
       setInboxError(error instanceof Error ? error.message : 'Cancellation is still being checked. Refresh before trying again.')
     } finally {
@@ -306,7 +307,7 @@ export default function SmsVerificationPage() {
                   <p className="text-xs text-gray-500">Expires {new Date(order.expires_at).toLocaleTimeString()}</p>
                   {order.status === 'waiting_sms' && !order.sms_code && (
                     <button disabled={cancelingOrderId !== null} onClick={() => void handleCancelOrder(order)} className="mt-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
-                      {cancelingOrderId === order.id ? 'Canceling…' : `Cancel · return ${order.price_xaf.toLocaleString()} XAF`}
+                      {cancelingOrderId === order.id ? 'Canceling…' : `Cancel · return ${Math.max(0, order.price_xaf - 50).toLocaleString()} XAF (50 XAF fee)`}
                     </button>
                   )}
                 </div>

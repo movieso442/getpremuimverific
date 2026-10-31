@@ -1449,16 +1449,23 @@ GRANT EXECUTE ON FUNCTION public.issue_admin_wallet_credit(UUID,UUID,UUID,NUMERI
 -- ================================================================
 -- sms-cancellation-refund-upgrade.sql
 -- ================================================================
--- Return the wallet charge exactly once when an unused FiveSIM activation is
--- canceled by the customer or expires at the provider without an SMS.
+-- Refund an unused FiveSIM activation exactly once. Customer-requested
+-- cancellation retains 50 XAF; provider-confirmed expiry is refunded in full.
 ALTER TABLE public.wallet_purchase_reservations
   DROP CONSTRAINT IF EXISTS wallet_purchase_reservations_state_check;
 ALTER TABLE public.wallet_purchase_reservations
   ADD CONSTRAINT wallet_purchase_reservations_state_check
   CHECK (state IN ('reserved','submitted','released','refunded'));
 
+ALTER TABLE public.sms_orders
+  ADD COLUMN IF NOT EXISTS cancellation_fee_xaf NUMERIC(12,2) NOT NULL DEFAULT 0
+  CHECK (cancellation_fee_xaf >= 0);
+
+DROP FUNCTION IF EXISTS public.refund_ended_sms_order(UUID,TEXT,TEXT);
+
 CREATE OR REPLACE FUNCTION public.refund_ended_sms_order(
-  p_order_id UUID, p_provider_order_id TEXT, p_final_status TEXT
+  p_order_id UUID, p_provider_order_id TEXT, p_final_status TEXT,
+  p_customer_cancel BOOLEAN DEFAULT FALSE
 ) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE
   activation public.sms_orders%ROWTYPE;
@@ -1466,9 +1473,11 @@ DECLARE
   reservation public.wallet_purchase_reservations%ROWTYPE;
   refund public.wallet_transactions%ROWTYPE;
   refund_reference TEXT;
+  fee NUMERIC(12,2);
+  refund_amount NUMERIC(12,2);
 BEGIN
   IF p_order_id IS NULL OR p_provider_order_id IS NULL
-     OR p_final_status NOT IN ('canceled','expired') THEN
+     OR p_final_status NOT IN ('canceled','expired') OR p_customer_cancel IS NULL THEN
     RAISE EXCEPTION 'Invalid SMS cancellation details';
   END IF;
   SELECT * INTO activation FROM public.sms_orders WHERE id=p_order_id;
@@ -1486,10 +1495,16 @@ BEGIN
   refund_reference := 'SMS-END-REFUND-' || activation.id;
   SELECT * INTO refund FROM public.wallet_transactions WHERE reference=refund_reference;
   IF FOUND THEN
-    IF refund.profile_id<>activation.profile_id OR refund.type<>'refund' OR refund.amount<>activation.price_xaf THEN
+    IF refund.profile_id<>activation.profile_id OR refund.type<>'refund' THEN
       RAISE EXCEPTION 'Existing SMS refund needs reconciliation';
     END IF;
-    RETURN jsonb_build_object('status',activation.status,'refunded_xaf',refund.amount,'already_refunded',TRUE);
+    RETURN jsonb_build_object('status',activation.status,'refunded_xaf',refund.amount,
+      'cancellation_fee_xaf',activation.cancellation_fee_xaf,'already_refunded',TRUE);
+  END IF;
+  IF activation.status='canceled' AND activation.cancellation_fee_xaf>0 THEN
+    RETURN jsonb_build_object('status',activation.status,
+      'refunded_xaf',GREATEST(0,activation.price_xaf-activation.cancellation_fee_xaf),
+      'cancellation_fee_xaf',activation.cancellation_fee_xaf,'already_refunded',TRUE);
   END IF;
   IF activation.status NOT IN ('waiting_sms','canceled','expired') THEN
     RAISE EXCEPTION 'SMS activation is not eligible for cancellation refund';
@@ -1509,20 +1524,26 @@ BEGIN
       OR reservation.provider_order_id IS DISTINCT FROM activation.provider_order_id) THEN
     RAISE EXCEPTION 'SMS purchase reservation does not match supplier order';
   END IF;
-  UPDATE public.sms_orders SET status=p_final_status
+  fee := CASE WHEN p_customer_cancel AND p_final_status='canceled' THEN LEAST(50,activation.price_xaf) ELSE 0 END;
+  refund_amount := activation.price_xaf-fee;
+  UPDATE public.sms_orders SET status=p_final_status,cancellation_fee_xaf=fee
     WHERE id=activation.id AND status IN ('waiting_sms','canceled','expired') AND sms_code IS NULL;
   IF NOT FOUND THEN RAISE EXCEPTION 'SMS activation changed while cancellation was being settled'; END IF;
-  INSERT INTO public.wallet_transactions(profile_id,amount,type,payment_method,reference,status,description)
-    VALUES(activation.profile_id,activation.price_xaf,'refund','wallet',refund_reference,'completed',
-      CASE WHEN p_final_status='expired' THEN 'Unused SMS activation expired without a code' ELSE 'Unused SMS activation canceled by customer' END);
+  IF refund_amount>0 THEN
+    INSERT INTO public.wallet_transactions(profile_id,amount,type,payment_method,reference,status,description)
+      VALUES(activation.profile_id,refund_amount,'refund','wallet',refund_reference,'completed',
+        CASE WHEN fee>0 THEN 'Unused SMS activation canceled by customer; 50 XAF cancellation fee retained'
+          WHEN p_final_status='expired' THEN 'Unused SMS activation expired without a code' ELSE 'Unused SMS activation canceled without a fee' END);
+  END IF;
   IF reservation.id IS NOT NULL THEN
     UPDATE public.wallet_purchase_reservations SET state='refunded',updated_at=NOW() WHERE id=reservation.id;
   END IF;
-  RETURN jsonb_build_object('status',p_final_status,'refunded_xaf',activation.price_xaf,'already_refunded',FALSE);
+  RETURN jsonb_build_object('status',p_final_status,'refunded_xaf',refund_amount,
+    'cancellation_fee_xaf',fee,'already_refunded',FALSE);
 END;
 $$;
-REVOKE ALL ON FUNCTION public.refund_ended_sms_order(UUID,TEXT,TEXT) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.refund_ended_sms_order(UUID,TEXT,TEXT) TO service_role;
+REVOKE ALL ON FUNCTION public.refund_ended_sms_order(UUID,TEXT,TEXT,BOOLEAN) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.refund_ended_sms_order(UUID,TEXT,TEXT,BOOLEAN) TO service_role;
 
 -- ================================================================
 -- service-markup-upgrade.sql

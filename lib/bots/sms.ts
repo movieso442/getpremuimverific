@@ -3,6 +3,7 @@ import { getPlatformSettings, retailPrice } from '@/lib/platform/settings'
 import { fetchFiveSimCountries, fetchFiveSimQuote } from '@/lib/providers/fivesim'
 import { recordFiveSimCost } from '@/lib/providers/sms-accounting'
 import { markWalletPurchaseSubmitted, PurchaseReservationError, releaseWalletPurchase, reserveWalletPurchase } from '@/lib/wallet/purchase-reservation'
+import { unusedActivationFinalStatus } from '@/lib/sms/provider-terminal'
 
 const baseUrl = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
 
@@ -18,7 +19,7 @@ export type BotSmsStatus =
   | { kind: 'received'; code: string }
   | { kind: 'waiting'; expiresAt?: string }
   | { kind: 'ended'; message: string }
-  | { kind: 'canceled'; refundedXaf: number }
+  | { kind: 'canceled'; refundedXaf: number; cancellationFeeXaf?: number }
   | { kind: 'error'; message: string }
 
 function countryForInput(input: string, countries: Awaited<ReturnType<typeof fetchFiveSimCountries>>) {
@@ -45,7 +46,7 @@ export async function reserveLiveBotSms(profileId: string, countryInput: string,
     if (profileResult.data.refund_hold) return { kind: 'error', message: 'Purchases are paused while your unused-deposit return is reserved. Contact customer support for help.' }
 
     const quote = await fetchFiveSimQuote(baseUrl, country.slug, product)
-    if (!quote) return { kind: 'unavailable', message: 'This verification number is no longer available. Please choose another service.' }
+    if (!quote) return { kind: 'unavailable', message: 'No available number currently meets our minimum 50% provider delivery rate for this service and country. No funds were charged; please choose another country or service.' }
     const priceXaf = retailPrice(quote.costUsd * 600, settings.sms_markup_multiplier, settings.extra_service_markup_percent)
     const balanceXaf = Number(profileResult.data.balance_xaf || 0)
     if (balanceXaf < priceXaf) return { kind: 'insufficient', requiredXaf: priceXaf, balanceXaf }
@@ -135,20 +136,15 @@ export async function checkLatestBotSms(profileId: string): Promise<BotSmsStatus
       await fetch(`${baseUrl}/user/finish/${encodeURIComponent(order.provider_order_id)}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } }).catch(() => undefined)
       return { kind: 'received', code }
     }
-    const supplierStatus = String(provider.status || '').toUpperCase()
-    if (['CANCELED', 'BANNED', 'TIMEOUT'].includes(supplierStatus) && Array.isArray(provider.sms) && provider.sms.length === 0) {
-      if (supplierStatus === 'BANNED') {
-        const { error: closeError } = await admin.from('sms_orders').update({ status: 'canceled' }).eq('id', order.id).eq('status', 'waiting_sms').is('sms_code', null)
-        if (closeError) return { kind: 'error', message: 'Could not update this number’s status. Please retry shortly.' }
-      } else {
-        const { error: refundError } = await admin.rpc('refund_ended_sms_order', {
-          p_order_id: order.id, p_provider_order_id: order.provider_order_id,
-          p_final_status: supplierStatus === 'TIMEOUT' ? 'expired' : 'canceled',
-        })
-        if (refundError) return { kind: 'error', message: 'This number ended, but wallet reconciliation is still in progress. Please retry shortly.' }
-        return { kind: 'canceled', refundedXaf: Number((await admin.from('sms_orders').select('price_xaf').eq('id', order.id).single()).data?.price_xaf || 0) }
-      }
-      return { kind: 'ended', message: 'This verification-number request has ended without a code.' }
+    const finalStatus = unusedActivationFinalStatus(provider.status, provider.sms)
+    if (finalStatus) {
+      const { error: refundError } = await admin.rpc('refund_ended_sms_order', {
+        p_order_id: order.id, p_provider_order_id: order.provider_order_id,
+        p_final_status: finalStatus,
+        p_customer_cancel: false,
+      })
+      if (refundError) return { kind: 'error', message: 'This number ended, but wallet reconciliation is still in progress. Please retry shortly.' }
+      return { kind: 'canceled', refundedXaf: Number((await admin.from('sms_orders').select('price_xaf').eq('id', order.id).single()).data?.price_xaf || 0) }
     }
     return { kind: 'waiting', expiresAt: provider.expires || order.expires_at }
   } catch (error) {
@@ -178,14 +174,21 @@ export async function cancelLatestBotSms(profileId: string): Promise<BotSmsStatu
       if (error) return { kind: 'error', message: 'A code arrived during cancellation. Please retry the status check; no refund was issued.' }
       return { kind: 'received', code }
     }
-    if (String(provider.status || '').toUpperCase() !== 'CANCELED' || !Array.isArray(provider.sms) || provider.sms.length) {
+    const finalStatus = unusedActivationFinalStatus(provider.status, provider.sms)
+    if (!finalStatus) {
       return { kind: 'error', message: 'The provider has not confirmed an unused cancellation. Your wallet was not refunded.' }
     }
-    const { error } = await admin.rpc('refund_ended_sms_order', {
-      p_order_id: order.id, p_provider_order_id: order.provider_order_id, p_final_status: 'canceled',
+    const { data: settlement, error } = await admin.rpc('refund_ended_sms_order', {
+      p_order_id: order.id, p_provider_order_id: order.provider_order_id,
+      p_final_status: finalStatus,
+      p_customer_cancel: true,
     })
     if (error) return { kind: 'error', message: 'The provider canceled the number, but wallet reconciliation needs support.' }
-    return { kind: 'canceled', refundedXaf: Number(order.price_xaf) }
+    return {
+      kind: 'canceled',
+      refundedXaf: Number(settlement?.refunded_xaf ?? Math.max(0, Number(order.price_xaf) - 50)),
+      cancellationFeeXaf: Number(settlement?.cancellation_fee_xaf ?? 50),
+    }
   } catch (error) {
     console.error('[Bot SMS cancellation failed]', error)
     return { kind: 'error', message: 'Cancellation could not be confirmed. Your wallet has not been refunded yet.' }

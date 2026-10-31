@@ -6,6 +6,7 @@ import { ADMIN_OWNER_EMAIL } from '@/lib/admin/owner'
 import { createClient } from '@/lib/supabase/client'
 import AdminNotificationPanel from '@/components/AdminNotificationPanel'
 import AdminSignIn from '@/components/AdminSignIn'
+import ProviderBalancesPanel from '@/components/ProviderBalancesPanel'
 import { CRYPTO_METHODS, isCryptoMethod } from '@/lib/payments/manual-crypto'
 import { AlertTriangle, Banknote, ClipboardList, Loader2, RefreshCw, Users } from 'lucide-react'
 
@@ -168,6 +169,7 @@ export default function AdminPage() {
 
         {error && <div className="rounded-xl border border-red-400/30 bg-red-500/10 text-red-100 p-4 text-sm">{error}</div>}
         <AdminNotificationPanel />
+        <ProviderBalancesPanel />
         {data.schema_notice && <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-100 p-4 text-sm flex gap-3"><AlertTriangle className="w-5 h-5 shrink-0" />{data.schema_notice}</div>}
         {data.followup_delivery && <section className="rounded-xl border border-slate-700 bg-slate-900 p-4 text-sm" aria-label="Top-up follow-up emails"><h2 className="font-bold">Top-up help emails</h2><p className="mt-1 text-slate-300">{data.followup_delivery.configured ? 'Automatic delivery configured' : 'Automatic delivery is off or missing Resend/cron configuration'} · {data.followup_delivery.schema_available ? `${data.followup_delivery.queued ?? 0} unsent checkout events` : 'Run customer-followups-upgrade.sql'}</p><p className="mt-1 text-xs text-slate-400">Only eligible, confirmed-email customers are contacted after the grace period. A queued event is not proof of an unpaid charge.</p></section>}
 

@@ -8,6 +8,7 @@ import { scheduleAdminNotifications } from '@/lib/notifications/admin-email'
 import { recordFiveSimCost } from '@/lib/providers/sms-accounting'
 import { markWalletPurchaseSubmitted, PurchaseReservationError, releaseWalletPurchase, reserveWalletPurchase } from '@/lib/wallet/purchase-reservation'
 import { syncSmsOrder } from '@/lib/sms/sync'
+import { unusedActivationFinalStatus } from '@/lib/sms/provider-terminal'
 
 const FIVE_SIM_BASE_URL = (process.env.SMS_PROVIDER_BASE_URL || 'https://5sim.net/v1').replace(/\/$/, '')
 const COUNTRY_SLUGS: Record<string, string> = {
@@ -85,23 +86,23 @@ export async function POST(request: Request) {
       const providerOrder = await providerResponse.json().catch(() => ({})) as FiveSimOrder & { error?: string }
       if (!providerResponse.ok)
         return NextResponse.json({ error: providerOrder.error || 'The provider could not confirm cancellation. Your wallet has not been refunded; refresh and try again.' }, { status: 409 })
-      const providerStatus = String(providerOrder.status || '').toUpperCase()
       if (providerOrder.sms?.some(message => message.code)) {
         await syncSmsOrder(admin, order)
         return NextResponse.json({ error: 'A code arrived while cancellation was processing. The order was not refunded.' }, { status: 409 })
       }
-      if (!['CANCELED', 'BANNED', 'TIMEOUT'].includes(providerStatus) || !Array.isArray(providerOrder.sms) || providerOrder.sms.length > 0)
+      const finalStatus = unusedActivationFinalStatus(providerOrder.status, providerOrder.sms)
+      if (!finalStatus)
         return NextResponse.json({ error: 'The provider has not confirmed an unused cancellation. Your wallet was not refunded.' }, { status: 409 })
 
-      const finalStatus = providerStatus === 'TIMEOUT' ? 'expired' : 'canceled'
       const { data: result, error: refundError } = await admin.rpc('refund_ended_sms_order', {
         p_order_id: order.id, p_provider_order_id: order.provider_order_id, p_final_status: finalStatus,
+        p_customer_cancel: true,
       })
       if (refundError) {
         console.error('[SMS cancellation wallet refund failed]', order.id, refundError)
         return NextResponse.json({ error: 'The provider canceled the number, but wallet reconciliation needs support. Please do not repurchase yet.' }, { status: 503 })
       }
-      return NextResponse.json({ status: finalStatus.toUpperCase(), refunded_xaf: result?.refunded_xaf ?? order.price_xaf })
+      return NextResponse.json({ status: finalStatus.toUpperCase(), refunded_xaf: result?.refunded_xaf ?? order.price_xaf, cancellation_fee_xaf: result?.cancellation_fee_xaf ?? 50 })
     }
 
     if (action === 'getStatus' || action === 'getSms') {
@@ -132,8 +133,8 @@ export async function POST(request: Request) {
     if (!catalogService || !providerCountry || !providerProduct)
       return NextResponse.json({ error: 'This SMS service or country is not supported by 5SIM.' }, { status: 400 })
     // 5SIM's public catalogue provides the current cost and available quantity for
-    // each country/product/operator. Select the cheapest available live operator;
-    // the browser's displayed price is never used for charging.
+    // each country/product/operator. Only offers with a reported >=50% rate
+    // are eligible; the browser's displayed price is never used for charging.
     let quote
     try {
       quote = await fetchFiveSimQuote(FIVE_SIM_BASE_URL, providerCountry, providerProduct)
@@ -142,7 +143,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'The live provider could not return a price right now. No funds were charged. Please retry shortly or choose another service or country.' }, { status: 503 })
     }
     if (!quote)
-      return NextResponse.json({ error: '5SIM has no number available for this service and country. No funds were charged.' }, { status: 409 })
+      return NextResponse.json({ error: 'No number is available with a verified provider delivery rate of at least 50% for this service and country. No funds were charged; please choose another country or service.' }, { status: 409 })
 
     const settings = await getPlatformSettings(admin)
     const providerCostXaf = quote.costUsd * 600
