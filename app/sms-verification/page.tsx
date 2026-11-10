@@ -14,6 +14,16 @@ type SmsInboxOrder = {
   phone_number: string; sms_code: string | null; status: string; created_at: string; expires_at: string; price_xaf: number;
 }
 
+function failedOrderMessage(order: Pick<SmsInboxOrder, 'status' | 'price_xaf'>) {
+  if (order.status === 'expired') {
+    return `No code arrived before the provider timer ended. ${order.price_xaf.toLocaleString()} XAF was returned to your wallet.`
+  }
+  if (order.status === 'canceled') {
+    return 'This number was canceled before a code arrived. Check your wallet activity for the returned amount.'
+  }
+  return null
+}
+
 export default function SmsVerificationPage() {
   const router = useRouter()
   const { profile, setProfile } = useAppState()
@@ -284,6 +294,14 @@ export default function SmsVerificationPage() {
               <RefreshCw className="w-5 h-5 text-[#ea580c] animate-spin" />
             )}
           </div>
+          {(activeNumber.status === 'EXPIRED' || activeNumber.status === 'CANCELED') && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-900">
+              <p className="font-bold">This number did not receive a code.</p>
+              <p className="mt-1">{activeNumber.status === 'EXPIRED'
+                ? 'The provider timer ended without a code. The full charge is automatically returned to your wallet after provider confirmation.'
+                : 'The number was canceled before a code arrived. Check your wallet activity for the returned amount.'}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -295,15 +313,16 @@ export default function SmsVerificationPage() {
           {!inboxOrders.length && <p className="text-sm text-gray-500">Your reserved numbers will appear here.</p>}
           <div className="space-y-3" aria-live="polite">
             {inboxOrders.map(order => (
-              <article key={order.id} className="rounded-xl border border-gray-200 p-4 flex flex-wrap justify-between gap-3">
+              <article key={order.id} className={`rounded-xl border p-4 flex flex-wrap justify-between gap-3 ${failedOrderMessage(order) ? 'border-red-200 bg-red-50/40' : 'border-gray-200'}`}>
                 <div>
                   <p className="font-semibold">{order.service_name} · {order.country_name}</p>
                   <p className="font-mono text-sm">{order.phone_number}</p>
                   <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleString()}</p>
+                  {failedOrderMessage(order) && <p role="status" className="mt-2 max-w-xl text-sm font-medium text-red-800">{failedOrderMessage(order)}</p>}
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500 capitalize">{order.status.replaceAll('_', ' ')}</p>
-                  <p className="font-mono font-bold text-green-700">{order.sms_code || (order.status === 'waiting_sms' ? 'Waiting for SMS…' : 'No code received')}</p>
+                  <p className={`font-mono font-bold ${order.sms_code ? 'text-green-700' : failedOrderMessage(order) ? 'text-red-700' : 'text-gray-700'}`}>{order.sms_code || (order.status === 'waiting_sms' ? 'Waiting for SMS…' : 'No code received')}</p>
                   <p className="text-xs text-gray-500">Expires {new Date(order.expires_at).toLocaleTimeString()}</p>
                   {order.status === 'waiting_sms' && !order.sms_code && (
                     <button disabled={cancelingOrderId !== null} onClick={() => void handleCancelOrder(order)} className="mt-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
