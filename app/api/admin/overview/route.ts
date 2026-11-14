@@ -12,14 +12,15 @@ export async function GET() {
     const access = await requireAdmin()
     if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status })
 
-    const [profilesResult, transactionsResult, smmResult, smsResult, accountsResult, entriesResult, claimsResult, settings, auditEventsResult] = await Promise.all([
+    const [profilesResult, transactionsResult, smmResult, smsResult, accountsResult, entriesResult, claimsResult, refundRequestsResult, settings, auditEventsResult] = await Promise.all([
       access.admin.from('profiles').select('id, email, full_name, phone_number, balance_xaf, role, created_at').order('created_at', { ascending: false }).limit(500),
-      access.admin.from('wallet_transactions').select('id, profile_id, amount, type, payment_method, reference, status, description, created_at').order('created_at', { ascending: false }).limit(500),
-      access.admin.from('smm_orders').select('id, profile_id, service_name, category, quantity, charge_xaf, start_count, remains, status, api_order_id, created_at').order('created_at', { ascending: false }).limit(500),
-      access.admin.from('sms_orders').select('id, profile_id, service_name, country_name, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
+      access.admin.from('wallet_transactions').select('id, profile_id, amount, type, payment_method, reference, status, description, refund_for_transaction_id, created_at').order('created_at', { ascending: false }).limit(500),
+      access.admin.from('smm_orders').select('id, profile_id, service_id, service_name, category, target_link, quantity, charge_xaf, start_count, remains, status, api_order_id, created_at').order('created_at', { ascending: false }).limit(500),
+      access.admin.from('sms_orders').select('id, profile_id, service_name, service_code, country_name, phone_number, provider_order_id, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('account_orders').select('id, profile_id, item_title, category, price_xaf, status, created_at').order('created_at', { ascending: false }).limit(500),
       access.admin.from('financial_entries').select('id, kind, amount_xaf, description, reference, created_at').order('created_at', { ascending: false }).limit(250),
       access.admin.from('manual_payment_claims').select('*').order('created_at', { ascending: false }).limit(200),
+      access.admin.from('refund_requests').select('id, transaction_id, state, approved_amount_xaf, reserved_amount_xaf').order('created_at', { ascending: false }).limit(500),
       getPlatformSettings(access.admin),
       access.admin.from('audit_events').select('event_type, session_id, path, created_at').order('created_at', { ascending: false }).limit(1000),
     ])
@@ -29,6 +30,37 @@ export async function GET() {
     }
 
     const transactions = transactionsResult.data || []
+    const refundRequestByTransaction = new Map((refundRequestsResult.data || []).map((request) => [request.transaction_id, request]))
+    const transactionByReference = new Map(transactions.map((row) => [row.reference, row]))
+    const smsSettlementAlerts = (smsResult.data || []).flatMap((order) => {
+      if (!['canceled', 'expired'].includes(order.status)) return []
+      const purchase = transactionByReference.get(`SMS-${order.id}`) || transactionByReference.get(`BOT-SMS-${order.id}`)
+      if (!purchase || purchase.status !== 'completed') return []
+      const directRefund = transactionByReference.get(`SMS-END-REFUND-${order.id}`)
+      const linkedRefund = transactions.filter((row) => row.type === 'refund' && row.status === 'completed' && row.refund_for_transaction_id === purchase.id)
+        .reduce((total, row) => total + Number(row.amount || 0), 0)
+      const refunded = Math.max(Number(directRefund?.status === 'completed' ? directRefund.amount : 0), linkedRefund)
+      const minimumExpected = order.status === 'canceled' ? Math.max(0, Number(order.price_xaf) - 50) : Number(order.price_xaf)
+      if (refunded >= minimumExpected) return []
+      const refundRequest = refundRequestByTransaction.get(purchase.id)
+      return [{ kind: 'SMS', id: order.id, profile_id: order.profile_id, service: order.service_name, status: order.status,
+        charged_xaf: Number(purchase.amount), refunded_xaf: refunded, review_amount_xaf: Math.max(0, minimumExpected - refunded),
+        refund_request_state: refundRequest?.state || null, target_link: null, provider_order_id: order.provider_order_id || order.phone_number || null }]
+    })
+    const smmSettlementAlerts = (smmResult.data || []).flatMap((order) => {
+      if (!['canceled', 'partial'].includes(order.status)) return []
+      const purchase = transactionByReference.get(`SMM-${order.id}`)
+      if (!purchase || purchase.status !== 'completed') return []
+      const refunded = transactions.filter((row) => row.type === 'refund' && row.status === 'completed' && row.refund_for_transaction_id === purchase.id)
+        .reduce((total, row) => total + Number(row.amount || 0), 0)
+      const expected = order.status === 'canceled' ? Number(purchase.amount)
+        : Math.min(Number(purchase.amount), Math.ceil(Number(purchase.amount) * Number(order.remains || 0) / Math.max(1, Number(order.quantity))))
+      if (refunded >= expected) return []
+      const refundRequest = refundRequestByTransaction.get(purchase.id)
+      return [{ kind: 'SMM', id: order.id, profile_id: order.profile_id, service: order.service_name, status: order.status,
+        charged_xaf: Number(purchase.amount), refunded_xaf: refunded, review_amount_xaf: Math.max(0, expected - refunded),
+        refund_request_state: refundRequest?.state || null, target_link: order.target_link, provider_order_id: order.api_order_id }]
+    })
     const completedDeposits = transactions.filter((row) => row.type === 'deposit' && completed(row))
     const customerSales = transactions.filter((row) => ['smm_order', 'sms_purchase', 'account_purchase'].includes(row.type) && completed(row))
     const refunds = transactions.filter((row) => row.type === 'refund' && completed(row))
@@ -90,6 +122,7 @@ export async function GET() {
       audit_events: auditEvents,
       profiles: profilesResult.data || [],
       transactions,
+      settlement_alerts: [...smsSettlementAlerts, ...smmSettlementAlerts].sort((a, b) => b.review_amount_xaf - a.review_amount_xaf),
       smm_orders: smmResult.data || [],
       sms_orders: smsResult.data || [],
       account_orders: accountsResult.data || [],

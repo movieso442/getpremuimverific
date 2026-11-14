@@ -16,19 +16,27 @@ type Overview = {
   followup_delivery?: { configured: boolean; queued: number | null; schema_available: boolean }
   metrics: Record<string, number>
   profiles: Array<{ id: string; email: string; full_name: string | null; phone_number: string | null; balance_xaf: number; role: 'client' | 'admin'; created_at: string }>
-  transactions: Array<{ id: string; profile_id: string; amount: number; type: string; payment_method: string; reference: string; status: string; description?: string; created_at: string }>
-  smm_orders: Array<{ id: string; profile_id: string; service_name: string; quantity: number; charge_xaf: number; status: string; remains: number; created_at: string }>
-  sms_orders: Array<{ id: string; profile_id: string; service_name: string; price_xaf: number; status: string; created_at: string }>
+  transactions: Array<{ id: string; profile_id: string; amount: number; type: string; payment_method: string; reference: string; status: string; description?: string; refund_for_transaction_id?: string | null; created_at: string }>
+  smm_orders: Array<{ id: string; profile_id: string; service_id: number; service_name: string; category: string; target_link: string; api_order_id: string | null; quantity: number; charge_xaf: number; status: string; remains: number; start_count: number; created_at: string }>
+  sms_orders: Array<{ id: string; profile_id: string; service_name: string; service_code: string; country_name: string; phone_number: string; price_xaf: number; status: string; created_at: string }>
   account_orders: Array<{ id: string; profile_id: string; item_title: string; price_xaf: number; status: string; created_at: string }>
   expenses: Array<{ id: string; kind: string; amount_xaf: number; description: string; reference?: string; created_at: string }>
   manual_claims: Array<{ id: string; profile_id: string; amount_xaf: number; payment_method: string; payer_phone: string | null; transfer_reference: string; status: string; created_at: string; crypto_amount?: string; receiving_address?: string; approved_amount_xaf?: number; service_fee_xaf?: number; receipt_storage_path?: string }>
   settings: { support_email: string; support_phone: string; whatsapp_number: string; smm_markup_multiplier: number; sms_markup_multiplier: number }
   analytics: Array<{ date: string; deposits_xaf: number; sales_xaf: number; orders: number }>
+  settlement_alerts?: Array<{ kind: 'SMS' | 'SMM'; id: string; profile_id: string; service: string; status: string; charged_xaf: number; refunded_xaf: number; review_amount_xaf: number; refund_request_state: string | null; target_link: string | null; provider_order_id: string | null }>
 }
 
 const xaf = (value: number | string | undefined) => `${Number(value || 0).toLocaleString()} XAF`
 const when = (value: string) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 const badge = (status: string) => status === 'completed' ? 'bg-emerald-100 text-emerald-800' : status === 'failed' || status === 'canceled' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+const safeExternalUrl = (value: string | null | undefined) => {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null
+  } catch { return null }
+}
 
 export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null)
@@ -66,8 +74,19 @@ export default function AdminPage() {
   const matchingTransactions = useMemo(() => (data?.transactions || []).filter((transaction) => {
     const customer = profileById.get(transaction.profile_id)
     const needle = filter.toLowerCase().trim()
-    return !needle || [transaction.reference, transaction.type, transaction.status, customer?.email, customer?.full_name].some((value) => value?.toLowerCase().includes(needle))
+    return !needle || [transaction.reference, transaction.type, transaction.status, transaction.description, customer?.email, customer?.full_name].some((value) => value?.toLowerCase().includes(needle))
   }), [data, filter, profileById])
+
+  const linkedOrderFor = (reference: string) => {
+    const match = reference.match(/(?:SMS-END-REFUND-|PURCHASE-RELEASE-|BOT-SMS-|SMS-|SMM-)([0-9a-f-]{36})/i)
+    if (!match) return null
+    const id = match[1]
+    const sms = data?.sms_orders.find((order) => order.id === id)
+    if (sms) return { kind: 'SMS', id, label: `${sms.service_name} · ${sms.country_name} · ${sms.status}`, destination: sms.phone_number, href: null as string | null }
+    const smm = data?.smm_orders.find((order) => order.id === id)
+    if (smm) return { kind: 'SMM', id, label: `${smm.service_name} · ${smm.status}`, destination: smm.target_link, href: safeExternalUrl(smm.target_link) }
+    return null
+  }
 
   const addExpense = async (event: FormEvent) => {
     event.preventDefault()
@@ -201,8 +220,13 @@ export default function AdminPage() {
           <button type="button" onClick={() => void syncCatalogue()} disabled={syncingCatalog} className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-60 px-4 py-3 font-bold text-sm"><RefreshCw className={`w-4 h-4 ${syncingCatalog ? 'animate-spin' : ''}`} />{syncingCatalog ? 'Syncing catalogue…' : 'Sync JAP catalogue'}</button>
         </section>
 
+        {Boolean(data.settlement_alerts?.length) && <section className="rounded-2xl border border-amber-500/40 bg-amber-950/30 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-extrabold text-amber-100">Orders needing settlement review</h2><p className="mt-1 text-xs text-amber-200/80">Order status and wallet-ledger status are different. These closed orders have less linked wallet credit than expected. Review evidence before taking action—no balance is changed automatically.</p></div><span className="rounded-full bg-amber-900 px-3 py-1 text-xs font-bold">{data.settlement_alerts?.length} flagged</span></div>
+          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[930px] text-left text-sm"><thead className="text-xs uppercase text-amber-200/70"><tr><th className="p-2">Customer</th><th className="p-2">Order / destination</th><th className="p-2">Order state</th><th className="p-2">Charged</th><th className="p-2">Wallet credited</th><th className="p-2">Refund request</th><th className="p-2">Review amount</th></tr></thead><tbody>{data.settlement_alerts?.map(alert => <tr key={`${alert.kind}-${alert.id}`} className="border-t border-amber-700/40"><td className="p-2">{profileById.get(alert.profile_id)?.email || 'Unknown'}</td><td className="max-w-md p-2"><p className="font-semibold">{alert.kind} · {alert.service}</p>{safeExternalUrl(alert.target_link) ? <a href={safeExternalUrl(alert.target_link)!} target="_blank" rel="noopener noreferrer" className="mt-1 block break-all text-xs text-cyan-300 underline">Open destination</a> : alert.provider_order_id && <p className="mt-1 break-all font-mono text-xs text-slate-300">{alert.provider_order_id}</p>}</td><td className="p-2 capitalize">{alert.status}</td><td className="p-2">{xaf(alert.charged_xaf)}</td><td className="p-2">{xaf(alert.refunded_xaf)}</td><td className="p-2 capitalize">{alert.refund_request_state || 'none'}</td><td className="p-2 font-bold text-amber-100">{xaf(alert.review_amount_xaf)}</td></tr>)}</tbody></table></div>
+        </section>}
+
         <section className="grid lg:grid-cols-[1.2fr_.8fr] gap-6">
-          <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800 flex flex-col sm:flex-row gap-3 justify-between"><div><h2 className="font-extrabold">Transaction ledger</h2><p className="text-xs text-slate-400 mt-1">Verified and failed wallet transactions. No browser action can credit these records.</p></div><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search reference or customer" className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-orange-400" /></div><div className="overflow-x-auto"><table className="w-full min-w-180 text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Reference</th><th className="p-3">Customer</th><th className="p-3">Type</th><th className="p-3">Amount</th><th className="p-3">Status</th><th className="p-3">Date</th></tr></thead><tbody>{matchingTransactions.slice(0, 100).map((transaction) => <tr key={transaction.id} className="border-t border-slate-800"><td className="p-3 font-mono text-xs">{transaction.reference}</td><td className="p-3">{profileById.get(transaction.profile_id)?.email || 'Unknown'}</td><td className="p-3 capitalize">{transaction.type.replace('_', ' ')}</td><td className="p-3 font-bold">{xaf(transaction.amount)}</td><td className="p-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${badge(transaction.status)}`}>{transaction.status}</span></td><td className="p-3 text-xs text-slate-400">{when(transaction.created_at)}</td></tr>)}</tbody></table></div></div>
+          <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden"><div className="p-5 border-b border-slate-800 flex flex-col sm:flex-row gap-3 justify-between"><div><h2 className="font-extrabold">Wallet transaction ledger</h2><p className="text-xs text-slate-400 mt-1">“Completed” means that individual debit or credit posted. Check the linked order state separately to confirm what the customer received.</p></div><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search reference, customer, or description" className="rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm outline-none focus:border-orange-400" /></div><div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-sm"><thead className="text-left text-xs uppercase text-slate-400 bg-slate-800/50"><tr><th className="p-3">Reference / reason</th><th className="p-3">Customer</th><th className="p-3">Linked order / destination</th><th className="p-3">Ledger entry</th><th className="p-3">Amount</th><th className="p-3">Posted</th></tr></thead><tbody>{matchingTransactions.slice(0, 100).map((transaction) => { const linked = linkedOrderFor(transaction.reference); return <tr key={transaction.id} className="border-t border-slate-800"><td className="p-3"><p className="break-all font-mono text-xs">{transaction.reference}</p><p className="mt-1 max-w-64 text-xs text-slate-400">{transaction.description || '—'}</p></td><td className="p-3">{profileById.get(transaction.profile_id)?.email || 'Unknown'}</td><td className="max-w-sm p-3">{linked ? <><p className="text-xs font-semibold">{linked.label}</p>{linked.href ? <a href={linked.href} target="_blank" rel="noopener noreferrer" className="mt-1 block break-all text-xs text-cyan-300 underline">Open customer destination</a> : <p className="mt-1 font-mono text-xs text-slate-400">{linked.destination || linked.id}</p>}</> : '—'}</td><td className="p-3"><span className="capitalize">{transaction.type.replaceAll('_', ' ')}</span><p className="mt-1 text-xs text-slate-400">{transaction.status}</p></td><td className="p-3 whitespace-nowrap font-bold">{xaf(transaction.amount)}</td><td className="p-3 whitespace-nowrap text-xs text-slate-400">{when(transaction.created_at)}</td></tr>})}</tbody></table></div></div>
 
           <form onSubmit={addExpense} className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4 h-fit"><div><h2 className="font-extrabold">Record a platform expense</h2><p className="text-xs text-slate-400 mt-1">Add JAP/5SIM costs, Payunit fees, or business expenses. This makes profit real rather than estimated.</p></div><select value={expense.kind} onChange={(event) => setExpense({ ...expense, kind: event.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm"><option value="provider_cost">Provider cost</option><option value="payment_fee">Payment fee</option><option value="operating_expense">Operating expense</option><option value="adjustment">Adjustment</option></select><input required type="number" min="1" placeholder="Amount (XAF)" value={expense.amount_xaf} onChange={(event) => setExpense({ ...expense, amount_xaf: event.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm" /><input required placeholder="Description" value={expense.description} onChange={(event) => setExpense({ ...expense, description: event.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm" /><input placeholder="Reference (optional)" value={expense.reference} onChange={(event) => setExpense({ ...expense, reference: event.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-sm" /><button disabled={saving} className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-60 rounded-lg py-3 font-bold text-sm">{saving ? 'Saving…' : 'Record expense'}</button></form>
         </section>

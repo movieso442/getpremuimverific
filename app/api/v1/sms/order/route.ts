@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id))
         return NextResponse.json({ error: 'A valid SMS order is required.' }, { status: 400 })
       const { data: order } = await admin.from('sms_orders')
-        .select('id,provider_order_id,status,sms_code,profile_id,phone_number,service_name,price_xaf')
+        .select('id,provider_order_id,status,sms_code,profile_id,phone_number,service_name,service_code,country_code,price_xaf')
         .eq('id', id).eq('profile_id', profile.id).maybeSingle()
       if (!order) return NextResponse.json({ error: 'SMS order not found.' }, { status: 404 })
       if (order.sms_code || order.status === 'received')
@@ -102,7 +102,15 @@ export async function POST(request: Request) {
         console.error('[SMS cancellation wallet refund failed]', order.id, refundError)
         return NextResponse.json({ error: 'The provider canceled the number, but wallet reconciliation needs support. Please do not repurchase yet.' }, { status: 503 })
       }
-      return NextResponse.json({ status: finalStatus.toUpperCase(), refunded_xaf: result?.refunded_xaf ?? order.price_xaf, cancellation_fee_xaf: result?.cancellation_fee_xaf ?? 50 })
+      const isVpnPolicyOrder = order.service_code === 'fb' || order.country_code === 'US'
+      const defaultFee = isVpnPolicyOrder ? Math.round(order.price_xaf * 0.5) : 50
+      const defaultRefund = Math.max(0, order.price_xaf - defaultFee)
+      return NextResponse.json({
+        status: finalStatus.toUpperCase(),
+        refunded_xaf: result?.refunded_xaf ?? defaultRefund,
+        cancellation_fee_xaf: result?.cancellation_fee_xaf ?? defaultFee,
+        vpn_policy_applied: isVpnPolicyOrder,
+      })
     }
 
     if (action === 'getStatus' || action === 'getSms') {
@@ -143,13 +151,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'The live provider could not return a price right now. No funds were charged. Please retry shortly or choose another service or country.' }, { status: 503 })
     }
     if (!quote)
-      return NextResponse.json({ error: 'No number is available with a verified provider delivery rate of at least 50% for this service and country. No funds were charged; please choose another country or service.' }, { status: 409 })
+      return NextResponse.json({ error: 'No live numbers are currently available from the provider for this service and country. No funds were charged; please choose another country or service.' }, { status: 409 })
 
     const settings = await getPlatformSettings(admin)
     const providerCostXaf = quote.costUsd * 600
     const priceXaf = retailPrice(providerCostXaf, settings.sms_markup_multiplier, settings.extra_service_markup_percent)
-    if (action === 'quote') return NextResponse.json({ price_xaf: priceXaf, available: quote.available }, { headers: { 'Cache-Control': 'private, no-store' } })
+    const isVpnRequired = service === 'fb' || country === 'US' || (typeof quote.deliveryRate === 'number' && quote.deliveryRate < 50)
+    if (action === 'quote') return NextResponse.json({ price_xaf: priceXaf, available: quote.available, delivery_rate: quote.deliveryRate, vpn_policy_required: isVpnRequired }, { headers: { 'Cache-Control': 'private, no-store' } })
     if (action !== 'getNumber') return NextResponse.json({ error: 'Unknown SMS action.' }, { status: 400 })
+    if (isVpnRequired && !body.agreed_vpn_policy) {
+      return NextResponse.json({
+        error: 'You must confirm that you are using a US Residential VPN and agree that if no code arrives, 50% will be retained as a carrier fee and 50% refunded to your wallet.',
+        vpn_policy_required: true,
+      }, { status: 400 })
+    }
     if (body.max_price_xaf!==undefined && (!Number.isFinite(body.max_price_xaf)||body.max_price_xaf<=0))return NextResponse.json({error:'Invalid confirmed price.'},{status:400})
     if (body.max_price_xaf!==undefined && priceXaf>body.max_price_xaf)return NextResponse.json({error:'The live price changed. Review the new price and confirm again.',required_xaf:priceXaf},{status:409})
     const reservationId = await reserveWalletPurchase(admin, profile.id, 'sms_purchase', 'web', priceXaf)
