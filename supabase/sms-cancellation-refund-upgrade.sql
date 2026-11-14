@@ -80,7 +80,11 @@ BEGIN
     RAISE EXCEPTION 'SMS purchase reservation does not match supplier order';
   END IF;
 
-  fee := CASE WHEN p_customer_cancel AND p_final_status='canceled' THEN LEAST(50,activation.price_xaf) ELSE 0 END;
+  fee := CASE
+    WHEN (activation.service_code = 'fb' OR activation.country_code = 'US') THEN ROUND(activation.price_xaf * 0.50)
+    WHEN p_customer_cancel AND p_final_status='canceled' THEN LEAST(50,activation.price_xaf)
+    ELSE 0
+  END;
   refund_amount := activation.price_xaf-fee;
   UPDATE public.sms_orders SET status=p_final_status,cancellation_fee_xaf=fee
     WHERE id=activation.id AND status IN ('waiting_sms','canceled','expired') AND sms_code IS NULL;
@@ -89,8 +93,12 @@ BEGIN
   IF refund_amount>0 THEN
     INSERT INTO public.wallet_transactions(profile_id,amount,type,payment_method,reference,status,description)
       VALUES(activation.profile_id,refund_amount,'refund','wallet',refund_reference,'completed',
-        CASE WHEN fee>0 THEN 'Unused SMS activation canceled by customer; 50 XAF cancellation fee retained'
-          WHEN p_final_status='expired' THEN 'Unused SMS activation expired without a code' ELSE 'Unused SMS activation canceled without a fee' END);
+        CASE
+          WHEN (activation.service_code = 'fb' OR activation.country_code = 'US') THEN 'Unused SMS ended without code (US/Facebook Residential VPN contract: 50% retained fee, 50% refunded)'
+          WHEN fee>0 THEN 'Unused SMS activation canceled by customer; 50 XAF cancellation fee retained'
+          WHEN p_final_status='expired' THEN 'Unused SMS activation expired without a code'
+          ELSE 'Unused SMS activation canceled without a fee'
+        END);
   END IF;
   IF FOUND AND reservation.id IS NOT NULL THEN
     UPDATE public.wallet_purchase_reservations SET state='refunded',updated_at=NOW() WHERE id=reservation.id;

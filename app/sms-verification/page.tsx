@@ -14,11 +14,21 @@ type SmsInboxOrder = {
   phone_number: string; sms_code: string | null; status: string; created_at: string; expires_at: string; price_xaf: number;
 }
 
-function failedOrderMessage(order: Pick<SmsInboxOrder, 'status' | 'price_xaf'>) {
+function failedOrderMessage(order: Pick<SmsInboxOrder, 'status' | 'price_xaf' | 'service_name' | 'country_name'>) {
+  const isVpnStrict = order.service_name.toLowerCase().includes('facebook') || order.country_name.toLowerCase().includes('united states') || order.country_name.toLowerCase().includes('us')
+  const retainedFee = isVpnStrict ? Math.round(order.price_xaf * 0.5) : 0
+  const refundAmount = order.price_xaf - retainedFee
+
   if (order.status === 'expired') {
-    return `No code arrived before the provider timer ended. ${order.price_xaf.toLocaleString()} XAF was returned to your wallet.`
+    if (isVpnStrict) {
+      return `No code arrived before the timer ended. Under the US/Facebook Residential VPN contract, 50% (${retainedFee.toLocaleString()} XAF) was retained as a carrier fee and 50% (${refundAmount.toLocaleString()} XAF) was returned to your wallet.`
+    }
+    return `No code arrived before the provider timer ended. ${order.price_xaf.toLocaleString()} XAF was returned to your wallet in full.`
   }
   if (order.status === 'canceled') {
+    if (isVpnStrict) {
+      return `This number was canceled. Under the US/Facebook Residential VPN contract, 50% (${retainedFee.toLocaleString()} XAF) was retained and 50% (${refundAmount.toLocaleString()} XAF) was returned to your wallet.`
+    }
     return 'This number was canceled before a code arrived. Check your wallet activity for the returned amount.'
   }
   return null
@@ -43,6 +53,9 @@ export default function SmsVerificationPage() {
   const [quoteError,setQuoteError]=useState<string | null>(null)
   const [quoteRetry,setQuoteRetry]=useState(0)
   const [cancelingOrderId,setCancelingOrderId]=useState<string|null>(null)
+  const [agreedVpnPolicy, setAgreedVpnPolicy] = useState(false)
+
+  const isVpnPolicyRequired = selectedService.code === 'fb' || selectedCountry.code === 'US' || (typeof deliveryRate === 'number' && deliveryRate < 50)
   useEffect(()=>{
     let active=true
     if(!profile.id)return
@@ -81,11 +94,16 @@ export default function SmsVerificationPage() {
       return
     }
 
+    if (isVpnPolicyRequired && !agreedVpnPolicy) {
+      setRequestError('You must agree to use an authentic US Residential VPN and accept the 50% partial refund policy for non-delivery before requesting a number.')
+      return
+    }
+
     setIsRequesting(true)
     try {
       const response = await fetch('/api/v1/sms/order', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ service: selectedService.code, country: selectedCountry.code,max_price_xaf:priceXaf })
+        body: JSON.stringify({ service: selectedService.code, country: selectedCountry.code, max_price_xaf: priceXaf, agreed_vpn_policy: agreedVpnPolicy })
       })
       const result = await response.json()
       if (!response.ok) {
@@ -228,7 +246,7 @@ export default function SmsVerificationPage() {
               value={selectedService.id}
               onChange={(e) => {
                 const s = SMS_SERVICES.find(srv => srv.id === e.target.value)
-                if (s) {setPriceXaf(null);setQuoteError(null);setSelectedService(s)}
+                if (s) {setPriceXaf(null);setQuoteError(null);setAgreedVpnPolicy(false);setSelectedService(s)}
               }}
               className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-900 outline-none focus:border-[#ff5722]"
             >
@@ -247,7 +265,7 @@ export default function SmsVerificationPage() {
               value={selectedCountry.code}
               onChange={(e) => {
                 const c = COUNTRIES.find(cnt => cnt.code === e.target.value)
-                if (c) {setPriceXaf(null);setQuoteError(null);setSelectedCountry(c)}
+                if (c) {setPriceXaf(null);setQuoteError(null);setAgreedVpnPolicy(false);setSelectedCountry(c)}
               }}
               className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-900 outline-none focus:border-[#ff5722]"
             >
@@ -271,30 +289,74 @@ export default function SmsVerificationPage() {
                 ({deliveryRate >= 50 ? 'High provider delivery rate' : 'Strict platform verification filters'})
               </span>
             </div>
-            <span className="font-semibold text-emerald-700 text-[11px] bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-              🛡️ 100% Automatic Refund if no code
+            <span className={`font-semibold text-[11px] px-2.5 py-0.5 rounded-full border ${
+              isVpnPolicyRequired
+                ? 'text-amber-800 bg-amber-50 border-amber-300'
+                : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+            }`}>
+              {isVpnPolicyRequired ? '⚠️ 50% Refund Policy on Non-Delivery' : '🛡️ 100% Automatic Refund if no code'}
             </span>
           </div>
         )}
 
-        {(selectedService.code === 'fb' || selectedCountry.code === 'US') && (
-          <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-950 space-y-1.5">
-            <span className="font-bold block text-blue-900">💡 Tips for US & Facebook SMS Verification:</span>
-            <ul className="list-disc list-inside text-[11px] text-blue-800 space-y-1">
-              <li>Match your IP location: If you are verifying a US number, use a clean US residential proxy or VPN to avoid Meta automated silent drops.</li>
-              <li>Avoid multiple resends: Request the code once and wait; spamming "Resend" activates Meta temporary security blocks.</li>
-              <li>Risk-free guarantee: If no code arrives before timeout, your wallet is automatically refunded 100% with no funds lost.</li>
-            </ul>
+        {isVpnPolicyRequired && (
+          <div className="p-4 bg-amber-50/90 border-2 border-amber-300 rounded-2xl text-xs text-amber-950 space-y-3 shadow-xs animate-in fade-in duration-200">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-extrabold text-amber-950 text-sm">
+                  Mandatory Notice: US Residential VPN Required & 50% Partial Refund Contract
+                </h4>
+                <p className="text-[11px] text-amber-900 mt-1 leading-relaxed">
+                  Meta (Facebook) and US mobile networks enforce strict fraud firewalls. If you attempt verification from a foreign IP address or a standard datacenter/free VPN (e.g., Windscribe, TurboVPN, free Proton), Meta will silently drop the verification SMS without sending it.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white/80 p-3 rounded-xl border border-amber-200 space-y-1.5 text-[11px] text-amber-900">
+              <div className="font-bold text-amber-950">📋 Contract & Refund Conditions:</div>
+              <ul className="list-disc list-inside space-y-1 text-amber-900">
+                <li><span className="font-semibold text-amber-950">Authentic US Residential VPN:</span> You must connect to a genuine US Residential IP/Proxy before triggering the SMS in your app.</li>
+                <li><span className="font-semibold text-amber-950">50% Carrier Retention Fee:</span> Because telecom carrier routes are permanently allocated by upstream providers upon purchase, <strong>if you fail to use a proper residential VPN and no code arrives, 100% refund is NOT granted. Exactly 50% will be retained as a carrier fee and 50% will be refunded to your wallet.</strong></li>
+                <li><span className="font-semibold text-amber-950">No multiple resends:</span> Do not spam "Resend Code" to avoid 24-hour security locks from Meta.</li>
+              </ul>
+            </div>
+
+            <label className="flex items-start gap-2.5 cursor-pointer select-none pt-1">
+              <input
+                type="checkbox"
+                checked={agreedVpnPolicy}
+                onChange={(e) => setAgreedVpnPolicy(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300 cursor-pointer shrink-0"
+              />
+              <span className="font-bold text-xs text-amber-950">
+                I understand and agree: I must use an authentic US Residential VPN. If no code arrives, 50% will be retained as a carrier routing fee and 50% will be returned to my wallet.
+              </span>
+            </label>
           </div>
         )}
 
         <button
           onClick={handleGetNumber}
-          disabled={isRequesting || Boolean(profile.id && priceXaf===null)}
-          className="w-full py-4 rounded-xl bg-[#ff5722] hover:bg-[#ea580c] text-white font-extrabold text-xs uppercase shadow-md transition flex items-center justify-center gap-2"
+          disabled={isRequesting || Boolean(profile.id && priceXaf===null) || Boolean(isVpnPolicyRequired && !agreedVpnPolicy)}
+          className={`w-full py-4 rounded-xl text-white font-extrabold text-xs uppercase shadow-md transition flex items-center justify-center gap-2 ${
+            isVpnPolicyRequired && !agreedVpnPolicy
+              ? 'bg-gray-400 cursor-not-allowed opacity-80'
+              : 'bg-[#ff5722] hover:bg-[#ea580c]'
+          }`}
         >
           <Smartphone className="w-4 h-4" />
-          <span>{isRequesting ? 'Requesting live number…' : !profile.id ? 'Sign in to get a number' : priceXaf===null ? 'Waiting for a live price' : <>Get virtual number · <LocalAmount amountXaf={priceXaf} /></>}</span>
+          <span>
+            {isRequesting
+              ? 'Requesting live number…'
+              : !profile.id
+              ? 'Sign in to get a number'
+              : priceXaf === null
+              ? 'Waiting for a live price'
+              : isVpnPolicyRequired && !agreedVpnPolicy
+              ? 'Accept US VPN Policy Above to Order'
+              : <>Get virtual number · <LocalAmount amountXaf={priceXaf} /> {isVpnPolicyRequired && '(50% Refund Policy)'}</>}
+          </span>
         </button>
         {requestError && <p className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">{requestError}</p>}
         {quoteError && <div role="status" className="rounded-xl bg-amber-50 p-3 text-base text-amber-900"><p>{quoteError}</p><button onClick={()=>{setPriceXaf(null);setQuoteError(null);setQuoteRetry(value=>value+1)}} className="mt-2 font-bold underline">Refresh live price</button></div>}
@@ -305,7 +367,15 @@ export default function SmsVerificationPage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 space-y-4 shadow-2xs">
           <h3 className="text-sm font-bold text-gray-900">Active Virtual Number Session</h3>
           <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-            Use this number immediately and request the SMS in the target app. You can cancel and get the wallet charge back while the provider still accepts cancellation, before a code arrives and before {new Date(activeNumber.expiresAt).toLocaleTimeString()}. If it expires without a code, the charge is returned after the provider confirms the timeout. The provider controls the timer; we cannot extend it.
+            {isVpnPolicyRequired ? (
+              <p>
+                <strong>Residential VPN Active Reminder:</strong> Use this number immediately in your app with an authentic <strong>US Residential VPN</strong> connected. If this number expires or is canceled before a code arrives, under the agreed contract <strong>50% is retained as a carrier fee and 50% is returned to your wallet.</strong>
+              </p>
+            ) : (
+              <p>
+                Use this number immediately and request the SMS in the target app. You can cancel and get the wallet charge back while the provider still accepts cancellation, before a code arrives and before {new Date(activeNumber.expiresAt).toLocaleTimeString()}. If it expires without a code, the charge is returned after the provider confirms the timeout.
+              </p>
+            )}
           </div>
 
           <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -367,7 +437,11 @@ export default function SmsVerificationPage() {
                   <p className="text-xs text-gray-500">Expires {new Date(order.expires_at).toLocaleTimeString()}</p>
                   {order.status === 'waiting_sms' && !order.sms_code && (
                     <button disabled={cancelingOrderId !== null} onClick={() => void handleCancelOrder(order)} className="mt-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
-                      {cancelingOrderId === order.id ? 'Canceling…' : `Cancel · return ${Math.max(0, order.price_xaf - 50).toLocaleString()} XAF (50 XAF fee)`}
+                      {cancelingOrderId === order.id
+                        ? 'Canceling…'
+                        : (order.service_name.toLowerCase().includes('facebook') || order.country_name.toLowerCase().includes('united states') || order.country_name.toLowerCase().includes('us'))
+                        ? `Cancel · return ${Math.round(order.price_xaf * 0.5).toLocaleString()} XAF (50% fee)`
+                        : `Cancel · return ${Math.max(0, order.price_xaf - 50).toLocaleString()} XAF (50 XAF fee)`}
                     </button>
                   )}
                 </div>
