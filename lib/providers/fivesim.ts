@@ -44,10 +44,15 @@ export async function fetchFiveSimQuote(baseUrl: string, country: string, produc
   const operators = payload[country]?.[product] || {}
   const candidates = Object.entries(operators)
     .map(([operator, value]) => ({ operator, costUsd: Number(value.cost), available: Number(value.count || 0), deliveryRate: value.rate == null ? undefined : Number(value.rate) }))
-    .filter((quote) => quote.available > 0 && Number.isFinite(quote.costUsd) && quote.costUsd > 0
-      && meetsSmsDeliveryThreshold(quote.deliveryRate))
-    // Supplier statistics are a better first-use signal than the cheapest
-    // number. The final customer price is recalculated from this choice.
-    .sort((a, b) => (b.deliveryRate ?? -1) - (a.deliveryRate ?? -1) || b.available - a.available || a.costUsd - b.costUsd)
-  return candidates[0] || null
+    .filter((quote) => quote.available > 0 && Number.isFinite(quote.costUsd) && quote.costUsd > 0)
+
+  if (candidates.length === 0) return null
+
+  // Prioritize candidates meeting the recommended >= 50% delivery rate threshold.
+  // If none meet 50% (e.g. Meta/Facebook US where industry delivery rates are 20-40%),
+  // select the highest available delivery rate candidate rather than blocking the user entirely.
+  const highQuality = candidates.filter((quote) => meetsSmsDeliveryThreshold(quote.deliveryRate))
+  const pool = highQuality.length > 0 ? highQuality : candidates
+  pool.sort((a, b) => (b.deliveryRate ?? -1) - (a.deliveryRate ?? -1) || b.available - a.available || a.costUsd - b.costUsd)
+  return pool[0] || null
 }

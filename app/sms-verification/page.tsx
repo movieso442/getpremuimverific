@@ -39,6 +39,7 @@ export default function SmsVerificationPage() {
   const [inboxOrders, setInboxOrders] = useState<SmsInboxOrder[]>([])
   const [inboxError, setInboxError] = useState<string | null>(null)
   const [priceXaf,setPriceXaf]=useState<number | null>(null)
+  const [deliveryRate,setDeliveryRate]=useState<number | null>(null)
   const [quoteError,setQuoteError]=useState<string | null>(null)
   const [quoteRetry,setQuoteRetry]=useState(0)
   const [cancelingOrderId,setCancelingOrderId]=useState<string|null>(null)
@@ -46,8 +47,20 @@ export default function SmsVerificationPage() {
     let active=true
     if(!profile.id)return
     void fetch('/api/v1/sms/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'quote',service:selectedService.code,country:selectedCountry.code})})
-      .then(async response=>{const result=await response.json();if(!active)return;if(!response.ok||!Number.isFinite(result.price_xaf)||result.price_xaf<=0){setPriceXaf(null);setQuoteError('No live quote is available for this selection. Try another country or service.');return}setPriceXaf(result.price_xaf);setQuoteError(null)})
-      .catch(()=>{if(active){setPriceXaf(null);setQuoteError('Could not refresh the live price. Please try again.')}})
+      .then(async response=>{
+        const result=await response.json();
+        if(!active)return;
+        if(!response.ok||!Number.isFinite(result.price_xaf)||result.price_xaf<=0){
+          setPriceXaf(null);
+          setDeliveryRate(null);
+          setQuoteError(result.error || 'No live quote is available for this selection. Try another country or service.');
+          return
+        }
+        setPriceXaf(result.price_xaf);
+        setDeliveryRate(typeof result.delivery_rate === 'number' ? result.delivery_rate : null);
+        setQuoteError(null)
+      })
+      .catch(()=>{if(active){setPriceXaf(null);setDeliveryRate(null);setQuoteError('Could not refresh the live price. Please try again.')}})
     return()=>{active=false}
   },[profile.id,selectedService.code,selectedCountry.code,quoteRetry])
   useEffect(() => { router.prefetch('/add-funds') }, [router])
@@ -246,6 +259,34 @@ export default function SmsVerificationPage() {
             </select>
           </div>
         </div>
+
+        {deliveryRate !== null && priceXaf !== null && (
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
+            <div className="flex items-center gap-2">
+              <span className={`inline-block w-2.5 h-2.5 rounded-full ${deliveryRate >= 50 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              <span className="font-bold text-gray-800">
+                Live Delivery Success: ~{Math.round(deliveryRate)}%
+              </span>
+              <span className="text-gray-500 text-[11px]">
+                ({deliveryRate >= 50 ? 'High provider delivery rate' : 'Strict platform verification filters'})
+              </span>
+            </div>
+            <span className="font-semibold text-emerald-700 text-[11px] bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+              🛡️ 100% Automatic Refund if no code
+            </span>
+          </div>
+        )}
+
+        {(selectedService.code === 'fb' || selectedCountry.code === 'US') && (
+          <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-950 space-y-1.5">
+            <span className="font-bold block text-blue-900">💡 Tips for US & Facebook SMS Verification:</span>
+            <ul className="list-disc list-inside text-[11px] text-blue-800 space-y-1">
+              <li>Match your IP location: If you are verifying a US number, use a clean US residential proxy or VPN to avoid Meta automated silent drops.</li>
+              <li>Avoid multiple resends: Request the code once and wait; spamming "Resend" activates Meta temporary security blocks.</li>
+              <li>Risk-free guarantee: If no code arrives before timeout, your wallet is automatically refunded 100% with no funds lost.</li>
+            </ul>
+          </div>
+        )}
 
         <button
           onClick={handleGetNumber}

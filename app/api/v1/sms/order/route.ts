@@ -143,12 +143,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'The live provider could not return a price right now. No funds were charged. Please retry shortly or choose another service or country.' }, { status: 503 })
     }
     if (!quote)
-      return NextResponse.json({ error: 'No number is available with a verified provider delivery rate of at least 50% for this service and country. No funds were charged; please choose another country or service.' }, { status: 409 })
+      return NextResponse.json({ error: 'No live numbers are currently available from the provider for this service and country. No funds were charged; please choose another country or service.' }, { status: 409 })
 
     const settings = await getPlatformSettings(admin)
     const providerCostXaf = quote.costUsd * 600
     const priceXaf = retailPrice(providerCostXaf, settings.sms_markup_multiplier, settings.extra_service_markup_percent)
-    if (action === 'quote') return NextResponse.json({ price_xaf: priceXaf, available: quote.available }, { headers: { 'Cache-Control': 'private, no-store' } })
+    if (action === 'quote') return NextResponse.json({ price_xaf: priceXaf, available: quote.available, delivery_rate: quote.deliveryRate }, { headers: { 'Cache-Control': 'private, no-store' } })
     if (action !== 'getNumber') return NextResponse.json({ error: 'Unknown SMS action.' }, { status: 400 })
     if (body.max_price_xaf!==undefined && (!Number.isFinite(body.max_price_xaf)||body.max_price_xaf<=0))return NextResponse.json({error:'Invalid confirmed price.'},{status:400})
     if (body.max_price_xaf!==undefined && priceXaf>body.max_price_xaf)return NextResponse.json({error:'The live price changed. Review the new price and confirm again.',required_xaf:priceXaf},{status:409})
